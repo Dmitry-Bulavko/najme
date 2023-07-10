@@ -1,0 +1,55 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      dockerfile: Dockerfile
+      context: ./server
+      target: development
+    volumes:
+      - ./server:/najme/src/app
+      - /najme/src/app/node_modules
+    command: npm run start:dev
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgres://user:password@postgress:5432/najme
+      NODE_ENV: development
+      PORT: 3000
+    ports:
+      - 3000:3000
+      - 9229:9229
+
+  web:
+    build:
+      dockerfile: Dockerfile
+      context: ./web
+      target: development
+    command: npm run start
+    volumes:
+      - ./web:/najme/web/src/app
+      - /najme/web/src/app/node_modules
+    ports:
+      - 4200:4200
+    links:
+      - api
+
+  postgres:
+    image: postgres:10.4
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: najme
+    ports:
+      - 35000:5432
+
+  postgress_admin:
+    image: dpage/pgadmin4:4.28
+    depends_on:
+      - postgres
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: password
+    ports:
+      - 5050:80
+
