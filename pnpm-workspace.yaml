@@ -1,0 +1,16 @@
+packages:
+  - 'web'
+  - 'mobile'
+  - 'server'
+  - 'packages/*'
+overrides:
+  '@types/react': '19.2.15'
+  '@types/react-dom': '19.1.5'
+allowBuilds:
+  '@nestjs/core': true
+  '@prisma/client': true
+  '@prisma/engines': true
+  bcrypt: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true

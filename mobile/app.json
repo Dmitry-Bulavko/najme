@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Najme.me",
+    "slug": "najme",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FBFCFF"
+    },
+    "scheme": "najme",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "me.najme.app",
+      "config": {
+        "googleSignIn": {
+          "reservedClientId": "REPLACE_WITH_IOS_REVERSED_CLIENT_ID"
+        }
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FBFCFF"
+      },
+      "package": "me.najme.app",
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

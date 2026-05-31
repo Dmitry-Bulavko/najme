@@ -1,55 +1,41 @@
 version: "3.8"
 
 services:
-  api:
-    build:
-      dockerfile: Dockerfile
-      context: ./server
-      target: development
-    volumes:
-      - ./server:/najme/src/app
-      - /najme/src/app/node_modules
-    command: npm run start:dev
-    depends_on:
-      - postgres
-    environment:
-      DATABASE_URL: postgres://user:password@postgress:5432/najme
-      NODE_ENV: development
-      PORT: 3000
-    ports:
-      - 3000:3000
-      - 9229:9229
-
-  web:
-    build:
-      dockerfile: Dockerfile
-      context: ./web
-      target: development
-    command: npm run start
-    volumes:
-      - ./web:/najme/web/src/app
-      - /najme/web/src/app/node_modules
-    ports:
-      - 4200:4200
-    links:
-      - api
-
   postgres:
-    image: postgres:10.4
+    container_name: postgres_container
+    image: postgres:15
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: najme
+      PGDATA: /data/postgres
+    volumes:
+      - postgres:/data/postgres
     ports:
-      - 35000:5432
-
-  postgress_admin:
-    image: dpage/pgadmin4:4.28
-    depends_on:
+      - "5434:5432"
+    networks:
       - postgres
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: password
-    ports:
-      - 5050:80
+    restart: unless-stopped
 
+  pgadmin:
+    container_name: pgadmin_container
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    networks:
+      - postgres
+    restart: unless-stopped
+
+networks:
+  postgres:
+    driver: bridge
+
+volumes:
+  postgres:
+  pgadmin:
