@@ -1,0 +1,13 @@
+{
+  "extends": "@najme/config/tsconfig/node.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": ["src", "test"],
+  "exclude": ["node_modules", "dist"]
+}

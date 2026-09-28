@@ -1,0 +1,14 @@
+// Prisma schema for the Najme API. See ADR-0002, ADR-0005 and docs/conventions/api.md.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+// The connection URL lives in `prisma.config.ts` (Prisma 7), not here. `PrismaClient` is
+// constructed with a driver adapter (`@prisma/adapter-pg`), see `src/prisma/prisma.service.ts`.
+datasource db {
+  provider = "postgresql"
+}
+
+// No domain models yet (scaffolded in #13; domain models land in later M0/M1 tasks). The initial
+// migration only enables extensions relied on by future scheduling constraints (ADR-0005).

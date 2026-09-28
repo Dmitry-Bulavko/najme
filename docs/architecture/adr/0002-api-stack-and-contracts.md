@@ -40,3 +40,15 @@ CJS output (`dist/index.js` / `dist/index.cjs`) plus type declarations per modul
 NestJS (which compiles to CommonJS) `require()` the package and Next.js/Expo `import` it from the
 same published output, without the API needing an ESM-only Nest setup. See
 `packages/contracts/README.md` for details.
+
+## Update (2026-09-28): `apps/api` is ESM
+
+`apps/api` ships as `"type": "module"` (ESM), not the CommonJS Nest app assumed above. TypeScript 6's
+`verbatimModuleSyntax` — hardcoded by `@najme/config`'s shared `tsconfig/node.json`, which also
+hardcodes `module`/`moduleResolution: NodeNext` — rejects `import`/`export` syntax in any file that
+resolves as CommonJS, so a CJS Nest app fails to typecheck under the shared preset. Node 24 runs
+ESM Nest apps natively, so switching `apps/api` to real ESM was the smallest fix that does not weaken
+`verbatimModuleSyntax` repo-wide. Consequences: `apps/api` imports `@najme/contracts` through its
+`import` condition directly (no `require()`), and all relative imports use explicit `.js`
+extensions as `NodeNext` requires. `@najme/contracts`' CJS build is unaffected and remains in place
+for consumers that still need `require()` (future CJS bundlers).

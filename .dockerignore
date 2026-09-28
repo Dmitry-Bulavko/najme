@@ -1,7 +1,18 @@
-node_modules
-**/node_modules
-**/.next
-**/dist
-**/coverage
-**/.turbo
+# Build context excludes for Docker builds (apps/api/Dockerfile, apps/web/Dockerfile, and any
+# future app images). Keep anything the Dockerfiles COPY: pnpm-lock.yaml, pnpm-workspace.yaml,
+# turbo.json, package.json, apps/*/package.json, packages/*, apps/*/src, apps/*/prisma, etc.
+
 .git
+.claude
+
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/generated
+**/coverage
+**/.expo
+**/*.tsbuildinfo
+
+**/.env
+**/.env.*
