@@ -27,5 +27,23 @@
   },
   "languageSwitcher": {
     "label": "Language"
+  },
+  "tabs": {
+    "discover": "Discover",
+    "bookings": "Bookings",
+    "account": "Account"
+  },
+  "screens": {
+    "discover": {
+      "title": "Discover",
+      "body": "Browse local businesses and services — coming soon."
+    },
+    "bookings": {
+      "title": "Bookings",
+      "body": "Your upcoming and past bookings will appear here."
+    },
+    "account": {
+      "title": "Account"
+    }
   }
 }
