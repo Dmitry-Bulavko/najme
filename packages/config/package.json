@@ -8,8 +8,14 @@
     "./tsconfig/base.json": "./tsconfig/base.json",
     "./tsconfig/node.json": "./tsconfig/node.json",
     "./tsconfig/react.json": "./tsconfig/react.json",
-    "./eslint": "./eslint/index.js",
-    "./vitest": "./vitest/index.js"
+    "./eslint": {
+      "types": "./types/eslint.d.ts",
+      "default": "./eslint/index.js"
+    },
+    "./vitest": {
+      "types": "./types/vitest.d.ts",
+      "default": "./vitest/index.js"
+    }
   },
   "scripts": {
     "lint": "eslint .",

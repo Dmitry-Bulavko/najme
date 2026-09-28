@@ -71,6 +71,14 @@ export default withBaseConfig({
 });
 ```
 
+## Types
+
+The `eslint` and `vitest` entries ship hand-written declarations (`types/*.d.ts`, wired through
+`types` conditions in `package.json#exports`), so TypeScript config files such as `vitest.config.ts`
+typecheck without excluding them from `tsc`. Keep the declarations in sync when changing the
+exports of `eslint/index.js` or `vitest/index.js`; `src/types.test.ts` imports them through the
+public entries as a self-check.
+
 ## Developing this package
 
 - `pnpm --filter @najme/config lint` — lints this package with its own exported ESLint config.

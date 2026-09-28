@@ -4,6 +4,6 @@
     "noEmit": true,
     "ignoreDeprecations": "6.0"
   },
-  "include": ["src"],
+  "include": ["src", "vitest.config.ts", "tsup.config.ts"],
   "exclude": ["src/dual-module.test.ts"]
 }
