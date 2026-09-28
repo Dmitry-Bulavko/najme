@@ -5,7 +5,7 @@ import { defaultLocale, isSupportedLocale } from './routing';
 
 /**
  * Supplies `next-intl` with messages for the current request. Locale resolution itself happens in
- * `middleware.ts` (ADR-0004: cookie -> Accept-Language -> en) before this ever runs; by the time a
+ * `proxy.ts` (ADR-0004: cookie -> Accept-Language -> en) before this ever runs; by the time a
  * request reaches a `[locale]` route, the segment is already a supported locale.
  */
 export default getRequestConfig(async ({ requestLocale }) => {

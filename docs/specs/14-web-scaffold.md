@@ -17,7 +17,7 @@ and ADR-0004.
 - **Framework:** Next.js 16 (App Router), TypeScript strict via `@najme/config/tsconfig/react.json`
   (with the `jsx`/`module`/`moduleResolution` overrides Next requires), Tailwind CSS v4 wired through
   `@najme/ui-tokens/theme.css`, Manrope loaded with `next/font/google`.
-- **Locale routing:** a custom `middleware.ts` (not `next-intl`'s built-in locale-detection
+- **Locale routing:** a custom `proxy.ts` (not `next-intl`'s built-in locale-detection
   middleware) implements the exact ADR-0004 resolution order using `@najme/i18n`'s
   `resolveLocale`/`parseAcceptLanguage`: read the `NEXT_LOCALE` cookie first, else parse
   `Accept-Language`, else fall back to `en`; redirect any path without a supported locale prefix to
@@ -129,3 +129,5 @@ Round 2: merged `origin/main` (#13, the API scaffold), resolving conflicts in `.
 Round 3: `pnpm format` (formatting fixes to `apps/web/tsconfig.json` and this spec) and finalized
 these implementation notes. `pnpm --filter @najme/web lint|typecheck|test|build` and the full
 `pnpm check` are green.
+
+Follow-up #31: `middleware.ts` was migrated to `src/proxy.ts` (named `proxy` export, same `config.matcher`), and an unsupported locale-like first segment (`/xx/foo`) is now replaced instead of prefixed.
