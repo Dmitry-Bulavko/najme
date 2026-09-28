@@ -70,24 +70,26 @@ Constraints: unique `(userId, provider)`; unique `(provider, providerAccountId)`
 
 ### Business
 
-| Field                     | Type                  | Null? | Notes                                                        |
-| ------------------------- | --------------------- | ----- | ------------------------------------------------------------ |
-| id                        | String (uuid v7)      | no    | PK                                                           |
-| name                      | String                | no    |                                                              |
-| slug                      | String                | no    | unique; public URL                                           |
-| categoryId                | String                | no    | FK → Category                                                |
-| description               | String                | yes   |                                                              |
-| timezone                  | String                | no    | IANA tz name, default `Europe/Podgorica` (ADR-0005)          |
-| city                      | String                | yes   |                                                              |
-| address                   | String                | yes   |                                                              |
-| contactPhone              | String                | yes   |                                                              |
-| contactEmail              | String                | yes   |                                                              |
-| confirmationMode          | enum ConfirmationMode | no    | `AUTO` \| `MANUAL`, default `AUTO` (open question Q3)        |
-| cancellationWindowMinutes | Int                   | no    | default `120` (open question Q4)                             |
-| status                    | enum BusinessStatus   | no    | `PENDING_APPROVAL`, `APPROVED`, `REJECTED`, `SUSPENDED` (Q8) |
-| approvedAt                | DateTime              | yes   |                                                              |
-| createdAt/updatedAt       | DateTime              | no    |                                                              |
-| deletedAt                 | DateTime              | yes   | soft delete                                                  |
+| Field                     | Type                  | Null? | Notes                                                                            |
+| ------------------------- | --------------------- | ----- | -------------------------------------------------------------------------------- |
+| id                        | String (uuid v7)      | no    | PK                                                                               |
+| name                      | String                | no    |                                                                                  |
+| slug                      | String                | no    | unique; public URL                                                               |
+| categoryId                | String                | no    | FK → Category                                                                    |
+| description               | String                | yes   |                                                                                  |
+| timezone                  | String                | no    | IANA tz name, default `Europe/Podgorica` (ADR-0005)                              |
+| city                      | String                | yes   |                                                                                  |
+| address                   | String                | yes   |                                                                                  |
+| contactPhone              | String                | yes   |                                                                                  |
+| contactEmail              | String                | yes   |                                                                                  |
+| confirmationMode          | enum ConfirmationMode | no    | `AUTO` \| `MANUAL`, default `AUTO` (open question Q3)                            |
+| cancellationWindowMinutes | Int                   | no    | default `120` (open question Q4)                                                 |
+| minBookingNoticeMinutes   | Int                   | no    | default `60`; earliest a slot may start from now (assumption, confirm before M3) |
+| bookingHorizonDays        | Int                   | no    | default `60`; how far ahead slots are offered (assumption, confirm before M3)    |
+| status                    | enum BusinessStatus   | no    | `PENDING_APPROVAL`, `APPROVED`, `REJECTED`, `SUSPENDED` (Q8)                     |
+| approvedAt                | DateTime              | yes   |                                                                                  |
+| createdAt/updatedAt       | DateTime              | no    |                                                                                  |
+| deletedAt                 | DateTime              | yes   | soft delete                                                                      |
 
 Relations: has many `Membership`, `Invitation`, `StaffMember`, `Service`, `Booking`, `Review`.
 
@@ -141,20 +143,22 @@ Relations: has many `WorkingHours`, `TimeOff`, `Booking`; many-to-many with `Ser
 
 ### Service
 
-| Field               | Type             | Null? | Notes                                     |
-| ------------------- | ---------------- | ----- | ----------------------------------------- |
-| id                  | String (uuid v7) | no    | PK                                        |
-| businessId          | String           | no    | FK → Business                             |
-| name                | String           | no    | business-entered, single language (Q7)    |
-| description         | String           | yes   |                                           |
-| durationMinutes     | Int              | no    | > 0                                       |
-| bufferBeforeMinutes | Int              | no    | default `0`; blocked time before the slot |
-| bufferAfterMinutes  | Int              | no    | default `0`; blocked time after the slot  |
-| priceAmount         | Int              | no    | minor units                               |
-| priceCurrency       | String           | no    | ISO 4217, e.g. `EUR`                      |
-| active              | Boolean          | no    | default `true`                            |
-| createdAt/updatedAt | DateTime         | no    |                                           |
-| deletedAt           | DateTime         | yes   | soft delete                               |
+| Field                   | Type             | Null? | Notes                                                 |
+| ----------------------- | ---------------- | ----- | ----------------------------------------------------- |
+| id                      | String (uuid v7) | no    | PK                                                    |
+| businessId              | String           | no    | FK → Business                                         |
+| name                    | String           | no    | business-entered, single language (Q7)                |
+| description             | String           | yes   |                                                       |
+| durationMinutes         | Int              | no    | > 0                                                   |
+| bufferBeforeMinutes     | Int              | no    | default `0`; blocked time before the slot             |
+| bufferAfterMinutes      | Int              | no    | default `0`; blocked time after the slot              |
+| priceAmount             | Int              | no    | minor units                                           |
+| priceCurrency           | String           | no    | ISO 4217, e.g. `EUR`                                  |
+| minBookingNoticeMinutes | Int              | yes   | overrides `Business.minBookingNoticeMinutes` when set |
+| bookingHorizonDays      | Int              | yes   | overrides `Business.bookingHorizonDays` when set      |
+| active                  | Boolean          | no    | default `true`                                        |
+| createdAt/updatedAt     | DateTime         | no    |                                                       |
+| deletedAt               | DateTime         | yes   | soft delete                                           |
 
 Relations: many-to-many with `StaffMember` via `ServiceStaffAssignment`; has many
 `ServiceCustomFieldDefinition`, `Booking`.
@@ -356,7 +360,7 @@ stateDiagram-v2
     PENDING --> CONFIRMED: business member confirms
     PENDING --> CANCELLED: client cancels, or business member declines
 
-    CONFIRMED --> CANCELLED: client cancels (within cancellationWindowMinutes)\nor business member cancels
+    CONFIRMED --> CANCELLED: client or business member cancels
     CONFIRMED --> COMPLETED: system, after endsAt passes\nor business member marks complete
     CONFIRMED --> NO_SHOW: business member marks no-show, after startsAt
 
@@ -369,6 +373,11 @@ Notes:
 
 - Only `PENDING` and `CONFIRMED` are "active" for the overlap exclusion constraint; `CANCELLED`,
   `COMPLETED` and `NO_SHOW` never block a slot.
+- **Cancellation window direction:** a client may self-cancel or self-reschedule a `PENDING` or
+  `CONFIRMED` booking only while more than `Business.cancellationWindowMinutes` remain before
+  `startsAt`. Once inside that window, only a business member (or the system, e.g. an automated
+  no-show/completion job) can change the booking; a client-initiated cancel/reschedule request inside
+  the window is rejected (422) rather than silently allowed.
 - **Reschedule** (vision: clients and businesses can reschedule) is modeled as updating `startsAt` /
   `endsAt` on the same `Booking` row while it is `PENDING` or `CONFIRMED`, re-validated against the
   exclusion constraint like a new booking; it does not change `status` and is recorded as its own
@@ -387,19 +396,20 @@ Prisma cannot express exclusion constraints, so this constraint is raw SQL in a 
 `btree_gist` extension is already enabled by the baseline migration
 `apps/api/prisma/migrations/20260928184345_init`).
 
-Buffers extend the range a booking blocks. Rather than computing this in application code (which
-would race with the exclusion check), the range is a generated, stored column derived from the
-buffer snapshot on the row:
+Buffers extend the range a booking blocks. A `GENERATED ALWAYS AS (...) STORED` column cannot express
+this: `timestamptz ± interval` depends on the session's `TimeZone` setting to resolve DST, so Postgres
+classifies it `STABLE`, not `IMMUTABLE`, and rejects it as a generation expression ("generation
+expression is not immutable"; reproduced against local Postgres 16). Instead `blocked_range` is a
+plain, `NOT NULL` column that the application computes and writes in the same `INSERT`/`UPDATE`
+statement as `starts_at`/`ends_at`/the buffer snapshot — one statement, so there is no race window for
+the exclusion constraint to miss. A `CHECK` constraint is the safety net that stops a row from ever
+being written with a `blocked_range` narrower than `[starts_at, ends_at)`:
 
 ```sql
 ALTER TABLE bookings
-  ADD COLUMN blocked_range tstzrange GENERATED ALWAYS AS (
-    tstzrange(
-      starts_at - (buffer_before_minutes || ' minutes')::interval,
-      ends_at + (buffer_after_minutes || ' minutes')::interval,
-      '[)'
-    )
-  ) STORED;
+  ADD COLUMN blocked_range tstzrange NOT NULL,
+  ADD CONSTRAINT bookings_blocked_range_contains_range
+    CHECK (blocked_range @> tstzrange(starts_at, ends_at, '[)'));
 
 ALTER TABLE bookings
   ADD CONSTRAINT bookings_no_overlap
@@ -410,7 +420,26 @@ ALTER TABLE bookings
   WHERE (status IN ('PENDING', 'CONFIRMED'));
 ```
 
+The application (or a repository helper shared by create/reschedule) always sets
+`blocked_range = tstzrange(starts_at - buffer_before_minutes * interval '1 minute', ends_at +
+buffer_after_minutes * interval '1 minute', '[)')` before writing. An alternative considered was a
+`BEFORE INSERT OR UPDATE` trigger that derives `blocked_range` server-side instead of relying on the
+application to set it correctly; that removes the "application must remember to compute it" risk at
+the cost of logic living in the database instead of the codebase agents mostly work in. We chose the
+application-computed column for M1–M3: it keeps all booking logic in the `bookings`/`scheduling`
+modules, and the `CHECK` constraint still rejects an incorrectly computed value outright.
+
 The API maps a violation (Postgres error `23P01`) to `409 SLOT_TAKEN` (`docs/conventions/api.md`).
+
+**Verified** against local Postgres 16 (`psql postgresql://najme:najme@localhost:5432/najme_test`,
+inside `BEGIN; … ROLLBACK;`, using the DDL above plus a minimal `bookings` test table and
+`CREATE EXTENSION IF NOT EXISTS btree_gist`):
+
+- Two `PENDING`/`CONFIRMED` rows for the same `staff_member_id` with overlapping `blocked_range` →
+  `ERROR: conflicting key value violates exclusion constraint "bookings_no_overlap"` (`23P01`).
+- The same overlap with the first row `CANCELLED` → both inserts succeed.
+- A row whose `blocked_range` does not contain `[starts_at, ends_at)` → rejected by
+  `bookings_blocked_range_contains_range`.
 
 ### Other unique constraints
 
@@ -419,7 +448,8 @@ The API maps a violation (Postgres error `23P01`) to `409 SLOT_TAKEN` (`docs/con
   `provider_account_id IS NOT NULL`.
 - `refresh_tokens.token_hash` unique.
 - `memberships` unique `(user_id, business_id)`.
-- `staff_members` unique `membership_id` (nullable, so at most one staff record per membership).
+- `memberships` unique `staff_member_id` (nullable; at most one membership operates as a given staff
+  member).
 - `invitations.token_hash` unique.
 - `businesses.slug` unique.
 - `service_staff_assignments` unique `(service_id, staff_member_id)`.
@@ -450,6 +480,34 @@ transitively through `StaffMember`/`Service` (`WorkingHours`, `TimeOff`,
 `ServiceCustomFieldDefinition`, `ServiceStaffAssignment`). Every business-scoped API endpoint filters
 by `businessId` and verifies the caller's `Membership` and role in that business
 (`docs/conventions/api.md`); this is enforced in services, not only at the query level.
+
+**Cross-tenant FK consistency.** A `Booking` references `serviceId` and `staffMemberId`; a
+`ServiceStaffAssignment` references `serviceId` and `staffMemberId`. Nothing in a plain foreign key
+stops those rows from belonging to a _different_ `businessId` than the booking/assignment itself.
+The rule is **application-level validation, not a database constraint**: when creating or updating a
+`Booking` or `ServiceStaffAssignment`, the service layer loads the referenced `Service` and
+`StaffMember` rows and rejects the request (404 if not found at all, 422/`VALIDATION_FAILED` if found
+but owned by a different business) when their `businessId` does not match. Every endpoint that writes
+one of these rows gets an e2e test asserting a cross-tenant reference is rejected
+(`docs/conventions/testing.md`), the same way business-scoped reads are tested against non-members
+(`docs/conventions/api.md`).
+
+Composite foreign keys (`(business_id, service_id)` referencing a composite unique key
+`services (business_id, id)`, and likewise for `staff_member_id`) would let Postgres enforce this
+instead of the application. We do not adopt them now: they would require every referencing table to
+also carry and index `business_id` purely for the FK shape (already true for `Booking`, but not for
+`ServiceStaffAssignment`), and Prisma's relation modeling for composite FKs is more awkward than a
+single-column FK plus a service-layer check. Revisit this as an ADR-0009 amendment if cross-tenant
+bugs show up in practice.
+
+### Availability inputs
+
+Per ADR-0005, slots are computed server-side from staff working hours minus time off minus existing
+active bookings (with buffers) minus **minimum notice** minus **booking horizon**. Those last two are
+modeled as `Business.minBookingNoticeMinutes` (default `60`) and `Business.bookingHorizonDays`
+(default `60`), each optionally overridden per `Service` when set (e.g. a transfer service needing
+more lead time than a haircut). These defaults are assumptions of this model, not answers to an open
+product question; confirm or adjust them before the M3 scheduling task implements slot computation.
 
 ### Soft-delete policy
 

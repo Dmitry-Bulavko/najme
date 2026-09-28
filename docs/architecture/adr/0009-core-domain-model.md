@@ -39,11 +39,12 @@ shaping the schema from the start. The full entity list, fields and diagrams liv
   absolute UTC ranges.
 - **Booking integrity:** a Postgres exclusion constraint (`btree_gist`, already enabled by the
   baseline migration) forbids overlapping `blocked_range` values for the same `staffMemberId` among
-  `PENDING`/`CONFIRMED` bookings. `blocked_range` is a generated, stored `tstzrange` column computed
-  from `startsAt`/`endsAt` and the buffer-minute snapshot on the row, so buffers are enforced by the
-  same constraint without an application-level race. This cannot be expressed in the Prisma schema
-  language, so it is raw SQL added by a Prisma migration (ADR-0002, ADR-0005); the exact DDL is in
-  `docs/architecture/data-model.md`.
+  `PENDING`/`CONFIRMED` bookings. `blocked_range` is a plain, application-computed `tstzrange` column
+  (not a `GENERATED ALWAYS AS` column — see "Alternatives considered") written in the same statement
+  as `startsAt`/`endsAt`/the buffer-minute snapshot, backed by a `CHECK` constraint that it contains
+  `[startsAt, endsAt)`. This cannot be expressed in the Prisma schema language, so it is raw SQL added
+  by a Prisma migration (ADR-0002, ADR-0005); the exact DDL, and its verification against local
+  Postgres 16, is in `docs/architecture/data-model.md`.
 - **Status machine:** `Booking.status` is `PENDING → CONFIRMED → {COMPLETED, NO_SHOW}` or
   `→ CANCELLED` from either active state, with every transition recorded in
   `BookingStatusHistory` (who: client, business member, or system job, per ADR-0006). Reschedule
@@ -69,9 +70,12 @@ shaping the schema from the start. The full entity list, fields and diagrams liv
 - M1–M3 tasks implement this model incrementally in `apps/api/prisma/schema.prisma` and can rely on
   table/column names, tenancy and soft-delete conventions already being agreed rather than
   re-litigating them per task.
-- The overlap exclusion constraint and its generated column must be written as raw SQL in every
-  migration that touches `bookings`; `prisma migrate diff`/`db pull` will not reproduce it
-  automatically, so schema changes to `bookings` need care not to drop it.
+- The overlap exclusion constraint, the `blocked_range` column and its `CHECK` constraint must be
+  written as raw SQL in every migration that touches `bookings`; `prisma migrate diff`/`db pull` will
+  not reproduce them automatically, so schema changes to `bookings` need care not to drop them. Every
+  code path that writes a `Booking` (create, reschedule) must compute and set `blocked_range`
+  correctly; this is worth a shared repository helper and a unit test, since the `CHECK` constraint
+  only catches a wrong value, it does not compute the right one.
 - If Q2, Q3, Q4, Q6 or Q8 are answered differently from their default before M2/M3, the affected
   field (type, default value, or nullability) changes in a schema migration; the shape of the rest of
   the model is unaffected.
@@ -84,6 +88,15 @@ shaping the schema from the start. The full entity list, fields and diagrams liv
 - **Transfer-specific fields on `Service`/`Booking`:** rejected for MVP per Q2's default; would need a
   new migration for every future service type needing custom data (e.g. a dentist's insurance
   number).
-- **Computing the blocked range in application code before insert:** rejected — races under
-  concurrent requests, which is exactly the failure ADR-0005's exclusion constraint exists to
-  prevent; a generated column keeps the buffer maths inside the same atomic constraint check.
+- **`blocked_range` as a `GENERATED ALWAYS AS (...) STORED` column:** tried first, rejected —
+  `timestamptz ± interval` arithmetic depends on the session `TimeZone` setting to resolve DST, so
+  Postgres classifies it `STABLE` rather than `IMMUTABLE` and refuses it as a generation expression
+  ("generation expression is not immutable"; reproduced against local Postgres 16). A plain column set
+  by the application in the same `INSERT`/`UPDATE` as `startsAt`/`endsAt` has no race window (it is one
+  statement, and the exclusion constraint still evaluates atomically against it), and a `CHECK`
+  constraint guards against a value that does not actually cover `[startsAt, endsAt)`.
+- **`BEFORE INSERT OR UPDATE` trigger computing `blocked_range` server-side:** considered instead of
+  the application-computed column; would remove the risk of application code forgetting to set it
+  correctly, at the cost of moving booking logic into a database trigger that agents working in
+  `apps/api` do not see by reading the codebase. Not adopted for M1–M3; revisit if the
+  application-computed column proves error-prone in practice.
