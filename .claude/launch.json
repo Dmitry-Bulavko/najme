@@ -1,11 +1,11 @@
 {
+  "version": "0.0.1",
   "configurations": [
     {
       "name": "web",
-      "command": "pnpm --filter @najme/web dev",
-      "cwd": ".",
-      "port": 3001,
-      "description": "Next.js web app dev server (apps/web), WEB_PORT from .env / .env.example."
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@najme/web", "dev"],
+      "port": 3001
     }
   ]
 }
