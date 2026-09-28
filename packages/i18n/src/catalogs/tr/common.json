@@ -27,5 +27,23 @@
   },
   "languageSwitcher": {
     "label": "Dil"
+  },
+  "tabs": {
+    "discover": "Keşfet",
+    "bookings": "Randevular",
+    "account": "Hesap"
+  },
+  "screens": {
+    "discover": {
+      "title": "Keşfet",
+      "body": "Yerel işletmeleri ve hizmetleri keşfedin — yakında."
+    },
+    "bookings": {
+      "title": "Randevular",
+      "body": "Yaklaşan ve geçmiş randevularınız burada görünecek."
+    },
+    "account": {
+      "title": "Hesap"
+    }
   }
 }
