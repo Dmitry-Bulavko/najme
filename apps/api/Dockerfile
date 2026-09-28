@@ -29,6 +29,16 @@ ENV GIT_SHA=${GIT_SHA}
 ENV DATABASE_URL=postgresql://build:build@localhost:5432/build?schema=public
 RUN pnpm turbo run build --filter=@najme/api...
 
+# --- Production-only dependencies, installed fresh from the pruned workspace (no devDependencies:
+# --- neither the pruned lockfile nor the pruned `apps/api/package.json` list them). `prisma` and
+# --- `dotenv` are runtime dependencies of `@najme/api` (needed by `db:migrate:deploy` and
+# --- `prisma.config.ts`), so this stage's node_modules has everything the runtime needs.
+FROM base AS prod-deps
+COPY --from=pruner /app/out/json/ .
+COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=pruner /app/out/pnpm-workspace.yaml ./pnpm-workspace.yaml
+RUN pnpm install --prod --frozen-lockfile
+
 # --- Runtime image: only production dependencies, compiled output, Prisma schema/migrations and
 # --- the generated Prisma client, run as a non-root user.
 FROM node:24-slim AS runtime
@@ -44,10 +54,10 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/generated ./apps/api/generated
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
 COPY --from=build /app/apps/api/prisma.config.ts ./apps/api/prisma.config.ts
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=prod-deps /app/package.json ./package.json
+COPY --from=prod-deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
 WORKDIR /app/apps/api
 RUN groupadd --system najme && useradd --system --gid najme --home /app najme \

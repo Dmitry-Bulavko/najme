@@ -1,0 +1,15 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "env": ["DATABASE_URL", "GIT_SHA"]
+    },
+    "typecheck": {
+      "env": ["DATABASE_URL"]
+    },
+    "test": {
+      "env": ["DATABASE_URL", "GIT_SHA", "NODE_ENV", "PORT", "PUBLIC_URL"]
+    }
+  }
+}

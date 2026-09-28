@@ -90,3 +90,27 @@ None — API only, no user-facing strings.
   `@prisma/client-runtime-utils` as a dependency, which had to be added explicitly to `apps/api`'s
   own `package.json` too — pnpm does not hoist it for a non-workspace, generated-at-build-time
   package.
+
+### Round 2 (review fixes)
+
+- ADR-0002 gained an "`apps/api` is ESM" update section explaining the ESM decision in the context
+  of the ADR's original (CJS-assuming) text.
+- `ZodValidationPipe` now has a unit test covering valid input (parsed/coerced value returned),
+  invalid input (`BadRequestException` with the `VALIDATION_FAILED` shape and field `path`s), and
+  the final envelope produced once `ApiExceptionFilter` reshapes that exception.
+- `prisma` and `dotenv` moved from `devDependencies` to `dependencies` (both are needed at runtime:
+  `db:migrate:deploy` and `prisma.config.ts`). The Dockerfile gained a `prod-deps` stage that runs
+  `pnpm install --prod --frozen-lockfile` from the pruned workspace, so the runtime image's
+  `node_modules` no longer carries devDependencies (eslint, vitest, tsx, typescript, etc.).
+- Added a root `.dockerignore` (`.git`, `node_modules`, `dist`, `.next`, `.turbo`, `generated`,
+  `coverage`, `.expo`, `.env*`, `.claude`) to keep the `docker build` context small; nothing the
+  Dockerfile `COPY`s (source, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `turbo.json`, `packages/*`)
+  is excluded.
+- `turbo.json`'s root `globalEnv` addition was reverted (it busted every package's cache); the same
+  env vars are now declared per-task in a new `apps/api/turbo.json` (`extends: ["//"]`), scoped to
+  `build` (`DATABASE_URL`, `GIT_SHA`), `typecheck` (`DATABASE_URL`) and `test` (`DATABASE_URL`,
+  `GIT_SHA`, `NODE_ENV`, `PORT`, `PUBLIC_URL`).
+- `HealthService` and `PrismaService` no longer read `process.env` directly: a new
+  `ConfigModule`/`ENV` DI token (`src/config/config.module.ts`, `src/config/env.token.ts`) exposes
+  the `loadEnv()`-validated `Env` object; both services now take it via `@Inject(ENV)`, and
+  `HealthService`'s unit test passes a fake `Env` instead of mutating `process.env`.

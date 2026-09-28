@@ -1,7 +1,6 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "stream",
-  "globalEnv": ["DATABASE_URL", "GIT_SHA", "NODE_ENV", "PORT", "PUBLIC_URL"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
