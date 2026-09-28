@@ -58,6 +58,17 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=prod-deps /app/package.json ./package.json
 COPY --from=prod-deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+# prod-deps only installs manifests (out/json), so its pnpm workspace symlinks (e.g.
+# node_modules/@najme/contracts -> ../../packages/contracts) point at directories that have a
+# package.json but no built output. For every workspace package @najme/api imports at runtime
+# (currently only @najme/contracts; @najme/config is dev-only), copy its package.json, its built
+# dist/ (from the build stage) and its own node_modules (from prod-deps): the package's own
+# node_modules holds pnpm symlinks for its runtime dependencies (e.g. packages/contracts depends
+# on zod) that resolve into the already-copied /app/node_modules/.pnpm store — without it, imports
+# from within the workspace package's dist/ fail with "Cannot find package 'zod'".
+COPY --from=build /app/packages/contracts/package.json ./packages/contracts/package.json
+COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
+COPY --from=prod-deps /app/packages/contracts/node_modules ./packages/contracts/node_modules
 
 WORKDIR /app/apps/api
 RUN groupadd --system najme && useradd --system --gid najme --home /app najme \

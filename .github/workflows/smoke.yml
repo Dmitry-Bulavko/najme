@@ -1,0 +1,144 @@
+name: Smoke
+
+# Builds the production images and boots infra/compose.prod.yml end-to-end (ADR-0007), proving the
+# stack builds, migrates and reports healthy before any change reaches the server. Complements
+# ci.yml/deploy.yml: docs/runbooks/deploy.md.
+
+on:
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'infra/**'
+      - '**/Dockerfile'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'infra/**'
+      - '**/Dockerfile'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/smoke.yml'
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_PREFIX: najme-smoke
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build najme-api image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: false
+          load: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          tags: ${{ env.IMAGE_PREFIX }}-api:${{ env.IMAGE_TAG }}
+          cache-from: type=gha,scope=smoke-api
+          cache-to: type=gha,mode=max,scope=smoke-api
+
+      - name: Build najme-web image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: false
+          load: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          tags: ${{ env.IMAGE_PREFIX }}-web:${{ env.IMAGE_TAG }}
+          cache-from: type=gha,scope=smoke-web
+          cache-to: type=gha,mode=max,scope=smoke-web
+
+      - name: Write throwaway .env
+        working-directory: infra
+        run: |
+          umask 077
+          cat >.env <<EOF
+          DOMAIN=localhost
+          IMAGE_PREFIX=${IMAGE_PREFIX}
+          IMAGE_TAG=${IMAGE_TAG}
+          POSTGRES_USER=najme
+          POSTGRES_PASSWORD=najme-smoke
+          POSTGRES_DB=najme
+          EOF
+
+      - name: Validate compose config
+        working-directory: infra
+        run: docker compose -f compose.prod.yml -f compose.smoke.yml --env-file .env --profile migrate config
+
+      - name: Run database migrations
+        working-directory: infra
+        run: |
+          docker compose -f compose.prod.yml -f compose.smoke.yml --env-file .env \
+            --profile migrate run --rm -T migrate
+
+      - name: Start the stack
+        working-directory: infra
+        run: docker compose -f compose.prod.yml -f compose.smoke.yml --env-file .env up -d
+
+      - name: Wait for API health
+        working-directory: infra
+        run: |
+          status=''
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost/api/v1/health -o /tmp/health.json; then
+              status="$(jq -r .status /tmp/health.json)"
+              [[ "$status" == "ok" ]] && break
+            fi
+            sleep 2
+          done
+          echo "health response:"
+          cat /tmp/health.json
+          [[ "$(jq -r .status /tmp/health.json)" == "ok" ]]
+          [[ "$(jq -r .db /tmp/health.json)" == "ok" ]]
+
+      - name: Verify @najme/contracts is bundled in the api image
+        working-directory: infra
+        # Regression check for #16: the api runtime image must ship the workspace packages it
+        # depends on (packages/contracts), not a dangling pnpm symlink.
+        run: |
+          docker compose -f compose.prod.yml -f compose.smoke.yml --env-file .env exec -T api \
+            node -e "import('@najme/contracts').then((m) => { if (typeof m.healthResponseSchema?.parse !== 'function') { throw new Error('missing @najme/contracts export'); } console.log('@najme/contracts ok'); })"
+
+      - name: Wait for web home page
+        run: |
+          code=''
+          for _ in $(seq 1 60); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://localhost/en)"
+            [[ "$code" == "200" ]] && break
+            sleep 2
+          done
+          echo "web /en status: $code"
+          [[ "$code" == "200" ]]
+
+      - name: Show compose logs on failure
+        if: failure()
+        working-directory: infra
+        run: docker compose -f compose.prod.yml -f compose.smoke.yml --env-file .env logs --no-color
+
+      - name: Tear down
+        if: always()
+        working-directory: infra
+        run: docker compose -f compose.prod.yml -f compose.smoke.yml --env-file .env down -v --remove-orphans
