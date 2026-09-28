@@ -1,0 +1,22 @@
+name: najme-dev
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-najme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-najme}
+      POSTGRES_DB: ${POSTGRES_DB:-najme}
+    ports:
+      - '${POSTGRES_PORT:-5434}:5432'
+    volumes:
+      - najme_dev_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  najme_dev_pgdata:

@@ -17,6 +17,7 @@ GoogleService-Info.plist
 dist/
 build/
 out/
+generated/
 .next/
 .expo/
 .turbo/
