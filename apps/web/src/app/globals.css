@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+@import '@najme/ui-tokens/theme.css';
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text01);
+  font-family: var(--font-sans);
+}

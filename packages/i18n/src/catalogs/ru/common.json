@@ -19,5 +19,13 @@
     "empty": "Пока ничего нет",
     "error": "Что-то пошло не так"
   },
-  "bookingsCount": "{count, plural, one {# бронирование} few {# бронирования} many {# бронирований} other {# бронирования}}"
+  "bookingsCount": "{count, plural, one {# бронирование} few {# бронирования} many {# бронирований} other {# бронирования}}",
+  "apiStatus": {
+    "label": "Статус API",
+    "online": "Доступен",
+    "unavailable": "Недоступен"
+  },
+  "languageSwitcher": {
+    "label": "Язык"
+  }
 }
