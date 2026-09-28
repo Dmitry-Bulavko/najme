@@ -9,10 +9,12 @@ See ADR-0003: tokens are shared, UI components are not.
   `base01`/`base04`, `background`) plus `success`/`warning`/`danger`/`info` and their `*Foreground`
   pairs, tuned to meet WCAG AA contrast (>= 4.5:1) as background/foreground pairs.
 - `radius` — `sm 8`, `md 12`, `lg 16`, `xl 20`, `full 9999`.
-- `spacing` — `xs 4` … `xxxxl 48` (4, 8, 12, 16, 20, 24, 32, 40, 48).
-- `typography` — `fontFamily` ("Manrope"), `fontWeight` (`medium 500`, `bold 700`, `extrabold 800`)
-  and `scale`, a type scale from `caption` to `display`, each with `fontSize`, `lineHeight` and a
-  default `fontWeight`.
+- `spacing` — `xs 4`, `sm 8`, `md 12`, `lg 16`, `xl 20`, `2xl 24`, `3xl 32`, `4xl 40`, `5xl 48`
+  (same `xs`/`sm`/.../`2xl` progression Tailwind uses for its own named scales).
+- `typography` — `fontFamily` ("Manrope"), `fontWeight` (`medium '500'`, `bold '700'`,
+  `extrabold '800'` — string literals, valid both as CSS `font-weight` and as React Native
+  `TextStyle.fontWeight`) and `scale`, a type scale from `caption` to `display`, each with
+  `fontSize`, `lineHeight` and a default `fontWeight`.
 - `tokens` — all of the above combined into one plain object. Every value is a plain string or
   number (no CSS-only syntax beyond the `rgba()` string on `text03`), so `tokens` can be used
   directly to build a React Native `StyleSheet` value map, e.g.
@@ -23,8 +25,22 @@ See ADR-0003: tokens are shared, UI components are not.
 ## CSS custom properties (web)
 
 `dist/theme.css`, published as `@najme/ui-tokens/theme.css`, contains a Tailwind v4
-[`@theme`](https://tailwindcss.com/docs/theme) block with one CSS custom property per token (e.g.
-`--color-primary`, `--radius-md`, `--spacing-md`, `--font-size-body`).
+[`@theme`](https://tailwindcss.com/docs/theme) block using only
+[documented Tailwind v4 theme namespaces](https://tailwindcss.com/docs/theme#theme-variable-namespaces)
+— so Tailwind actually generates utilities from these variables, not just custom properties:
+
+- `--font-sans` — the font family (`'Manrope', ui-sans-serif, system-ui, sans-serif`).
+- `--font-weight-<name>` — e.g. `--font-weight-medium: 500;`.
+- `--text-<name>` — font size for a type scale entry (e.g. `--text-body: 14px;`), with its
+  `--text-<name>--line-height` and `--text-<name>--font-weight` companion properties (the
+  convention Tailwind v4 recognizes for a full type scale entry, so `text-body` also sets
+  `line-height` and `font-weight`).
+- `--color-<name>` — e.g. `--color-primary: #526ED3;`.
+- `--radius-<name>` — e.g. `--radius-md: 12px;`.
+- `--spacing-<name>` — e.g. `--spacing-md: 12px;`.
+
+All length values (radius, spacing, font sizes, line heights) carry an explicit `px` unit —
+unitless lengths are invalid in CSS and get dropped by browsers.
 
 **Source of truth:** `dist/theme.css` is **generated at build time** (via a `tsup` `onSuccess`
 hook, see `tsup.config.ts`) from the same `src/colors.ts` / `radius.ts` / `spacing.ts` /

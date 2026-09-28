@@ -14,7 +14,7 @@ describe('dist dual-module output', () => {
 
     expect(cjs.colors.primary).toBe('#526ED3');
     expect(cjs.radius.md).toBe(12);
-    expect(cjs.tokens.spacing.md).toBe(16);
+    expect(cjs.tokens.spacing.md).toBe(12);
   });
 
   it('can be imported as ESM', async () => {

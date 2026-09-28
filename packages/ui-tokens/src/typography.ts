@@ -1,11 +1,14 @@
 /** Brand typeface. Must be loaded/registered by each client (web: `next/font`, mobile: `expo-font`). */
 export const fontFamily = 'Manrope';
 
-/** Font weights used across the product. */
+/**
+ * Font weights used across the product, as string literals so the same values are valid React
+ * Native `TextStyle.fontWeight` (`'100'..'900' | 'normal' | 'bold'`) and CSS `font-weight` values.
+ */
 export const fontWeight = {
-  medium: 500,
-  bold: 700,
-  extrabold: 800,
+  medium: '500',
+  bold: '700',
+  extrabold: '800',
 } as const;
 
 export type FontWeightToken = keyof typeof fontWeight;
