@@ -1,0 +1,39 @@
+name: Task
+description: A unit of work that fits in one PR (size S or M). See docs/workflow/task-tracking.md.
+labels: ['status:backlog']
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: The outcome in one or two sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why now; links to ADRs, docs, related issues.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Observable, testable statements.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+  - type: textarea
+    id: notes
+    attributes:
+      label: Technical notes
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: One "Blocked by #N" per line, or "None".
+      value: None

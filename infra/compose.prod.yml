@@ -1,0 +1,88 @@
+# Production stack on the Lightsail instance (ADR-0007). Deployed to /opt/najme by
+# .github/workflows/deploy.yml together with a generated .env; run via scripts/deploy.sh.
+#
+# Contract with the app images:
+# - najme-api and najme-web listen on port 3000.
+# - najme-api serves GET /api/v1/health and its package.json has a `db:migrate:deploy` script that
+#   applies Prisma migrations (used by the `migrate` service).
+name: najme
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is required}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+
+  web:
+    image: ${IMAGE_PREFIX:?}-web:${IMAGE_TAG:?IMAGE_TAG is required}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      HOSTNAME: 0.0.0.0
+      PUBLIC_URL: https://${DOMAIN}
+      API_INTERNAL_URL: http://api:3000/api/v1
+    expose:
+      - '3000'
+    depends_on:
+      - api
+
+  api:
+    image: ${IMAGE_PREFIX:?}-api:${IMAGE_TAG:?IMAGE_TAG is required}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      GIT_SHA: ${IMAGE_TAG}
+      PUBLIC_URL: https://${DOMAIN}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB}?schema=public
+    expose:
+      - '3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  migrate:
+    image: ${IMAGE_PREFIX:?}-api:${IMAGE_TAG:?IMAGE_TAG is required}
+    profiles: [migrate]
+    restart: 'no'
+    command: ['npm', 'run', 'db:migrate:deploy']
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    shm_size: 256mb
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

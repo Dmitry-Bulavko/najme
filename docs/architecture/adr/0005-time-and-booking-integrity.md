@@ -1,0 +1,34 @@
+# ADR-0005: Time handling and booking integrity
+
+- Status: Accepted
+- Date: 2026-09-28
+
+## Context
+
+Booking is the core of the product. Bugs in time zones, DST transitions or concurrent booking
+requests directly cause double bookings and lost trust.
+
+## Decision
+
+- **Storage:** all instants are stored as `timestamptz` in UTC. Booking time ranges use start/end
+  instants (and a generated `tstzrange` column for constraints).
+- **Business timezone:** every business has an IANA timezone (default `Europe/Podgorica`). Working
+  hours are stored as local wall-clock times per weekday and interpreted in the business timezone,
+  so DST transitions are handled when computing slots.
+- **Slots are computed server-side** only, from: staff working hours − time off − existing active
+  bookings (with service buffers) − minimum notice − booking horizon. Clients receive ready-made
+  slots and never compute availability.
+- **No double bookings:** a PostgreSQL exclusion constraint (`btree_gist`) forbids overlapping
+  ranges for the same staff member among active bookings (`PENDING`, `CONFIRMED`). The API maps the
+  constraint violation to a `409 SLOT_TAKEN` error. This is created with raw SQL in a Prisma
+  migration.
+- **Libraries:** use a well-maintained timezone-aware date library (e.g. `date-fns` + `date-fns-tz`
+  or `Temporal` polyfill); decide in the scheduling task and record it here.
+- **Tests:** slot computation has unit tests covering DST switch days in `Europe/Podgorica`,
+  overlapping time off, buffers and back-to-back bookings; the constraint has an e2e test with
+  concurrent requests.
+
+## Consequences
+
+- Double-booking protection does not depend on application-level locking.
+- Every date shown to users must be converted from UTC to the business timezone.

@@ -1,0 +1,33 @@
+# ADR-0002: API stack and shared contracts
+
+- Status: Accepted
+- Date: 2026-09-28
+
+## Context
+
+We need a typed, well-structured backend that agents can extend module by module, and a way to keep
+API shapes in sync across api, web and mobile without hand-written duplicate types.
+
+## Decision
+
+- **NestJS** (latest stable) with a module per bounded context: `auth`, `users`, `businesses`,
+  `staff`, `services`, `scheduling`, `bookings`, `catalog`, `notifications`, `admin`, `health`.
+- **Prisma** (latest stable) as ORM and migration tool; **PostgreSQL 17**. Raw SQL is allowed in
+  migrations for things Prisma cannot express (e.g. exclusion constraints, see ADR-0005).
+- **REST under `/api/v1`**, JSON, conventions in `docs/conventions/api.md`.
+- **Contracts:** every request/response schema is a zod schema in `packages/contracts`, exported with
+  its inferred type. The API validates input with these schemas (e.g. via `nestjs-zod` or a small
+  `ZodValidationPipe`) and generates OpenAPI from them. Web and mobile import the same types.
+- **Auth:** short-lived JWT access token + rotating refresh token (stored hashed in DB); passwords
+  hashed with argon2id. Social login: Google (web + mobile), Apple (iOS). Details are decided in the
+  M1 tasks.
+- **Config:** env vars validated at startup with a zod schema; the app refuses to start on invalid
+  config.
+- **Errors:** a global exception filter maps errors to the error envelope defined in contracts.
+
+## Consequences
+
+- Changing an endpoint means changing `packages/contracts` first; type errors then show every
+  consumer that must be updated.
+- Prisma models are internal to the API; never expose Prisma types to clients — map to contract
+  types.

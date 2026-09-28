@@ -1,0 +1,132 @@
+name: Deploy
+
+# Production deploy to AWS Lightsail. ADR-0007, docs/runbooks/deploy.md.
+# - push to `production`: full CI → build & push images → deploy the new commit
+# - manual run with `image_tag`: redeploy an already-built image (rollback), skipping build
+
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Existing image tag (commit SHA) to redeploy. Empty = build and deploy the branch HEAD.'
+        required: false
+        default: ''
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_PREFIX: ghcr.io/dmitry-bulavko/najme
+
+jobs:
+  verify:
+    if: ${{ github.event_name == 'push' || inputs.image_tag == '' }}
+    uses: ./.github/workflows/ci.yml
+
+  images:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        app: [api, web]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.app }}
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.app }}:${{ github.sha }}
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.app }}:production
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+
+  deploy:
+    needs: [verify, images]
+    if: >-
+      ${{ always() && (needs.images.result == 'success' ||
+      (github.event_name == 'workflow_dispatch' && inputs.image_tag != '' &&
+      needs.verify.result == 'skipped' && needs.images.result == 'skipped')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://${{ vars.DOMAIN }}
+    env:
+      IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
+      SSH_TARGET: ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate image tag
+        run: |
+          if ! [[ "$IMAGE_TAG" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "::error::image tag must be a commit SHA, got '$IMAGE_TAG'"
+            exit 1
+          fi
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.LIGHTSAIL_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # Every production env var must be listed here (docs/conventions/env-vars.md).
+      - name: Assemble server .env
+        env:
+          DOMAIN: ${{ vars.DOMAIN }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          GHCR_USER: ${{ github.repository_owner }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+        run: |
+          umask 077
+          {
+            printf 'DOMAIN=%s\n' "$DOMAIN"
+            printf 'IMAGE_PREFIX=%s\n' "$IMAGE_PREFIX"
+            printf 'POSTGRES_USER=najme\n'
+            printf 'POSTGRES_DB=najme\n'
+            printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
+            printf 'GHCR_USER=%s\n' "$GHCR_USER"
+            printf 'GHCR_READ_TOKEN=%s\n' "$GHCR_READ_TOKEN"
+          } > server.env
+
+      - name: Upload files
+        run: |
+          scp -q infra/compose.prod.yml infra/Caddyfile infra/scripts/deploy.sh infra/scripts/backup-db.sh \
+            "$SSH_TARGET":/opt/najme/
+          scp -q server.env "$SSH_TARGET":/opt/najme/.env
+          rm -f server.env
+
+      - name: Deploy ${{ env.IMAGE_TAG }}
+        # IMAGE_TAG is validated above and intentionally expanded on the runner.
+        run: |
+          # shellcheck disable=SC2029
+          ssh "$SSH_TARGET" "chmod +x /opt/najme/deploy.sh /opt/najme/backup-db.sh && /opt/najme/deploy.sh $IMAGE_TAG"

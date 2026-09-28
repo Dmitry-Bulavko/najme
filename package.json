@@ -1,18 +1,24 @@
 {
   "name": "najme",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "private": true,
-  "scripts": {
-    "dev:web": "pnpm --filter web dev",
-    "dev:mobile": "pnpm --filter mobile start",
-    "mobile:android": "pnpm --filter mobile android",
-    "mobile:ios": "pnpm --filter mobile ios",
-    "dev:server": "pnpm --filter server start:dev",
-    "build:web": "pnpm --filter web build",
-    "build:server": "pnpm --filter server build"
-  },
+  "description": "Najme — booking platform for service businesses in Montenegro",
+  "packageManager": "pnpm@12.6.0",
   "engines": {
-    "node": ">=20",
-    "pnpm": ">=9"
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "check": "pnpm format:check && turbo run lint typecheck test build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.9.9",
+    "turbo": "^2.11.4"
   }
 }
