@@ -28,7 +28,7 @@ pnpm dev                                  # builds shared packages, then API + w
 | Postgres | localhost:5434               | from `compose.dev.yml`                       |
 | Metro    | http://localhost:8081        | mobile only, see below                       |
 
-Env: in development the API and web load the root `.env` themselves (Node `--env-file-if-exists` /
+Env: in development the API, web and the Prisma CLI (migrate/generate) load the root `.env` themselves (Node `--env-file-if-exists` /
 `process.loadEnvFile`); variables already set in the shell win over the file. Production and Docker
 images never read an env file. Turbo runs in strict env mode, so any variable a `dev` task reads
 must be listed in that app's `turbo.json`.

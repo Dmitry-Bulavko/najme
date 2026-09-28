@@ -59,7 +59,6 @@ jobs:
         env:
           TURBO_UI: 'false'
         run: |
-          pnpm --filter @najme/api db:migrate:deploy
           cat >.env <<EOF
           DATABASE_URL=${DATABASE_URL}
           NODE_ENV=development
@@ -68,6 +67,9 @@ jobs:
           PUBLIC_URL=http://localhost:3001
           API_INTERNAL_URL=http://localhost:3000/api/v1
           EOF
+          # Prove the root-.env-only path: DATABASE_URL must come from the file, not the job env.
+          unset DATABASE_URL
+          pnpm --filter @najme/api db:migrate:deploy
           rm -rf packages/*/dist
           setsid nohup pnpm dev >dev.log 2>&1 &
           echo $! >dev.pid
