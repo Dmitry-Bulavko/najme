@@ -74,8 +74,9 @@ For open, non-epic issues:
 3. Plan the next phase: decompose its epic into tasks (as in `plan`), asking the user about open
    questions that phase depends on.
 4. Update `docs/roadmap.md` (current phase, status column, changelog line) on a branch
-   `docs/roadmap-<phase>` (or the designated session branch), open a PR, wait for CI and squash-merge
-   it (same CI rules as `/implement`).
+   `docs/roadmap-<phase>` (or the designated session branch, updated per `/implement` Step 2 — merge
+   `origin/main` in, never force-push), open a PR, wait for CI and squash-merge it (same CI rules as
+   `/implement`).
 5. Suggest a release if the finished phase is deployable.
 
 ### `release`
