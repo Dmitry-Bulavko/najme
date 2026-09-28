@@ -1,0 +1,34 @@
+name: Bug
+description: Something does not work as expected.
+labels: ['type:bug', 'status:backlog']
+body:
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: Include error messages, screenshots, platform (web/iOS/Android), locale.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ] A regression test reproduces the bug and passes after the fix
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      value: None

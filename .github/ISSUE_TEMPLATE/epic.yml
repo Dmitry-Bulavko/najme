@@ -1,0 +1,24 @@
+name: Epic
+description: A roadmap phase. Tasks are added as sub-issues. Usually created by /manager.
+labels: ['type:epic']
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+  - type: textarea
+    id: exit
+    attributes:
+      label: Exit criteria
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
