@@ -1,0 +1,23 @@
+{
+  "appName": "Najme",
+  "tagline": "Zakažite lokalne usluge u Crnoj Gori",
+  "languages": {
+    "en": "Engleski",
+    "me": "Crnogorski / Srpski",
+    "ru": "Ruski",
+    "tr": "Turski"
+  },
+  "actions": {
+    "save": "Sačuvaj",
+    "cancel": "Otkaži",
+    "back": "Nazad",
+    "retry": "Pokušaj ponovo",
+    "continue": "Nastavi"
+  },
+  "states": {
+    "loading": "Učitavanje…",
+    "empty": "Ovdje još nema ničega",
+    "error": "Nešto je pošlo po zlu"
+  },
+  "bookingsCount": "{count, plural, one {# rezervacija} few {# rezervacije} other {# rezervacija}}"
+}

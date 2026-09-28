@@ -1,0 +1,23 @@
+{
+  "appName": "Najme",
+  "tagline": "Karadağ'da yerel hizmetleri rezerve edin",
+  "languages": {
+    "en": "İngilizce",
+    "me": "Karadağca / Sırpça",
+    "ru": "Rusça",
+    "tr": "Türkçe"
+  },
+  "actions": {
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "back": "Geri",
+    "retry": "Tekrar dene",
+    "continue": "Devam et"
+  },
+  "states": {
+    "loading": "Yükleniyor…",
+    "empty": "Henüz bir şey yok",
+    "error": "Bir şeyler ters gitti"
+  },
+  "bookingsCount": "{count, plural, one {# rezervasyon} other {# rezervasyon}}"
+}
