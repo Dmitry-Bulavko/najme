@@ -60,8 +60,9 @@ pnpm --filter @najme/api test                   # unit + e2e (needs DATABASE_URL
 ## Troubleshooting
 
 - `Invalid environment configuration` (API): root `.env` is missing or lacks `DATABASE_URL`.
-- Badge shows "Unavailable": API not running, or `API_INTERNAL_URL` is unset/wrong, or the DB is
-  unreachable (`/api/v1/health` returns `db: "error"`); check `POSTGRES_PORT` matches `DATABASE_URL`.
+- Badge shows "Unavailable": API not running, or both `API_INTERNAL_URL` and `PUBLIC_URL` are
+  unset or point at the wrong API (`API_INTERNAL_URL` is optional; the badge falls back to
+  `PUBLIC_URL` + `/api/v1`), or the DB is unreachable (`/api/v1/health` returns `db: "error"`); check `POSTGRES_PORT` matches `DATABASE_URL`.
 - `Can't resolve '@najme/...'`: packages are not built; run `pnpm turbo run build --filter='./packages/*'`.
 - `EADDRINUSE`: a previous dev run is still alive on 3000/3001; stop it.
 

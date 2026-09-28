@@ -89,7 +89,10 @@ jobs:
       - name: Stop dev processes
         if: always()
         run: |
+          pkill -INT -f 'turbo' || true
+          sleep 3
           if [ -f dev.pid ]; then kill -- -"$(cat dev.pid)" 2>/dev/null || true; fi
           pkill -f 'next dev' || true
           pkill -f 'dist/main.js' || true
+          pkill -f 'typescript/bin/tsc' || true
           pkill -f 'turbo' || true
