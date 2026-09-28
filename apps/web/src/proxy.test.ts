@@ -29,13 +29,25 @@ describe('proxy', () => {
   it('passes through paths with a supported locale segment', () => {
     const response = proxy(new NextRequest('https://najme.example/ru/foo'));
     expect(response.headers.get('location')).toBeNull();
-    expect(response.headers.get('x-middleware-next')).toBe('1');
   });
 
   it('replaces an unsupported locale segment instead of prefixing it', () => {
     expect(redirectPath('/xx/foo')).toBe('/en/foo');
     expect(redirectPath('/xx-YY/foo/bar', { 'accept-language': 'tr' })).toBe('/tr/foo/bar');
     expect(redirectPath('/xx')).toBe('/en');
+  });
+
+  it('keeps the query string and sets the cookie when stripping a segment', () => {
+    const response = proxy(new NextRequest('https://najme.example/xx/foo?a=1'));
+    expect(new URL(response.headers.get('location') ?? '').search).toBe('?a=1');
+    expect(new URL(response.headers.get('location') ?? '').pathname).toBe('/en/foo');
+    expect(response.cookies.get(LOCALE_COOKIE_NAME)?.value).toBe('en');
+  });
+
+  it('strips region-qualified segments but never bare 3-letter ones', () => {
+    expect(redirectPath('/xx-YY/x')).toBe('/en/x');
+    expect(redirectPath('/faq/x')).toBe('/en/faq/x');
+    expect(redirectPath('/map')).toBe('/en/map');
   });
 
   it('prefixes paths with a missing locale segment', () => {

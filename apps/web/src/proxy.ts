@@ -9,11 +9,14 @@ export const config = {
 };
 
 /**
- * A first segment that looks like an attempted locale: two or three ASCII letters, optionally
- * followed by a region (`xx`, `xxx`, `xx-YY`). Only such segments are stripped when redirecting, so
- * real top-level paths (`/about`, `/business`) are kept intact.
+ * A first segment that looks like an attempted locale: two ASCII letters, or a two/three-letter
+ * language with a region (`xx`, `xx-YY`, `xxx-YY`). Only such segments are stripped when
+ * redirecting, so real top-level paths (`/about`, `/faq`, `/map`, `/spa`) are kept intact.
+ *
+ * Trade-off: bare 2-letter segments (e.g. `/ai`, `/qa`) are still stripped, so any future 2-letter
+ * top-level route must be added to an exclusion list here (or to the matcher).
  */
-const LOCALE_LIKE_SEGMENT = /^[A-Za-z]{2,3}(?:-[A-Za-z]{2})?$/;
+const LOCALE_LIKE_SEGMENT = /^(?:[A-Za-z]{2}|[A-Za-z]{2,3}-[A-Za-z]{2})$/;
 
 /**
  * Redirects any path without a supported locale prefix to `/{locale}/...`, resolving the locale
