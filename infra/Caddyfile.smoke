@@ -1,0 +1,13 @@
+# CI-only Caddyfile for the production-stack smoke test (issue #16). A bare port address (no
+# hostname) tells Caddy not to attempt automatic HTTPS/ACME, so it serves plain HTTP on :80 — CI
+# runners have no public DNS or certificate authority to complete a TLS handshake with. Routing
+# mirrors the production Caddyfile (/api/* -> api, everything else -> web).
+:80 {
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

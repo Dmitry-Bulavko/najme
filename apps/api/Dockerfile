@@ -58,6 +58,13 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=prod-deps /app/package.json ./package.json
 COPY --from=prod-deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+# prod-deps only installs manifests (out/json), so its pnpm workspace symlinks (e.g.
+# node_modules/@najme/contracts -> ../../packages/contracts) point at directories that have a
+# package.json but no built output. Copy the actual build output of every workspace package
+# @najme/api depends on at runtime (currently only @najme/contracts; @najme/config is dev-only) so
+# those symlinks resolve to real, buildable modules instead of dangling ones.
+COPY --from=build /app/packages/contracts/package.json ./packages/contracts/package.json
+COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
 
 WORKDIR /app/apps/api
 RUN groupadd --system najme && useradd --system --gid najme --home /app najme \

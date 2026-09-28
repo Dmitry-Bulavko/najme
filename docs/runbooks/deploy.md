@@ -2,6 +2,28 @@
 
 Architecture: ADR-0007. Pipeline: `.github/workflows/deploy.yml`. Server files: `infra/`.
 
+## Smoke test (CI)
+
+`.github/workflows/smoke.yml` runs on every pull request touching `apps/**`, `packages/**`,
+`infra/**`, any `Dockerfile`, the lockfile or the workflow itself, and on push to `main`. It proves
+the production stack actually works before a change can reach `production`:
+
+1. Builds `najme-api` and `najme-web` with Buildx (`load: true`, not pushed), reusing the same
+   build definitions as `deploy.yml`.
+2. Starts `infra/compose.prod.yml` with a throwaway `.env` and `infra/compose.smoke.yml`, a CI-only
+   override that swaps the Caddyfile for `infra/Caddyfile.smoke` (plain HTTP on `:80`, no ACME —
+   GitHub-hosted runners have no public DNS or CA to complete a TLS handshake). The production
+   compose file and `Caddyfile` are otherwise unchanged.
+3. Runs the `migrate` profile, then asserts `GET /api/v1/health` returns
+   `{"status":"ok","db":"ok"}`, that `@najme/contracts` actually resolves inside the running `api`
+   container (regression check for the dangling-workspace-symlink bug fixed in #16), and that the
+   web home page (`/en`) returns 200 through Caddy.
+4. Always tears the stack down (`docker compose down -v`); prints `docker compose logs` on failure.
+
+If it fails, re-run the job and read the printed compose logs first; a local repro is
+`docker compose -f infra/compose.prod.yml -f infra/compose.smoke.yml --env-file infra/.env up`
+with a hand-written `infra/.env` (same keys as the production one, `DOMAIN=localhost`).
+
 ## One-time server provisioning (human)
 
 The existing $20 Lightsail instance (4 GB RAM) is reused and wiped.

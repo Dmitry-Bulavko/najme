@@ -1,0 +1,7 @@
+# CI override for infra/compose.prod.yml, used only by .github/workflows/smoke.yml (issue #16).
+# Swaps the Caddyfile for a plain-HTTP one (see Caddyfile.smoke) so the smoke test does not need
+# a real domain or TLS certificates. Never deployed to the production server.
+services:
+  caddy:
+    volumes:
+      - ./Caddyfile.smoke:/etc/caddy/Caddyfile:ro
