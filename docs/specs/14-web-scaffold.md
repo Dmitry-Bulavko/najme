@@ -53,13 +53,13 @@ and ADR-0004.
 
 ## Changes
 
-| Area / path | Change |
-| ----------- | ------ |
-| `apps/web` | New Next.js app: middleware, `[locale]` routes, language switcher, status badge, Dockerfile |
-| `packages/i18n/src/catalogs/*/common.json` | Added `apiStatus.*` and `languageSwitcher.label` keys |
-| `.env.example` | `WEB_PORT` already present (added by scaffold conventions); `apps/web/.env.example` added |
-| `.claude/launch.json` | New entry to run the web dev server on port 3001 |
-| `pnpm-workspace.yaml` | `allowBuilds` entries for native build scripts pulled in by Next/Tailwind, if any |
+| Area / path                                | Change                                                                                      |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `apps/web`                                 | New Next.js app: middleware, `[locale]` routes, language switcher, status badge, Dockerfile |
+| `packages/i18n/src/catalogs/*/common.json` | Added `apiStatus.*` and `languageSwitcher.label` keys                                       |
+| `.env.example`                             | `WEB_PORT` already present (added by scaffold conventions); `apps/web/.env.example` added   |
+| `.claude/launch.json`                      | New entry to run the web dev server on port 3001                                            |
+| `pnpm-workspace.yaml`                      | `allowBuilds` entries for native build scripts pulled in by Next/Tailwind, if any           |
 
 ### Contracts / API
 
@@ -92,14 +92,40 @@ None.
 
 - No Docker daemon is available in this environment, so the image cannot be built/run here; it will
   be exercised by #16 and the deploy workflow's `images` job.
+- Next.js is deprecating the `middleware.ts` convention in favor of a `proxy.ts` file with the same
+  API (see the Next.js 16 release notes); `middleware.ts` still works and is not yet removed. Follow
+  up in a later issue once `proxy` is stable/documented, rather than churning this scaffold now.
 
 ## Implementation notes
 
-Round 1 (in progress): app scaffolded (middleware, `[locale]` layout/page, language switcher, API
-status badge, Dockerfile, Vitest tests) and `pnpm install`/`typecheck` are green. `pnpm --filter
-@najme/web lint` currently crashes (`scopeManager.addGlobals is not a function`) — `eslint-config-next`
-16.3.6's flat config predates ESLint 10's language/scope-manager API; needs a compatible
-`eslint-plugin-react`/parser combination or pinning ESLint to the range `eslint-config-next` expects.
-`pnpm --filter @najme/web test`/`build` and the full `pnpm check` have not been run yet. Remaining
-work for the next round: fix lint, run and fix test/build, run `pnpm format` and `pnpm check`
-end-to-end, then finalize this section.
+Round 1: app scaffolded (middleware, `[locale]` layout/page, language switcher, API status badge,
+Dockerfile, Vitest tests); `pnpm install`/`typecheck` green, but `pnpm --filter @najme/web lint`
+crashed (`scopeManager.addGlobals is not a function`) because `eslint-config-next` 16.3.6's flat
+config (via the `eslint-plugin-react` it bundles) is not yet compatible with ESLint 10's
+language/scope-manager API.
+
+Round 2: merged `origin/main` (#13, the API scaffold), resolving conflicts in `.dockerignore`,
+`pnpm-lock.yaml` and `pnpm-workspace.yaml`. Fixed the round-1 issues:
+
+- **Lint:** dropped `eslint-config-next`/`eslint-plugin-react` entirely; `apps/web/eslint.config.js`
+  now composes `@najme/config`'s shared base config with `@next/eslint-plugin-next`'s flat
+  `core-web-vitals` config (a superset of `recommended`) and `eslint-plugin-react-hooks`'s flat
+  `recommended-latest` config — both declare `eslint@^10` support and don't touch the removed
+  scope-manager API.
+- **Tests:** Vitest's default oxc TS/TSX transform respects `apps/web/tsconfig.json`'s
+  `jsx: "preserve"` (required by Next's own compiler) and leaves JSX untransformed, breaking
+  component tests. `apps/web/vitest.config.ts` sets `oxc: false` and `esbuild.jsx: 'automatic'` to
+  fall back to esbuild's own JSX transform for the test build. Separately, the shared Vitest base
+  config disables `globals`, so `@testing-library/react`'s auto-cleanup (which relies on a global
+  `afterEach`) never ran, leaking DOM between tests; `apps/web/vitest.setup.ts` now imports
+  `cleanup` from `@testing-library/react` and calls it in an explicit `afterEach` (documented in
+  `docs/conventions/testing.md`).
+- **Dev launch config:** `.claude/launch.json` was rewritten to a different shape by an earlier
+  step; restored it to the pre-rewrite format (`configurations[]` with `runtimeExecutable`/
+  `runtimeArgs`) and added the `web` entry (port 3001) in that format.
+- **Env example:** removed a duplicated `PUBLIC_URL` entry from `apps/web/.env.example` (it is
+  defined once, in the root `.env.example`, per `docs/conventions/env-vars.md`).
+
+Round 3: `pnpm format` (formatting fixes to `apps/web/tsconfig.json` and this spec) and finalized
+these implementation notes. `pnpm --filter @najme/web lint|typecheck|test|build` and the full
+`pnpm check` are green.

@@ -17,6 +17,10 @@
 | Web          | Vitest + Testing Library; Playwright for critical flows (later)                  | Components with logic, forms, i18n rendering                                   |
 | Mobile       | Jest (jest-expo) + React Native Testing Library                                  | Screens with logic, hooks                                                      |
 
+Web note: the shared Vitest base config disables `globals`, so Testing Library's auto-cleanup
+(which relies on a global `afterEach`) does not run automatically — register `cleanup()` explicitly
+in the app's Vitest setup file (see `apps/web/vitest.setup.ts`) to avoid DOM leaking between tests.
+
 ## Database in tests
 
 - CI provides a PostgreSQL service (see `.github/workflows/ci.yml`); locally use
