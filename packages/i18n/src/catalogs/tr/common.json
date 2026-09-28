@@ -19,5 +19,13 @@
     "empty": "Henüz bir şey yok",
     "error": "Bir şeyler ters gitti"
   },
-  "bookingsCount": "{count, plural, one {# rezervasyon} other {# rezervasyon}}"
+  "bookingsCount": "{count, plural, one {# rezervasyon} other {# rezervasyon}}",
+  "apiStatus": {
+    "label": "API durumu",
+    "online": "Çevrimiçi",
+    "unavailable": "Kullanılamıyor"
+  },
+  "languageSwitcher": {
+    "label": "Dil"
+  }
 }

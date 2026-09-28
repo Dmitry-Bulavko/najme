@@ -1,0 +1,40 @@
+{
+  "name": "@najme/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Najme public web app and business dashboard (Next.js, App Router)",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --turbopack -p ${WEB_PORT:-3001}",
+    "build": "next build",
+    "start": "next start -p ${PORT:-3000}",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@najme/contracts": "workspace:*",
+    "@najme/i18n": "workspace:*",
+    "@najme/ui-tokens": "workspace:*",
+    "next": "^16.3.6",
+    "next-intl": "^4.14.7",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@najme/config": "workspace:*",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/node": "^26.6.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^10.11.0",
+    "eslint-config-next": "^16.3.6",
+    "jsdom": "^30.1.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.2"
+  }
+}

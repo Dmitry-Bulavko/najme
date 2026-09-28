@@ -19,5 +19,13 @@
     "empty": "Ovdje još nema ničega",
     "error": "Nešto je pošlo po zlu"
   },
-  "bookingsCount": "{count, plural, one {# rezervacija} few {# rezervacije} other {# rezervacija}}"
+  "bookingsCount": "{count, plural, one {# rezervacija} few {# rezervacije} other {# rezervacija}}",
+  "apiStatus": {
+    "label": "Status API-ja",
+    "online": "Dostupno",
+    "unavailable": "Nedostupno"
+  },
+  "languageSwitcher": {
+    "label": "Jezik"
+  }
 }

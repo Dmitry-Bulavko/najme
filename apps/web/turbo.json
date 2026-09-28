@@ -1,0 +1,15 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "dev": {
+      "env": ["WEB_PORT"]
+    },
+    "build": {
+      "env": ["NODE_ENV"]
+    },
+    "start": {
+      "env": ["NODE_ENV", "PORT", "HOSTNAME", "PUBLIC_URL", "API_INTERNAL_URL", "GIT_SHA"]
+    }
+  }
+}
