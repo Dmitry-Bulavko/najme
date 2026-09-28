@@ -5,7 +5,7 @@
   "description": "Najme public web app and business dashboard (Next.js, App Router)",
   "type": "module",
   "scripts": {
-    "dev": "next dev --turbopack -p ${WEB_PORT:-3001}",
+    "dev": "node scripts/dev.mjs",
     "build": "next build",
     "start": "next start -p ${PORT:-3000}",
     "lint": "eslint .",

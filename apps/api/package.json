@@ -7,7 +7,7 @@
   "scripts": {
     "prebuild": "npm run db:generate",
     "build": "tsc -p tsconfig.build.json",
-    "dev": "npm run db:generate && tsx watch src/main.ts",
+    "dev": "npm run db:generate && node scripts/dev.mjs",
     "start": "node dist/main.js",
     "lint": "eslint .",
     "pretypecheck": "npm run db:generate",
