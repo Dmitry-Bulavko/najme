@@ -11,7 +11,9 @@ requests directly cause double bookings and lost trust.
 ## Decision
 
 - **Storage:** all instants are stored as `timestamptz` in UTC. Booking time ranges use start/end
-  instants (and a generated `tstzrange` column for constraints).
+  instants plus an application-computed `blocked_range tstzrange` column (start/end extended by
+  service buffers) that the overlap exclusion constraint runs against; see
+  `docs/architecture/data-model.md` and ADR-0009 for why it is not a `GENERATED ALWAYS AS` column.
 - **Business timezone:** every business has an IANA timezone (default `Europe/Podgorica`). Working
   hours are stored as local wall-clock times per weekday and interpreted in the business timezone,
   so DST transitions are handled when computing slots.
