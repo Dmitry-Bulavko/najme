@@ -103,7 +103,10 @@ None.
 ## Test plan
 
 - Unit (Jest + React Native Testing Library, `apps/mobile`): switching the active locale changes the
-  rendered tab titles (`src/app/(tabs)/_layout.test.tsx`).
+  rendered tab titles (`src/__tests__/tabs-layout.test.tsx`).
+- Unit (Jest, `apps/mobile`, `src/i18n/index.test.ts`): an explicit `me` choice persisted via
+  `setLocale` survives a fresh `initI18n()`; a garbage stored value falls back to device locales;
+  nothing stored resolves from device locales.
 - `@najme/i18n` Vitest suite continues to pass with the new keys (key parity + ICU validity).
 - Manual: not applicable in this environment (no simulator/emulator/Expo Go device); `expo export
 --platform web` is used as the CI-safe `build` check instead.
