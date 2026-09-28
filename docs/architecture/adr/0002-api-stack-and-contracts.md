@@ -31,3 +31,12 @@ API shapes in sync across api, web and mobile without hand-written duplicate typ
   consumer that must be updated.
 - Prisma models are internal to the API; never expose Prisma types to clients — map to contract
   types.
+
+## Update (2026-09-28): `@najme/contracts` build
+
+`packages/contracts` is runtime-agnostic (no Node/DOM APIs) and built with `tsup` into dual ESM +
+CJS output (`dist/index.js` / `dist/index.cjs`) plus type declarations per module format
+(`dist/index.d.ts` / `dist/index.d.cts`), selected via `package.json#exports` conditions. This lets
+NestJS (which compiles to CommonJS) `require()` the package and Next.js/Expo `import` it from the
+same published output, without the API needing an ESM-only Nest setup. See
+`packages/contracts/README.md` for details.
