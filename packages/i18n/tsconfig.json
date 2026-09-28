@@ -1,0 +1,10 @@
+{
+  "extends": "@najme/config/tsconfig/node.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "ignoreDeprecations": "6.0",
+    "resolveJsonModule": true
+  },
+  "include": ["src"],
+  "exclude": ["src/dual-module.test.ts"]
+}

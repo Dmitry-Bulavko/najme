@@ -1,0 +1,23 @@
+{
+  "appName": "Najme",
+  "tagline": "Book local services in Montenegro",
+  "languages": {
+    "en": "English",
+    "me": "Crnogorski / Srpski",
+    "ru": "Русский",
+    "tr": "Türkçe"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "retry": "Retry",
+    "continue": "Continue"
+  },
+  "states": {
+    "loading": "Loading…",
+    "empty": "Nothing here yet",
+    "error": "Something went wrong"
+  },
+  "bookingsCount": "{count, plural, one {# booking} other {# bookings}}"
+}

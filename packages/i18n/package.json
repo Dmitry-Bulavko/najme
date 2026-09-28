@@ -1,0 +1,42 @@
+{
+  "name": "@najme/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared locales, locale resolution and message catalogs for the Najme API, web and mobile clients",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "tsup",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@formatjs/icu-messageformat-parser": "^3.5.20",
+    "@najme/config": "workspace:*",
+    "@types/node": "^26.6.3",
+    "eslint": "^10.11.0",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.2"
+  }
+}
