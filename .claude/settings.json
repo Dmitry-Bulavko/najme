@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install*)",
+      "Bash(pnpm check*)",
+      "Bash(pnpm format*)",
+      "Bash(pnpm lint*)",
+      "Bash(pnpm typecheck*)",
+      "Bash(pnpm test*)",
+      "Bash(pnpm build*)",
+      "Bash(pnpm turbo *)",
+      "Bash(pnpm --filter *)",
+      "Bash(pnpm exec *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git fetch*)",
+      "Bash(git branch*)",
+      "Bash(git switch*)",
+      "Bash(git checkout -b *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git rev-parse*)",
+      "Bash(gh issue view*)",
+      "Bash(gh issue list*)",
+      "Bash(gh pr view*)",
+      "Bash(gh pr list*)",
+      "Bash(gh pr checks*)",
+      "Bash(gh run view*)",
+      "Bash(gh run list*)",
+      "Bash(gh auth status*)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push origin main*)",
+      "Bash(git push origin production*)",
+      "Bash(git push origin HEAD:main*)",
+      "Bash(git push origin HEAD:production*)",
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
