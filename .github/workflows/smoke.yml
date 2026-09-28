@@ -133,6 +133,17 @@ jobs:
           echo "web /en status: $code"
           [[ "$code" == "200" ]]
 
+      - name: Verify locale redirects run in the production image
+        # The proxy (ADR-0004) must execute in the standalone build: /en alone would pass without it.
+        run: |
+          out="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -H 'Accept-Language: ru' http://localhost/)"
+          echo "GET / (Accept-Language: ru): $out"
+          [[ "$out" =~ ^307\ .*/ru$ ]]
+
+          out="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -H 'Accept-Language: ru' http://localhost/xx/foo)"
+          echo "GET /xx/foo (Accept-Language: ru): $out"
+          [[ "$out" =~ ^307\ .*/ru/foo$ ]]
+
       - name: Show compose logs on failure
         if: failure()
         working-directory: infra

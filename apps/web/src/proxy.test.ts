@@ -1,8 +1,9 @@
+import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
 import { NextRequest } from 'next/server';
 import { describe, expect, it } from 'vitest';
 
 import { LOCALE_COOKIE_NAME } from './i18n/routing';
-import { proxy } from './proxy';
+import { config, proxy } from './proxy';
 
 describe('proxy', () => {
   it('keeps an explicit "me" cookie choice even when Accept-Language prefers English (#34)', () => {
@@ -55,4 +56,22 @@ describe('proxy', () => {
     expect(redirectPath('/about')).toBe('/en/about');
     expect(redirectPath('/business/x', { 'accept-language': 'ru' })).toBe('/ru/business/x');
   });
+});
+
+describe('proxy matcher', () => {
+  const matches = (url: string): boolean => unstable_doesMiddlewareMatch({ config, url });
+
+  it.each(['/', '/en/foo', '/apiary', '/api-docs', '/_nextish', '/foo/api'])(
+    'runs the proxy for %s',
+    (url) => {
+      expect(matches(url)).toBe(true);
+    },
+  );
+
+  it.each(['/api', '/api/v1/health', '/_next/static/x.js', '/_vercel/insights', '/favicon.ico'])(
+    'skips %s',
+    (url) => {
+      expect(matches(url)).toBe(false);
+    },
+  );
 });

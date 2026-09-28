@@ -17,7 +17,9 @@ the production stack actually works before a change can reach `production`:
 3. Runs the `migrate` profile, then asserts `GET /api/v1/health` returns
    `{"status":"ok","db":"ok"}`, that `@najme/contracts` actually resolves inside the running `api`
    container (regression check for the dangling-workspace-symlink bug fixed in #16), and that the
-   web home page (`/en`) returns 200 through Caddy.
+   web home page (`/en`) returns 200 through Caddy. It also asserts that `GET /` with
+   `Accept-Language: ru` returns 307 to `.../ru`, and that `GET /xx/foo` redirects to `.../ru/foo`
+   (no `-L`; proves the locale proxy runs in the standalone image and strips unsupported locales).
 4. Always tears the stack down (`docker compose down -v`); prints `docker compose logs` on failure.
 
 If it fails, re-run the job and read the printed compose logs first; a local repro is
