@@ -19,5 +19,13 @@
     "empty": "Nothing here yet",
     "error": "Something went wrong"
   },
-  "bookingsCount": "{count, plural, one {# booking} other {# bookings}}"
+  "bookingsCount": "{count, plural, one {# booking} other {# bookings}}",
+  "apiStatus": {
+    "label": "API status",
+    "online": "Online",
+    "unavailable": "Unavailable"
+  },
+  "languageSwitcher": {
+    "label": "Language"
+  }
 }
