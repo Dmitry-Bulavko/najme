@@ -4,8 +4,9 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { isSupportedLocale, LOCALE_COOKIE_MAX_AGE, LOCALE_COOKIE_NAME } from './i18n/routing';
 
 export const config = {
-  // Skip Next.js internals, static files and the API dev-proxy path.
-  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
+  // Skip Next.js internals, static files and the API dev-proxy path. `api`, `_next` and `_vercel`
+  // are excluded only as whole first segments, so `/apiary` and `/api-docs` still get a locale.
+  matcher: ['/((?!(?:api|_next|_vercel)(?:/|$)|.*\\..*).*)'],
 };
 
 /**
