@@ -16,6 +16,20 @@ then moves the answer to **Resolved** (and to an ADR if it is architectural).
 | Q7  | Are business-entered texts (service names, descriptions) translated? Manually per locale or machine translation?                        | M4        | Single language chosen by the business; no translation      |
 | Q8  | Moderation: must every business be approved before it is publicly listed?                                                               | M6        | Yes, manual approval by platform admin                      |
 
+## Defaults assumed by the domain model
+
+`docs/architecture/data-model.md` and ADR-0009 had to pick a concrete schema before M1–M3 can start.
+For the questions below, the model uses the "Default if unanswered" column as-is. These are design
+assumptions, not product decisions — confirm (or override) before the listed task starts.
+
+| #   | Modeled as                                                                                                             |
+| --- | ---------------------------------------------------------------------------------------------------------------------- |
+| Q2  | Generic `ServiceCustomFieldDefinition` (text/number/select) + `BookingCustomFieldValue`, no transfer-specific columns. |
+| Q3  | `Business.confirmationMode` enum, default `AUTO`, switchable per business.                                             |
+| Q4  | `Business.cancellationWindowMinutes` Int, default `120`.                                                               |
+| Q6  | `Booking.clientUserId` is required (no anonymous booking).                                                             |
+| Q8  | `Business.status` defaults to `PENDING_APPROVAL`; only `APPROVED` businesses are publicly listed.                      |
+
 ## Resolved
 
 | #   | Question                          | Decision                                                              | Date       |

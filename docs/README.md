@@ -17,7 +17,7 @@ doc is worse than no doc.
 | Product behaviour, naming       | `product/vision.md`, `product/glossary.md`                                                |
 | Anything architectural          | `architecture/overview.md`, relevant `architecture/adr/*`                                 |
 | API endpoints / DTOs            | `conventions/api.md`, ADR-0002                                                            |
-| Database schema / booking logic | `architecture/data-model.md` (once written), ADR-0005                                     |
+| Database schema / booking logic | `architecture/data-model.md`, ADR-0005, ADR-0009                                          |
 | Web or mobile UI                | ADR-0003, `conventions/i18n.md`, ADR-0004                                                 |
 | Tests                           | `conventions/testing.md`                                                                  |
 | New env var / secret            | `conventions/env-vars.md`                                                                 |

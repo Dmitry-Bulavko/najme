@@ -65,13 +65,17 @@ Dependency direction: `apps/*` → `packages/*`. Packages never import from apps
 
 See `adr/`. Current set:
 
-| ADR                                            | Decision                                                  |
-| ---------------------------------------------- | --------------------------------------------------------- |
-| [0001](adr/0001-monorepo.md)                   | pnpm workspaces + Turborepo monorepo                      |
-| [0002](adr/0002-api-stack-and-contracts.md)    | NestJS + Prisma + PostgreSQL; zod contracts; REST /api/v1 |
-| [0003](adr/0003-clients.md)                    | Next.js web + Expo mobile; one product with two modes     |
-| [0004](adr/0004-i18n.md)                       | Four locales, shared catalogs, locale resolution          |
-| [0005](adr/0005-time-and-booking-integrity.md) | UTC storage, business timezone, exclusion constraint      |
-| [0006](adr/0006-jobs-and-notifications.md)     | pg-boss jobs; push, email, Telegram                       |
-| [0007](adr/0007-deployment.md)                 | Lightsail VPS + Docker Compose + Caddy via GitHub Actions |
-| [0008](adr/0008-agentic-workflow.md)           | Issues as source of truth; orchestrator + subagents       |
+| ADR                                            | Decision                                                     |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| [0001](adr/0001-monorepo.md)                   | pnpm workspaces + Turborepo monorepo                         |
+| [0002](adr/0002-api-stack-and-contracts.md)    | NestJS + Prisma + PostgreSQL; zod contracts; REST /api/v1    |
+| [0003](adr/0003-clients.md)                    | Next.js web + Expo mobile; one product with two modes        |
+| [0004](adr/0004-i18n.md)                       | Four locales, shared catalogs, locale resolution             |
+| [0005](adr/0005-time-and-booking-integrity.md) | UTC storage, business timezone, exclusion constraint         |
+| [0006](adr/0006-jobs-and-notifications.md)     | pg-boss jobs; push, email, Telegram                          |
+| [0007](adr/0007-deployment.md)                 | Lightsail VPS + Docker Compose + Caddy via GitHub Actions    |
+| [0008](adr/0008-agentic-workflow.md)           | Issues as source of truth; orchestrator + subagents          |
+| [0009](adr/0009-core-domain-model.md)          | Core domain model: IDs, tenancy, money, time, status machine |
+
+See also [`data-model.md`](data-model.md) for the full entity list, ER diagram and booking status
+state machine.
