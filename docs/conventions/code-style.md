@@ -49,3 +49,6 @@ enforce.
 - Turborepo ≥ 2.11.5 may write a managed `AGENTS.md` block when run by an agent. If it appears,
   commit it unchanged in the same PR (or set `"agentGuidance": false` in `turbo.json`) so the
   working tree stays clean.
+- Every package declares, as `devDependencies`, each CLI its own scripts invoke (e.g. `eslint`,
+  `tsc`, `tsup`, `vitest`) — never rely on a globally installed binary happening to be on `PATH`.
+  CI and other machines will not have it, and turbo tasks will fail with an exit code like 127.

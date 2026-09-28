@@ -209,6 +209,9 @@ importers:
       '@types/node':
         specifier: ^26.6.3
         version: 26.6.3
+      eslint:
+        specifier: ^10.11.0
+        version: 10.11.0
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(postcss@8.5.28)(typescript@6.0.3)
