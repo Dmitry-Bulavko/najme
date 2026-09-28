@@ -90,7 +90,15 @@ The orchestrator stops, sets `status:blocked` and comments on the issue when:
 
 - **Local** (Claude Code CLI with `gh` authenticated): branches `task/<N>-<slug>`; CI is awaited
   with `gh pr checks --watch`.
-- **Cloud** (claude.ai/code): the session has one designated branch — use it for the task (reset it
-  to `origin/main` first if its previous PR was merged). One task per session. CI is awaited by
-  subscribing to PR activity; the session wakes on CI events.
+- **Cloud** (claude.ai/code): the session has one designated branch — use it for the task. Force-push
+  is never used (and is denied by `.claude/settings.json`). If its previous PR was merged, update it
+  with a no-op-content merge instead of a reset: `git fetch origin main && git switch <branch> &&
+git merge --no-edit origin/main`, verify `git diff --stat origin/main HEAD` is empty, then push
+  normally (fast-forward). If it still has unmerged commits of its own, stop and ask the user. When
+  the previous PR is only waiting on CI, pipeline the next task on a local `task/<N>-<slug>` branch
+  cut from the designated branch's HEAD, then once that PR merges, update the designated branch as
+  above and `git cherry-pick <base>..task/<N>-<slug>` the task commits onto it (no rebase of pushed
+  commits), regenerating `pnpm-lock.yaml` via `pnpm install` on conflicts. One task landed on the
+  designated branch at a time; use `git worktree add` for a second concurrent checkout. CI is awaited
+  by subscribing to PR activity; the session wakes on CI events.
 - Tool mapping for both: `docs/workflow/github-tooling.md`.

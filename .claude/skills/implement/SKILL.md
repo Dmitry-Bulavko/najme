@@ -48,10 +48,22 @@ References (read once per run, only the parts you need):
 2. Comment on the issue: `🤖 Claimed by /implement. Branch: <branch>.`
 3. Branch:
    - `git switch -c task/<N>-<slug> origin/main` (slug: 3–5 words from the title, kebab-case); or
-   - designated branch: `git switch <branch>` and `git reset --hard origin/main` **only if** that
-     branch has no unmerged commits of its own (check `git log origin/main..<branch>`; if its
-     previous PR is merged, the leftovers are already in main). If it has unmerged work, stop and
-     ask the user.
+   - designated branch: never force-push it. First confirm its previous PR is merged and
+     `git diff origin/main HEAD` is empty (no leftover unmerged commits of its own); if it has
+     unmerged work, stop and ask the user. Then update it with a merge, not a reset:
+     `git fetch origin main && git switch <branch> && git merge --no-edit origin/main`, and verify
+     `git diff --stat origin/main HEAD` is empty. Pushes from here on are fast-forward
+     (`git push -u origin <branch>`, never `--force`/`-f`/`--force-with-lease`).
+   - Pipelining (optional): if the previous PR on the designated branch is still only waiting on CI,
+     do not block — create a local branch `task/<N>-<slug>` from the designated branch's current
+     HEAD and run Steps 3–4 there. Once the previous PR merges, update the designated branch as
+     above, then bring the work over with
+     `git cherry-pick <base>..task/<N>-<slug>` (`<base>` = the designated branch HEAD the local
+     branch started from — never rebase already-pushed commits). Resolve any `pnpm-lock.yaml`
+     conflict by regenerating it (`pnpm install`), never by hand, then
+     `pnpm install --frozen-lockfile && pnpm check` before pushing; delete the local branch
+     afterwards. Use `git worktree add` for a second concurrent checkout if two branches need to
+     exist at once, and tell subagents which directory to use.
    - When resuming an in-progress task, check out its existing branch instead and continue from the
      appropriate step.
 
