@@ -1,7 +1,10 @@
 # Code style
 
-Formatting is automatic (Prettier, root config). Linting is ESLint flat config from
-`packages/config`. These rules cover what tools cannot enforce.
+Formatting is automatic (Prettier, root config). Linting and TypeScript settings come from
+`@najme/config` (`packages/config`): its `tsconfig/*.json` presets and its ESLint flat config are
+the source of truth — every package and app extends/imports them rather than redefining rules. See
+`packages/config/README.md` for how to consume each preset. These rules cover what tools cannot
+enforce.
 
 ## TypeScript
 
