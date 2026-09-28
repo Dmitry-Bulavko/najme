@@ -95,4 +95,11 @@ None.
 
 ## Implementation notes
 
-Filled in after implementation below once the code is in place.
+Round 1 (in progress): app scaffolded (middleware, `[locale]` layout/page, language switcher, API
+status badge, Dockerfile, Vitest tests) and `pnpm install`/`typecheck` are green. `pnpm --filter
+@najme/web lint` currently crashes (`scopeManager.addGlobals is not a function`) — `eslint-config-next`
+16.3.6's flat config predates ESLint 10's language/scope-manager API; needs a compatible
+`eslint-plugin-react`/parser combination or pinning ESLint to the range `eslint-config-next` expects.
+`pnpm --filter @najme/web test`/`build` and the full `pnpm check` have not been run yet. Remaining
+work for the next round: fix lint, run and fix test/build, run `pnpm format` and `pnpm check`
+end-to-end, then finalize this section.
