@@ -59,7 +59,7 @@ native builds in this task.
   resolve under pnpm's symlinked layout.
 - **Lint:** `eslint-config-expo` and `eslint-plugin-react` do not yet support ESLint 10's flat
   config/scope-manager API (same issue `apps/web` hit with `eslint-config-next`, see
-  `docs/specs/14-web-scaffold.md`), so `eslint.config.js` composes `@najme/config`'s shared
+  `docs/specs/14-web-scaffold.md`), so `eslint.config.mjs` composes `@najme/config`'s shared
   TypeScript rules with `eslint-plugin-react-hooks`'s flat `recommended-latest` config directly.
 - **Tests:** Jest (`jest-expo` preset) + `@testing-library/react-native`.
   `src/__tests__/tabs-layout.test.tsx` mocks `expo-router`'s `Tabs`/`Tabs.Screen` (rendering
