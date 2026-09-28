@@ -1,1 +1,37 @@
+# Dependencies
 node_modules/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.p8
+*.p12
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+
+# Build output
+dist/
+build/
+out/
+.next/
+.expo/
+.turbo/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+expo-env.d.ts
+
+# Native (Expo prebuild output)
+apps/mobile/ios/
+apps/mobile/android/
+
+# IDE / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+*.log
