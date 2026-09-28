@@ -54,3 +54,42 @@ jobs:
 
       - name: Lint, typecheck, test, build
         run: pnpm turbo run lint typecheck test build
+
+      - name: Dev smoke (pnpm dev from a fresh env)
+        env:
+          TURBO_UI: 'false'
+        run: |
+          pnpm --filter @najme/api db:migrate:deploy
+          cat >.env <<EOF
+          DATABASE_URL=${DATABASE_URL}
+          NODE_ENV=development
+          PORT=3000
+          WEB_PORT=3001
+          PUBLIC_URL=http://localhost:3001
+          API_INTERNAL_URL=http://localhost:3000/api/v1
+          EOF
+          rm -rf packages/*/dist
+          setsid nohup pnpm dev >dev.log 2>&1 &
+          echo $! >dev.pid
+          ok=0
+          for _ in $(seq 60); do
+            api=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/v1/health || true)
+            web=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/en || true)
+            if [ "$api" = 200 ] && [ "$web" = 200 ]; then ok=1; break; fi
+            sleep 2
+          done
+          if [ "$ok" != 1 ]; then
+            echo "pnpm dev did not become healthy (api=$api web=$web)"
+            cat dev.log
+            exit 1
+          fi
+          curl -s http://localhost:3000/api/v1/health
+          curl -s http://localhost:3001/en | grep -q 'data-online="true"'
+
+      - name: Stop dev processes
+        if: always()
+        run: |
+          if [ -f dev.pid ]; then kill -- -"$(cat dev.pid)" 2>/dev/null || true; fi
+          pkill -f 'next dev' || true
+          pkill -f 'dist/main.js' || true
+          pkill -f 'turbo' || true

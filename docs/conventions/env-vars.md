@@ -21,6 +21,13 @@ When code starts reading a new env var, the same PR must:
   common ones).
 - Print secrets in logs or CI output.
 
+## Local development
+
+In development the API and web read the repo-root `.env` (copy of `.env.example`); shell variables
+win. `API_INTERNAL_URL=http://localhost:3000/api/v1` is enabled in `.env.example` for the web API
+badge. Mobile uses `EXPO_PUBLIC_API_URL` (root `.env` or `apps/mobile/.env.local`). Turbo strict env
+mode: declare every variable a task reads in that app's `turbo.json`.
+
 ## Production variables
 
 | Name                    | Kind   | Used by       | Purpose                                                                                            |

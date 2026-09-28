@@ -10,6 +10,9 @@
     },
     "test": {
       "env": ["DATABASE_URL", "GIT_SHA", "NODE_ENV", "PORT", "PUBLIC_URL"]
+    },
+    "dev": {
+      "env": ["DATABASE_URL", "GIT_SHA", "NODE_ENV", "PORT", "PUBLIC_URL"]
     }
   }
 }

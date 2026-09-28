@@ -3,7 +3,7 @@
   "extends": ["//"],
   "tasks": {
     "dev": {
-      "env": ["WEB_PORT"]
+      "env": ["WEB_PORT", "NODE_ENV", "PUBLIC_URL", "API_INTERNAL_URL", "GIT_SHA"]
     },
     "build": {
       "env": ["NODE_ENV"]
