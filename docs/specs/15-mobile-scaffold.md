@@ -62,11 +62,13 @@ native builds in this task.
   `docs/specs/14-web-scaffold.md`), so `eslint.config.js` composes `@najme/config`'s shared
   TypeScript rules with `eslint-plugin-react-hooks`'s flat `recommended-latest` config directly.
 - **Tests:** Jest (`jest-expo` preset) + `@testing-library/react-native`.
-  `src/app/(tabs)/_layout.test.tsx` mocks `expo-router`'s `Tabs`/`Tabs.Screen` (rendering
+  `src/__tests__/tabs-layout.test.tsx` mocks `expo-router`'s `Tabs`/`Tabs.Screen` (rendering
   `options.title` as plain text, since the real components render native tab-bar chrome that isn't
   observable in a unit test) and renders the real `TabsLayout` component through an
   `I18nextProvider`, asserting the English titles render by default and the `me` titles render after
-  `i18next.changeLanguage('me')`.
+  `i18next.changeLanguage('me')`. `src/i18n/index.test.ts` covers `initI18n`/`setLocale`
+  persistence against the AsyncStorage jest mock: an explicit `me` choice survives a fresh
+  `initI18n()` call (#34), and a garbage stored value falls back to the (mocked) device locales.
 - **`build` script:** `expo export --platform web`, which needs no native toolchain, keeps a `build`
   check green in CI without `expo prebuild`/`eas build`.
 
@@ -112,9 +114,9 @@ None.
   Expo Go or a simulator; `expo export --platform web` and the Jest suite are the only executable
   verification here. A human/CI-with-device pass is recommended before relying on this scaffold for
   real screens.
-- `eas.json`'s `preview`/`production` `EXPO_PUBLIC_API_URL` values are placeholders
-  (`https://staging.najme.example/...`, `https://najme.example/...`); update them once the real
-  staging/production domains are decided (see `DOMAIN` in `docs/conventions/env-vars.md`).
+- `eas.json`'s `preview` and `production` `EXPO_PUBLIC_API_URL` both point at the single alpha
+  domain, `https://najme.dzmitry-bulauka.com/api/v1` (ADR-0007); split them once a separate staging
+  environment exists.
 
 ## Implementation notes
 

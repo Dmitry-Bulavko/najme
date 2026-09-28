@@ -26,18 +26,18 @@ function deviceLocaleCandidates(): string[] {
 
 /**
  * Initializes i18next once for the app lifetime. Resolution order follows ADR-0004: an explicit
- * choice persisted on device (read asynchronously from `AsyncStorage`) first, then device
- * languages, then the `en` default — all funneled through `@najme/i18n`'s `resolveLocale` so web,
- * mobile and the API stay in lockstep. `i18next-icu` is registered as the formatting engine so
- * catalog values keep the same ICU MessageFormat syntax (plurals, selects) used by `@najme/i18n`
- * and the API, instead of i18next's own `{{var}}`/`count`-suffixed-key interpolation.
+ * choice persisted on device (read asynchronously from `AsyncStorage`) wins outright if it is a
+ * valid {@link Locale} (checked directly with `isLocale`, since a stored internal code like `me`
+ * is not itself a BCP-47 primary subtag — see #34); otherwise device languages are resolved via
+ * `@najme/i18n`'s `resolveLocale`, falling back to `en`. `i18next-icu` is registered as the
+ * formatting engine so catalog values keep the same ICU MessageFormat syntax (plurals, selects)
+ * used by `@najme/i18n` and the API, instead of i18next's own `{{var}}`/`count`-suffixed-key
+ * interpolation.
  */
 export async function initI18n(): Promise<Locale> {
   const storedLocale = await AsyncStorage.getItem(LOCALE_STORAGE_KEY);
-  const candidates = storedLocale
-    ? [storedLocale, ...deviceLocaleCandidates()]
-    : deviceLocaleCandidates();
-  const locale = resolveLocale(candidates);
+  const locale =
+    storedLocale && isLocale(storedLocale) ? storedLocale : resolveLocale(deviceLocaleCandidates());
 
   if (!i18next.isInitialized) {
     await i18next

@@ -29,6 +29,9 @@ build/CI check green. EAS builds (`eas build`) are out of scope for this task (s
 
 `EXPO_PUBLIC_*` vars are inlined into the JS bundle at build time (never secrets). From Expo Go on
 a physical device, use the dev machine's LAN IP instead of `localhost` (see `.env.example`).
+`eas.json`'s `preview` and `production` build profiles both point at
+`https://najme.dzmitry-bulauka.com/api/v1` (ADR-0007, `docs/runbooks/deploy.md`): the alpha
+deployment has a single environment, so there is no separate staging host yet.
 
 ## i18n
 
@@ -52,8 +55,10 @@ shared with `apps/web` (ADR-0003) — this app uses plain React Native primitive
 ## Testing
 
 `pnpm --filter @najme/mobile test` runs Jest (`jest-expo` preset) + React Native Testing Library.
-`src/app/(tabs)/_layout.test.tsx` covers the acceptance criterion that switching the active locale
-changes the rendered tab titles.
+`src/__tests__/tabs-layout.test.tsx` covers the acceptance criterion that switching the active
+locale changes the rendered tab titles; `src/i18n/index.test.ts` covers locale persistence
+(`initI18n`/`setLocale`, including the internal `me` code and a garbage stored value falling back
+to device locales).
 
 ## Metro and the pnpm workspace
 
