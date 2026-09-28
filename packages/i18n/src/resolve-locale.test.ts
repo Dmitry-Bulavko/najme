@@ -29,6 +29,9 @@ describe('resolveLocale', () => {
     ['ignores garbage candidates like x-klingon', ['x-klingon', 'en'], 'en'],
     ['ignores whitespace-only candidates', ['   ', 'sr'], 'me'],
     ['trims surrounding whitespace', [' tr '], 'tr'],
+    ['explicit internal me code resolves to me', ['me'], 'me'],
+    ['explicit internal me code wins over later matches', ['me', 'en-US'], 'me'],
+    ['explicit internal me code is case-insensitive', ['ME'], 'me'],
   ];
 
   it.each(cases)('%s', (_description, candidates, expected) => {

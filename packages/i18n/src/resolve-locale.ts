@@ -8,6 +8,9 @@ import { DEFAULT_LOCALE, type Locale } from './locales.js';
  * - `ru`, `uk`, `be` -> `ru` (closest usable locale for other Slavic CIS languages).
  * - `tr` -> `tr`.
  * - `en` -> `en`.
+ * - `me` -> `me`. This is our internal locale code (not a BCP-47 primary subtag), included so an
+ *   explicit stored choice of `me` (read back from a cookie / `AsyncStorage`) resolves to itself
+ *   instead of being dropped (see #34).
  */
 const PRIMARY_SUBTAG_TO_LOCALE: Readonly<Record<string, Locale>> = {
   sr: 'me',
@@ -15,6 +18,7 @@ const PRIMARY_SUBTAG_TO_LOCALE: Readonly<Record<string, Locale>> = {
   bs: 'me',
   hr: 'me',
   sh: 'me',
+  me: 'me',
   ru: 'ru',
   uk: 'ru',
   be: 'ru',

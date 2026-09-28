@@ -1,0 +1,17 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "env": ["EXPO_PUBLIC_API_URL"]
+    },
+    "test": {
+      "env": ["EXPO_PUBLIC_API_URL"]
+    },
+    "start": {
+      "cache": false,
+      "persistent": true,
+      "env": ["EXPO_PUBLIC_API_URL"]
+    }
+  }
+}

@@ -27,5 +27,23 @@
   },
   "languageSwitcher": {
     "label": "Jezik"
+  },
+  "tabs": {
+    "discover": "Otkrij",
+    "bookings": "Rezervacije",
+    "account": "Nalog"
+  },
+  "screens": {
+    "discover": {
+      "title": "Otkrij",
+      "body": "Pregledajte lokalne biznise i usluge — uskoro."
+    },
+    "bookings": {
+      "title": "Rezervacije",
+      "body": "Ovdje će se prikazati vaše predstojeće i prošle rezervacije."
+    },
+    "account": {
+      "title": "Nalog"
+    }
   }
 }
