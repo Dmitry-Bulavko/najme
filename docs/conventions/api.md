@@ -5,7 +5,8 @@
 - Base path `/api/v1`. Breaking changes require `/api/v2` for the affected resources (avoid them).
 - JSON only; `camelCase` fields; timestamps as ISO 8601 UTC strings (`2026-10-01T09:00:00.000Z`);
   money as integer minor units + ISO currency (`{ "amount": 2500, "currency": "EUR" }`).
-- IDs are opaque strings (UUID v7 or cuid2 — decided in the API scaffold task).
+- IDs are opaque strings: **UUID v7** (time-ordered, so they sort and index well; generated
+  application-side, not by Postgres' `gen_random_uuid()` which is v4).
 - Resource naming: plural nouns, nested only one level for ownership
   (`/businesses/:businessId/services`).
 

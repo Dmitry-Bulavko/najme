@@ -16,12 +16,25 @@ pnpm install
 cp .env.example .env
 ```
 
-Once the API is scaffolded (M0), local services start with:
+Local services start with:
 
 ```bash
 docker compose -f compose.dev.yml up -d   # PostgreSQL (port from .env)
 pnpm dev                                  # all apps via turbo
 ```
+
+## `apps/api`
+
+```bash
+pnpm --filter @najme/api run db:migrate:dev     # create/apply a dev migration
+pnpm --filter @najme/api run db:migrate:deploy  # apply pending migrations (CI/prod contract)
+pnpm --filter @najme/api dev                    # watch mode on PORT (default 3000)
+pnpm --filter @najme/api test                   # unit + e2e (needs DATABASE_URL, real Postgres)
+```
+
+`GET http://localhost:3000/api/v1/health` and, outside production, OpenAPI docs at
+`/api/v1/docs`. Env vars are validated with zod at startup — see `apps/api/src/config/env.schema.ts`
+and `docs/conventions/env-vars.md`.
 
 Per-app commands, ports and seed scripts are documented in each app's `README.md` (added by the
 scaffold tasks — update this runbook when they land).
