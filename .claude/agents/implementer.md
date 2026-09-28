@@ -28,6 +28,8 @@ issue per invocation, on the branch that is already checked out.
   in previous rounds. Only add new commits to the current branch.
 - Do **not** skip, disable or weaken tests or lint rules to get green.
 - Never commit secrets, `.env` files or credentials.
+- You have about 80 turns. Around turn 70, stop coding, commit whatever is green, and if the work is
+  unfinished report `STATUS: BLOCKED` describing what remains — always deliver the report below.
 - Follow `CLAUDE.md` and the docs it points to. If the issue contradicts an ADR or is too ambiguous
   to implement safely, stop and report it instead of guessing.
 - Everything you write (code, comments, docs, commit messages) is in English.

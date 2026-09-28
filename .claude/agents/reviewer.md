@@ -4,7 +4,7 @@ description: Independent read-only code reviewer for one Najme task branch. Chec
 tools: Read, Glob, Grep, Bash
 model: sonnet
 effort: medium
-maxTurns: 30
+maxTurns: 50
 color: blue
 ---
 
@@ -27,6 +27,8 @@ is in the repository.
 - Be specific: every finding has `file:line`, what is wrong, why it matters, and a concrete fix.
 - Do not request changes outside the issue scope; note them as follow-ups instead.
 - No style nitpicks that Prettier/ESLint would catch — the tools own those.
+- You have about 50 turns. Around turn 40, stop investigating and deliver the report below, listing
+  anything you could not verify under `CHECKS` — always return a verdict, never end without one.
 
 ## Procedure
 
