@@ -74,13 +74,17 @@ Spec: <docs/specs/<N>-<slug>.md if it exists, else "none — create one if size:
 <job name, failing step, last ~80 relevant log lines>
 ```
 
-Read the report. If `STATUS: BLOCKED`, go to **Escalate**. Verify commits exist:
+Read the report. If the subagent stopped at its turn limit without delivering the report format,
+send one follow-up message to the same agent asking it to deliver its report now; escalate only if
+that also fails to produce one. If `STATUS: BLOCKED`, go to **Escalate**. Verify commits exist:
 `git log --oneline origin/main..HEAD`.
 
 ## Step 4 — Review (max 3 rounds)
 
 Launch the `reviewer` subagent with: issue number/title/body, spec path, base `origin/main`, round
-number, and on re-review the previous findings plus the previous reviewed HEAD sha.
+number, and on re-review the previous findings plus the previous reviewed HEAD sha. If it stops at
+its turn limit without a verdict, send one follow-up message asking it to deliver its report now;
+escalate only if that also fails to produce one.
 
 - `VERDICT: APPROVE` → Step 5.
 - `CHANGES_REQUESTED` → back to Step 3 with the findings (round + 1).

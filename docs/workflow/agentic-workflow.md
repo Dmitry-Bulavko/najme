@@ -15,6 +15,13 @@ Decision record: ADR-0008. This document is the operating manual.
 Subagents have no GitHub access; the orchestrator is the only one that talks to GitHub during a
 task. This keeps subagent context small and the audit trail in one place.
 
+Turn budgets: `implementer` has `maxTurns: 80` and is prompted to stop around turn 70, commit what
+is green, and report `STATUS: BLOCKED` with what remains if unfinished. `reviewer` has
+`maxTurns: 50` and is prompted to stop around turn 40 and deliver its verdict, listing anything
+unverified under `CHECKS`. Both must always hand back their fixed report format before the limit.
+If a subagent still stops at its turn limit without a report, the orchestrator sends it one
+follow-up message asking for the report (continuing the same agent) before escalating.
+
 ## The loop
 
 ```
