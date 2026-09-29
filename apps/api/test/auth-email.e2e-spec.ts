@@ -308,6 +308,46 @@ describe('Auth emails (e2e, fake mailer)', () => {
       );
     });
 
+    it('marks the email verified on reset, and only once per token', async () => {
+      const address = email('resetverify');
+      const session = await register(address);
+      await post('/auth/forgot-password').send({ email: address });
+      await mail.idle();
+      const token = tokenFromEmail(mailer.to(address)[1]!.text);
+      const body = { token, newPassword: NEW_PASSWORD };
+
+      expect((await post('/auth/reset-password').send(body)).status).toBe(204);
+      const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+      expect(user?.emailVerifiedAt).not.toBeNull();
+
+      const reuse = await post('/auth/reset-password').send(body);
+      expect(reuse.status).toBe(400);
+      expect(reuse.body.error.code).toBe('TOKEN_INVALID');
+    });
+
+    it('rejects a reset for a soft-deleted user and rolls the claim back', async () => {
+      const address = email('resetdeleted');
+      const session = await register(address);
+      await post('/auth/forgot-password').send({ email: address });
+      await mail.idle();
+      const token = tokenFromEmail(mailer.to(address)[1]!.text);
+      await prisma.user.update({ where: { id: session.user.id }, data: { deletedAt: new Date() } });
+
+      const res = await post('/auth/reset-password').send({ token, newPassword: NEW_PASSWORD });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('TOKEN_INVALID');
+      const stored = await prisma.emailToken.findUnique({
+        where: { tokenHash: hashEmailToken(token) },
+      });
+      expect(stored?.usedAt).toBeNull();
+      const identity = await prisma.authIdentity.findFirst({ where: { userId: session.user.id } });
+      expect(identity?.passwordHash).not.toBeNull();
+      const active = await prisma.refreshToken.count({
+        where: { userId: session.user.id, revokedAt: null },
+      });
+      expect(active).toBe(1);
+    });
+
     it('validates the new password', async () => {
       const res = await post('/auth/reset-password').send({ token: 'abc', newPassword: 'short' });
       expect(res.status).toBe(400);

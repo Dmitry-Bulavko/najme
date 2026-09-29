@@ -121,7 +121,7 @@ export class AuthService {
    * background, so the response is identical in content and (roughly) in timing.
    */
   forgotPassword(input: ForgotPasswordRequest): void {
-    this.mail.defer('resetPassword', 'unknown', async () => {
+    this.mail.defer('resetPassword', null, async () => {
       const credential = await this.users.findPasswordCredentialByEmail(input.email);
       if (credential) await this.issueAndSend('resetPassword', credential.user);
     });
@@ -136,6 +136,8 @@ export class AuthService {
         throw apiError(HttpStatus.BAD_REQUEST, 'TOKEN_INVALID', 'This link is invalid.');
       }
       await this.refreshTokens.revokeAllForUser(userId, tx);
+      // The link only reached the mailbox owner, so this proves ownership of the address.
+      await this.users.markEmailVerified(userId, tx);
     });
   }
 

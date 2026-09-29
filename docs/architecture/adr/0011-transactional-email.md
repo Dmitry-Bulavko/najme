@@ -24,7 +24,17 @@ the design must not depend on it, and sending must never make an auth request sl
   deep links later).
 - **Password reset** replaces the hash and revokes every refresh token in one transaction.
   Access tokens already issued remain valid up to 15 minutes (same accepted window as ADR-0010).
+  Because the link only reaches the mailbox owner, a successful reset also sets `emailVerifiedAt`
+  if unset (other identities are untouched).
+- **Logging:** failed background email jobs log a constant label, the user id when known, and the
+  error name and code, never the message: Prisma and nodemailer messages embed email addresses.
 - **Enumeration:** `forgot-password` always answers an empty 202 and does its work after responding.
+
+## Known limitations
+
+- Anyone can call `forgot-password` repeatedly for a victim's email; each call issues a new token
+  and invalidates the victim's pending reset link (a nuisance, not a takeover). Fix in M5: per-email
+  throttling, or not re-issuing a token within N minutes.
 
 ## Consequences
 

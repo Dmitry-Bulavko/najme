@@ -9,6 +9,7 @@ import { authSessionSchema, meSchema } from '@najme/contracts';
 import { configureApp } from '../src/app.setup.js';
 import { AppModule } from '../src/app.module.js';
 import { hashRefreshToken } from '../src/auth/refresh-token.service.js';
+import { MailService } from '../src/mail/mail.service.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
 const PASSWORD = 'correct horse battery';
@@ -66,6 +67,8 @@ describe('Auth (e2e)', () => {
   });
 
   afterEach(async () => {
+    // Registration sends its verification email in the background; let it finish before cleanup.
+    await app.get(MailService).idle();
     await prisma.user.deleteMany({ where: { email: { in: emails.splice(0) } } });
   });
 

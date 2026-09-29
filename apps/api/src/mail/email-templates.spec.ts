@@ -43,3 +43,12 @@ describe('formatMessage', () => {
     expect(formatMessage('{hours} saat', 'tr', { hours: 3 })).toBe('3 saat');
   });
 });
+
+describe('formatMessage with special characters', () => {
+  it('keeps $ sequences of a translation literal', () => {
+    expect(formatMessage('{hours, plural, one {$& # h} other {$1 # h}}', 'en', { hours: 2 })).toBe(
+      '$1 2 h',
+    );
+    expect(formatMessage('a $& {hours}', 'en', { hours: 2 })).toBe('a $& 2');
+  });
+});

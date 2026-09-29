@@ -19,7 +19,9 @@ Shared locale list, locale resolution and message catalogs used by `apps/api`, `
   is the TypeScript shape inferred from the `en` catalog (the source of truth); `MessageKey` is the
   union of dot-separated leaf paths (e.g. `'actions.save'`) for typed key lookups.
 - `catalogs[locale].emails` — subjects and bodies of transactional emails (verify email, reset
-  password), rendered by `apps/api`.
+  password), rendered by `apps/api`. The API renders them with a small formatter that supports only
+  this ICU subset: `{hours}` and `{hours, plural, one {…} few {…} other {…}}` (any CLDR categories,
+  `#` = the number, no nesting or other arguments). Anything else needs a real ICU formatter first.
 - `flattenMessages(tree)` — flattens a nested catalog into `{ 'a.b.c': 'message' }`, for consumers
   (e.g. i18next) that want flat keys, and used internally by the key-parity/ICU tests.
 

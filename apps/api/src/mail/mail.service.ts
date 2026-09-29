@@ -17,6 +17,15 @@ const PATH: Record<EmailKind, string> = {
   resetPassword: 'reset-password',
 };
 
+/** Log line for a failed job without any error message text (it may contain an email address). */
+export function describeFailure(kind: EmailKind, userId: string | null, error: unknown): string {
+  const name = error instanceof Error ? error.name : typeof error;
+  const rawCode = (error as { code?: unknown } | null)?.code;
+  const code = typeof rawCode === 'string' || typeof rawCode === 'number' ? ` code=${rawCode}` : '';
+  const user = userId ? ` user=${userId}` : '';
+  return `Email job failed: kind=${kind}${user} error=${name}${code}`;
+}
+
 /**
  * Renders and sends the transactional emails. Sending is fire-and-forget (see
  * `docs/specs/49-mailer-verify-reset.md`): callers never wait for, or fail because of, SMTP.
@@ -39,13 +48,13 @@ export class MailService implements BeforeApplicationShutdown {
 
   /**
    * Runs `job` (typically: issue a token, then call {@link send}) in the background. A failure is
-   * logged with the user id only and never propagates.
+   * logged as job label, optional user id, error name and code, and never propagates. The error
+   * message is deliberately left out: Prisma and nodemailer messages embed the queried or
+   * addressed email. Pass `userId` null when only an email is known (forgot-password).
    */
-  defer(kind: EmailKind, userId: string, job: () => Promise<void>): void {
+  defer(kind: EmailKind, userId: string | null, job: () => Promise<void>): void {
     const run = job().catch((error: unknown) => {
-      this.logger.error(
-        `Failed to send ${kind} email (user ${userId}): ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(describeFailure(kind, userId, error));
     });
     this.pending.add(run);
     void run.finally(() => this.pending.delete(run));

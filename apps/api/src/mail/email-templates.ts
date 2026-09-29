@@ -37,14 +37,16 @@ function escapeHtml(value: string): string {
  */
 export function formatMessage(message: string, locale: Locale, values: { hours: number }): string {
   const plural = /\{hours, plural, ((?:[a-z]+ \{[^}]*\} ?)+)\}/.exec(message);
-  if (!plural) return message.replaceAll('{hours}', String(values.hours));
+  if (!plural) return message.replaceAll('{hours}', () => String(values.hours));
   const forms = new Map<string, string>();
   for (const match of plural[1]!.matchAll(/([a-z]+) \{([^}]*)\}/g)) {
     forms.set(match[1]!, match[2]!);
   }
   const category = new Intl.PluralRules(locale === 'me' ? 'sr-Latn' : locale).select(values.hours);
   const form = forms.get(category) ?? forms.get('other') ?? '';
-  return message.replace(plural[0], form.replaceAll('#', String(values.hours)));
+  const chosen = form.replaceAll('#', String(values.hours));
+  // A replacer function: `$` sequences in a translation must not act as replacement patterns.
+  return message.replace(plural[0], () => chosen);
 }
 
 /** Renders the localized text and HTML parts of a transactional email that carries one link. */
