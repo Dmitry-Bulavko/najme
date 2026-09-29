@@ -1,7 +1,11 @@
 import commonEn from './catalogs/en/common.json' with { type: 'json' };
+import errorsEn from './catalogs/en/errors.json' with { type: 'json' };
 import commonMe from './catalogs/me/common.json' with { type: 'json' };
+import errorsMe from './catalogs/me/errors.json' with { type: 'json' };
 import commonRu from './catalogs/ru/common.json' with { type: 'json' };
+import errorsRu from './catalogs/ru/errors.json' with { type: 'json' };
 import commonTr from './catalogs/tr/common.json' with { type: 'json' };
+import errorsTr from './catalogs/tr/errors.json' with { type: 'json' };
 import type { Locale } from './locales.js';
 
 /** A nested ICU message catalog: leaves are message strings, branches are namespaced groups. */
@@ -12,6 +16,9 @@ export type MessageTree = { readonly [key: string]: string | MessageTree };
  * All locale catalogs are validated (key parity + ICU syntax) against this shape in tests.
  */
 export type CommonMessages = typeof commonEn;
+
+/** The `errors` namespace: one message per API error code, keyed by the bare `<CODE>`. */
+export type ErrorMessages = typeof errorsEn;
 
 /** Union of every dot-separated leaf path in a message tree, e.g. `'languages.en'`. */
 export type MessageKey<T = CommonMessages, Prefix extends string = ''> = {
@@ -25,6 +32,7 @@ export type MessageKey<T = CommonMessages, Prefix extends string = ''> = {
 /** Namespaced message catalogs bundled by this package. */
 export interface Namespaces {
   readonly common: CommonMessages;
+  readonly errors: ErrorMessages;
 }
 
 /** All catalogs for a single locale. */
@@ -32,10 +40,10 @@ export type LocaleCatalogs = Namespaces;
 
 /** Every namespaced catalog for every supported locale, keyed by {@link Locale}. */
 export const catalogs: Readonly<Record<Locale, LocaleCatalogs>> = {
-  en: { common: commonEn },
-  me: { common: commonMe as CommonMessages },
-  ru: { common: commonRu as CommonMessages },
-  tr: { common: commonTr as CommonMessages },
+  en: { common: commonEn, errors: errorsEn },
+  me: { common: commonMe as CommonMessages, errors: errorsMe },
+  ru: { common: commonRu as CommonMessages, errors: errorsRu },
+  tr: { common: commonTr as CommonMessages, errors: errorsTr },
 };
 
 /**

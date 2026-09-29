@@ -3,8 +3,8 @@
 Shared zod schemas and inferred TypeScript types for API requests and responses, consumed by
 `apps/api`, `apps/web` and `apps/mobile`. See ADR-0002 and `docs/conventions/api.md`.
 
-This package holds cross-cutting contracts only (health, the error envelope, pagination, money).
-Domain schemas (auth, businesses, bookings, …) live alongside the feature that introduces them,
+This package holds cross-cutting contracts and the M1 auth/user contracts. Further domain schemas
+(businesses, bookings, …) live alongside the feature that introduces them,
 under `packages/contracts/src/<domain>/`.
 
 ## What's exported
@@ -12,6 +12,17 @@ under `packages/contracts/src/<domain>/`.
 - `healthResponseSchema` / `HealthResponse` — `GET /api/v1/health` response.
 - `apiErrorSchema` / `ApiError` and `apiErrorResponseSchema` / `ApiErrorResponse` — the
   `{ error: { code, message, details? } }` envelope used by every non-2xx response.
+- `ERROR_CODES` / `ErrorCode` / `errorCodeSchema` — every known API error code (generic + auth);
+  each has an `errors.<CODE>` message in `@najme/i18n`.
+- `auth.ts` — `registerRequestSchema`, `loginRequestSchema`, `refreshRequestSchema` (mobile-only
+  body token), `googleSignInRequestSchema`, `verifyEmailRequestSchema`,
+  `forgotPasswordRequestSchema`, `resetPasswordRequestSchema`, `authSessionSchema` (each with an
+  inferred type, e.g. `RegisterRequest`, `AuthSession`). Emails are trimmed and lowercased.
+- `users.ts` — `meSchema` / `Me`, `updateProfileRequestSchema` (at least one field),
+  `changePasswordRequestSchema`.
+- `locale.ts` — `localeSchema` (`en|me|ru|tr`), kept in parity with `@najme/i18n` by a test
+  (contracts has `@najme/i18n` as a devDependency only). `primitives.ts` — shared email, password
+  and display-name schemas.
 - `paginationQuerySchema` / `PaginationQuery` — `?limit=&cursor=` query params for list endpoints
   (`limit` coerces from the query string, 1–100, default 20).
 - `paginated(itemSchema)` — wraps an item schema into `{ items: T[], nextCursor: string | null }`.

@@ -473,6 +473,9 @@ importers:
       '@najme/config':
         specifier: workspace:*
         version: link:../config
+      '@najme/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@types/node':
         specifier: ^26.6.3
         version: 26.6.3

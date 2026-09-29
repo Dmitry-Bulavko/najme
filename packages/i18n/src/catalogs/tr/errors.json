@@ -1,0 +1,21 @@
+{
+  "VALIDATION_FAILED": "Lütfen işaretli alanları kontrol edip tekrar deneyin.",
+  "UNAUTHORIZED": "Bu işlem için yetkiniz yok.",
+  "FORBIDDEN": "Bu işlemi yapmaya izniniz yok.",
+  "NOT_FOUND": "Aradığınızı bulamadık.",
+  "CONFLICT": "Bu işlem mevcut durumla çakışıyor. Lütfen sayfayı yenileyip tekrar deneyin.",
+  "UNPROCESSABLE_ENTITY": "Bu işlem tamamlanamıyor.",
+  "HTTP_ERROR": "İstek başarısız oldu. Lütfen tekrar deneyin.",
+  "INTERNAL_ERROR": "Bizim tarafımızda bir sorun oluştu. Lütfen daha sonra tekrar deneyin.",
+  "SLOT_TAKEN": "Bu saat az önce doldu. Lütfen başka bir saat seçin.",
+  "EMAIL_TAKEN": "Bu e-posta adresiyle kayıtlı bir hesap zaten var.",
+  "INVALID_CREDENTIALS": "E-posta veya şifre hatalı.",
+  "UNAUTHENTICATED": "Devam etmek için lütfen giriş yapın.",
+  "TOKEN_INVALID": "Bu bağlantı geçersiz.",
+  "TOKEN_EXPIRED": "Bu bağlantının süresi doldu. Lütfen yenisini isteyin.",
+  "REFRESH_TOKEN_REUSED": "Oturumunuz artık geçerli değil. Lütfen tekrar giriş yapın.",
+  "PASSWORD_NOT_SET": "Bu hesabın şifresi yok. Google ile giriş yapın veya şifre sıfırlama ile bir şifre belirleyin.",
+  "GOOGLE_SIGN_IN_DISABLED": "Google ile giriş şu anda kullanılamıyor.",
+  "GOOGLE_TOKEN_INVALID": "Google ile giriş başarısız oldu. Lütfen tekrar deneyin.",
+  "RATE_LIMITED": "Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar deneyin."
+}
