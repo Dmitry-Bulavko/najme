@@ -1,0 +1,60 @@
+{
+  "nav": {
+    "label": "Ana gezinme",
+    "discover": "Keşfet",
+    "bookings": "Rezervasyonlar",
+    "openMenu": "Menüyü aç",
+    "menuTitle": "Menü"
+  },
+  "shell": {
+    "logoLabel": "Najme ana sayfa",
+    "skipToContent": "İçeriğe geç",
+    "signIn": "Giriş yap",
+    "close": "Kapat",
+    "footer": {
+      "tagline": "Karadağ'daki yerel hizmetleri birkaç dokunuşla rezerve edin.",
+      "rights": "© {year} Najme. Tüm hakları saklıdır."
+    }
+  },
+  "home": {
+    "hero": {
+      "title": "Yerel hizmetleri bulun ve rezerve edin",
+      "subtitle": "Karadağ genelinde salonlar, uzmanlar, transferler ve klinikler — size uygun saati seçin."
+    },
+    "search": {
+      "label": "Hizmet ara",
+      "placeholder": "Hizmet veya işletme arayın",
+      "submit": "Ara"
+    },
+    "categories": {
+      "title": "Popüler kategoriler",
+      "salons": "Güzellik salonları",
+      "barbers": "Berberler",
+      "wellness": "Wellness ve spa",
+      "clinics": "Klinikler",
+      "transfers": "Transferler",
+      "fitness": "Fitness"
+    }
+  },
+  "devUi": {
+    "title": "UI kiti vitrini",
+    "description": "Tüm bileşenlerin ve varyantların yalnızca geliştirme amaçlı önizlemesi.",
+    "loading": "Yükleniyor",
+    "showToast": "Bildirim göster",
+    "toastMessage": "Başarıyla kaydedildi",
+    "openSheet": "Paneli aç",
+    "openDropdown": "Açılır menüyü aç",
+    "emailLabel": "E-posta",
+    "emailError": "Geçerli bir e-posta adresi girin",
+    "nameLabel": "Ad soyad",
+    "nameHint": "Kimliğinizde göründüğü gibi",
+    "alertTitle": "Dikkat",
+    "alertBody": "Bu bilgilendirici bir uyarıdır.",
+    "alertErrorTitle": "Bir şeyler ters gitti",
+    "alertErrorBody": "Lütfen biraz sonra tekrar deneyin.",
+    "cardTitle": "Kart başlığı",
+    "cardBody": "Kart içeriği burada yer alır.",
+    "itemOne": "Profil",
+    "itemTwo": "Ayarlar"
+  }
+}

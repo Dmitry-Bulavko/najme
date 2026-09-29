@@ -1,0 +1,60 @@
+{
+  "nav": {
+    "label": "Main navigation",
+    "discover": "Discover",
+    "bookings": "Bookings",
+    "openMenu": "Open menu",
+    "menuTitle": "Menu"
+  },
+  "shell": {
+    "logoLabel": "Najme home",
+    "skipToContent": "Skip to content",
+    "signIn": "Sign in",
+    "close": "Close",
+    "footer": {
+      "tagline": "Book local services in Montenegro, in a few taps.",
+      "rights": "© {year} Najme. All rights reserved."
+    }
+  },
+  "home": {
+    "hero": {
+      "title": "Find and book local services",
+      "subtitle": "Salons, specialists, transfers and clinics across Montenegro — pick a time that suits you."
+    },
+    "search": {
+      "label": "Search services",
+      "placeholder": "Search for a service or business",
+      "submit": "Search"
+    },
+    "categories": {
+      "title": "Popular categories",
+      "salons": "Beauty salons",
+      "barbers": "Barbers",
+      "wellness": "Wellness and spa",
+      "clinics": "Clinics",
+      "transfers": "Transfers",
+      "fitness": "Fitness"
+    }
+  },
+  "devUi": {
+    "title": "UI kit showcase",
+    "description": "Development-only preview of every component and variant.",
+    "loading": "Loading",
+    "showToast": "Show toast",
+    "toastMessage": "Saved successfully",
+    "openSheet": "Open sheet",
+    "openDropdown": "Open dropdown",
+    "emailLabel": "Email",
+    "emailError": "Enter a valid email address",
+    "nameLabel": "Full name",
+    "nameHint": "As shown on your ID",
+    "alertTitle": "Heads up",
+    "alertBody": "This is an informational alert.",
+    "alertErrorTitle": "Something went wrong",
+    "alertErrorBody": "Please try again in a moment.",
+    "cardTitle": "Card title",
+    "cardBody": "Card content goes here.",
+    "itemOne": "Profile",
+    "itemTwo": "Settings"
+  }
+}

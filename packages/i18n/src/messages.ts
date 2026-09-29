@@ -1,11 +1,15 @@
 import commonEn from './catalogs/en/common.json' with { type: 'json' };
 import errorsEn from './catalogs/en/errors.json' with { type: 'json' };
+import shellEn from './catalogs/en/shell.json' with { type: 'json' };
 import commonMe from './catalogs/me/common.json' with { type: 'json' };
 import errorsMe from './catalogs/me/errors.json' with { type: 'json' };
+import shellMe from './catalogs/me/shell.json' with { type: 'json' };
 import commonRu from './catalogs/ru/common.json' with { type: 'json' };
 import errorsRu from './catalogs/ru/errors.json' with { type: 'json' };
+import shellRu from './catalogs/ru/shell.json' with { type: 'json' };
 import commonTr from './catalogs/tr/common.json' with { type: 'json' };
 import errorsTr from './catalogs/tr/errors.json' with { type: 'json' };
+import shellTr from './catalogs/tr/shell.json' with { type: 'json' };
 import type { Locale } from './locales.js';
 
 /** A nested ICU message catalog: leaves are message strings, branches are namespaced groups. */
@@ -20,6 +24,9 @@ export type CommonMessages = typeof commonEn;
 /** The `errors` namespace: one message per API error code, keyed by the bare `<CODE>`. */
 export type ErrorMessages = typeof errorsEn;
 
+/** The `shell` namespace: app shell, navigation, home page and dev showcase strings. */
+export type ShellMessages = typeof shellEn;
+
 /** Union of every dot-separated leaf path in a message tree, e.g. `'languages.en'`. */
 export type MessageKey<T = CommonMessages, Prefix extends string = ''> = {
   [K in keyof T & string]: T[K] extends string
@@ -33,6 +40,7 @@ export type MessageKey<T = CommonMessages, Prefix extends string = ''> = {
 export interface Namespaces {
   readonly common: CommonMessages;
   readonly errors: ErrorMessages;
+  readonly shell: ShellMessages;
 }
 
 /** All catalogs for a single locale. */
@@ -40,10 +48,10 @@ export type LocaleCatalogs = Namespaces;
 
 /** Every namespaced catalog for every supported locale, keyed by {@link Locale}. */
 export const catalogs: Readonly<Record<Locale, LocaleCatalogs>> = {
-  en: { common: commonEn, errors: errorsEn },
-  me: { common: commonMe as CommonMessages, errors: errorsMe },
-  ru: { common: commonRu as CommonMessages, errors: errorsRu },
-  tr: { common: commonTr as CommonMessages, errors: errorsTr },
+  en: { common: commonEn, errors: errorsEn, shell: shellEn },
+  me: { common: commonMe as CommonMessages, errors: errorsMe, shell: shellMe },
+  ru: { common: commonRu as CommonMessages, errors: errorsRu, shell: shellRu },
+  tr: { common: commonTr as CommonMessages, errors: errorsTr, shell: shellTr },
 };
 
 /**
