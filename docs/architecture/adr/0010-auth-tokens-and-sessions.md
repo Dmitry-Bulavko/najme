@@ -53,7 +53,7 @@ verification against a dummy hash when the email is unknown or has no password, 
 emails exist. Registration necessarily answers `409 EMAIL_TAKEN`.
 
 **Rate limiting.** `@nestjs/throttler`, in-memory, per client IP and route: register 5/min, login
-10/min, refresh 30/min, `429 RATE_LIMITED` with `Retry-After`. The API trusts one proxy hop
+10/min, refresh 30/min, change password (`/me/password`) 5/min, `429 RATE_LIMITED` with `Retry-After`. The API trusts one proxy hop
 (`trust proxy` = 1, Caddy) so the limiter sees real client IPs. In-memory state is per instance;
 move to a shared store if the API is ever scaled out.
 
@@ -95,3 +95,9 @@ guard lookup; revisit it if per-session management ("sign out other devices") is
 
 The endpoint is throttled (5/min per IP), answers `401 INVALID_CREDENTIALS` for a wrong current
 password and `409 PASSWORD_NOT_SET` for accounts without a password identity (e.g. Google-only).
+
+Client obligations (#52 web, #55 mobile): after `POST /me/password`, clients must replace their stored
+refresh token with the one from the response; mobile writes it to secure storage, web receives it
+automatically via `Set-Cookie`. Clients must not run a refresh concurrently with the change:
+presenting the pre-change token triggers `REFRESH_TOKEN_REUSED` and revokes all sessions, including
+the new one.
