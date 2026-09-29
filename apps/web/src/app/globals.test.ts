@@ -66,6 +66,19 @@ describe('globals.css theme', () => {
     expect(declarationValue(css, '--container-6xl')).toBe('72rem');
   });
 
+  it('pins every max-width/min-width to the installed Tailwind container size', async () => {
+    const twTheme = await readFile(require.resolve('tailwindcss/theme.css'), 'utf8');
+    const tokensTheme = await readFile(require.resolve('@najme/ui-tokens/theme.css'), 'utf8');
+    const containers = new Map(
+      [...twTheme.matchAll(/--container-([\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2]]),
+    );
+    const pinned = [...tokensTheme.matchAll(/--(?:max|min)-width-([\w-]+):\s*([^;]+);/g)];
+    expect(pinned.length).toBeGreaterThan(0);
+    for (const [, name, value] of pinned) {
+      expect(value, `--max/min-width-${name}`).toBe(containers.get(name!));
+    }
+  });
+
   it('still resolves padding and gap from the spacing tokens', () => {
     expect(css).toMatch(/\.p-md\s*\{\s*padding:\s*var\(--spacing-md\)/);
     expect(declarationValue(css, '--spacing-md')).toBe('12px');
