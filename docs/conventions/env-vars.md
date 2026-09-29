@@ -37,11 +37,15 @@ mode: declare every variable a task reads in that app's `turbo.json`.
 | `API_INTERNAL_URL`      | var    | web           | Internal API base URL for server-side calls (`http://api:3000/api/v1` in `infra/compose.prod.yml`) |
 | `PUBLIC_URL`            | var    | web, api      | Public origin (`https://${DOMAIN}`), set in `infra/compose.prod.yml`                               |
 | `POSTGRES_PASSWORD`     | secret | postgres, api | Database password                                                                                  |
+| `JWT_ACCESS_SECRET`     | secret | api           | HS256 key signing access tokens, min 32 chars (`openssl rand -base64 48`, ADR-0010)                |
 | `LIGHTSAIL_HOST`        | secret | deploy        | Server IP / hostname for SSH                                                                       |
 | `LIGHTSAIL_USER`        | secret | deploy        | SSH user (`deploy`)                                                                                |
 | `LIGHTSAIL_SSH_KEY`     | secret | deploy        | Private key for the deploy user                                                                    |
 | `LIGHTSAIL_KNOWN_HOSTS` | secret | deploy        | `ssh-keyscan` output for host key verification                                                     |
 | `GHCR_READ_TOKEN`       | secret | deploy        | PAT with `read:packages` so the server can pull images                                             |
+
+Optional, not set in production: `AUTH_COOKIE_SECURE` (api) overrides the `Secure` flag of the
+refresh cookie, which defaults to on unless `NODE_ENV=development`.
 
 Add rows as features introduce variables (JWT secrets, OAuth client IDs, email provider keys,
 Telegram bot token, Expo access token…).

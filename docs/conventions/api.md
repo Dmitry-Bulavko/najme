@@ -38,7 +38,8 @@ Every error response uses the envelope from contracts:
 
 ## Auth and authorization
 
-- `Authorization: Bearer <accessToken>`. Public endpoints are explicitly marked (e.g. `@Public()`).
+- `Authorization: Bearer <accessToken>`. A global guard protects every route; public endpoints are
+  explicitly marked with `@Public()`. Every 401 carries `UNAUTHENTICATED` (session details: ADR-0010).
 - Authorization is checked in services, not only guards: business-scoped endpoints verify the user's
   membership and role in that business. Every business-scoped endpoint gets an e2e test proving a
   non-member receives 403/404.
