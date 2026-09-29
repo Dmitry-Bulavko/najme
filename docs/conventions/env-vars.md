@@ -38,6 +38,13 @@ mode: declare every variable a task reads in that app's `turbo.json`.
 | `PUBLIC_URL`            | var    | web, api      | Public origin (`https://${DOMAIN}`), set in `infra/compose.prod.yml`                               |
 | `POSTGRES_PASSWORD`     | secret | postgres, api | Database password                                                                                  |
 | `JWT_ACCESS_SECRET`     | secret | api           | HS256 key signing access tokens, min 32 chars (`openssl rand -base64 48`, ADR-0010)                |
+| `SMTP_HOST`             | var    | api           | SMTP relay host of the email provider (chosen in M5, Q1)                                           |
+| `SMTP_PORT`             | var    | api           | SMTP relay port (465 = implicit TLS, otherwise STARTTLS when offered)                              |
+| `SMTP_USER`             | secret | api           | SMTP username; leave empty for an unauthenticated relay (set together with the password)           |
+| `SMTP_PASSWORD`         | secret | api           | SMTP password; must not contain `'` (the server `.env` is sourced by bash)                         |
+| `MAIL_FROM`             | var    | api           | Sender, e.g. `Najme <no-reply@najme.example>`; the domain needs SPF/DKIM at the provider           |
+| `GOOGLE_CLIENT_IDS`     | var    | api           | Comma-separated public Google OAuth client IDs (web/iOS/Android); unset disables Google sign-in    |
+| `APP_WEB_URL`           | var    | api           | Origin for links in emails; set to `https://${DOMAIN}` in `infra/compose.prod.yml`                 |
 | `LIGHTSAIL_HOST`        | secret | deploy        | Server IP / hostname for SSH                                                                       |
 | `LIGHTSAIL_USER`        | secret | deploy        | SSH user (`deploy`)                                                                                |
 | `LIGHTSAIL_SSH_KEY`     | secret | deploy        | Private key for the deploy user                                                                    |

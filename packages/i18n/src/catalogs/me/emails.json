@@ -1,0 +1,23 @@
+{
+  "layout": {
+    "brand": "Najme",
+    "linkFallback": "Ako dugme ne radi, kopirajte ovaj link u pretraživač:",
+    "footer": "Primili ste ovu poruku zbog aktivnosti na vašem Najme nalogu."
+  },
+  "verifyEmail": {
+    "subject": "Potvrdite svoju e-mail adresu",
+    "heading": "Potvrdite e-mail",
+    "intro": "Dobro došli na Najme! Potvrdite svoju e-mail adresu kako bismo vas mogli obavještavati o vašim rezervacijama.",
+    "action": "Potvrdi e-mail",
+    "expiry": "Link važi {hours, plural, one {# sat} few {# sata} other {# sati}}.",
+    "ignore": "Ako niste kreirali Najme nalog, slobodno ignorišite ovu poruku."
+  },
+  "resetPassword": {
+    "subject": "Resetujte lozinku",
+    "heading": "Resetujte lozinku",
+    "intro": "Primili smo zahtjev za resetovanje lozinke vašeg Najme naloga. Pomoću dugmeta ispod izaberite novu lozinku.",
+    "action": "Izaberi novu lozinku",
+    "expiry": "Link važi {hours, plural, one {# sat} few {# sata} other {# sati}} i može se iskoristiti samo jednom.",
+    "ignore": "Ako niste vi tražili ovo, ignorišite poruku; vaša lozinka se neće promijeniti."
+  }
+}

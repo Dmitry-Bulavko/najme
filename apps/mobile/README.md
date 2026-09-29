@@ -55,6 +55,9 @@ shared with `apps/web` (ADR-0003) — this app uses plain React Native primitive
 ## Testing
 
 `pnpm --filter @najme/mobile test` runs Jest (`jest-expo` preset) + React Native Testing Library.
+The per-test timeout is 20 s (`jest.testTimeout` in `package.json`): the first render in a file
+lazily loads React Native modules, which exceeded Jest's 5 s default on a loaded CI runner while
+turbo ran the other packages' tasks in parallel.
 `src/__tests__/tabs-layout.test.tsx` covers the acceptance criterion that switching the active
 locale changes the rendered tab titles; `src/i18n/index.test.ts` covers locale persistence
 (`initI18n`/`setLocale`, including the internal `me` code and a garbage stored value falling back

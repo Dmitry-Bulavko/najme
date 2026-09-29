@@ -105,6 +105,12 @@ jobs:
           DOMAIN: ${{ vars.DOMAIN }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ vars.MAIL_FROM }}
+          GOOGLE_CLIENT_IDS: ${{ vars.GOOGLE_CLIENT_IDS }}
           GHCR_USER: ${{ github.repository_owner }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
         run: |
@@ -116,6 +122,12 @@ jobs:
             printf 'POSTGRES_DB=najme\n'
             printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
             printf 'JWT_ACCESS_SECRET=%s\n' "$JWT_ACCESS_SECRET"
+            printf 'SMTP_HOST=%s\n' "$SMTP_HOST"
+            printf 'SMTP_PORT=%s\n' "$SMTP_PORT"
+            printf "SMTP_USER='%s'\n" "$SMTP_USER"
+            printf "SMTP_PASSWORD='%s'\n" "$SMTP_PASSWORD"
+            printf 'MAIL_FROM="%s"\n' "$MAIL_FROM"
+            printf 'GOOGLE_CLIENT_IDS="%s"\n' "$GOOGLE_CLIENT_IDS"
             printf 'GHCR_USER=%s\n' "$GHCR_USER"
             printf 'GHCR_READ_TOKEN=%s\n' "$GHCR_READ_TOKEN"
           } > server.env

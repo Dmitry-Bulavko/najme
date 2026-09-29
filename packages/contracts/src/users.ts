@@ -16,7 +16,7 @@ export const meSchema = z.object({
 
 export type Me = z.infer<typeof meSchema>;
 
-/** `PATCH /users/me` body. At least one field is required. */
+/** `PATCH /me` body. At least one field is required. */
 export const updateProfileRequestSchema = z
   .object({
     displayName: displayNameSchema.optional(),
@@ -28,7 +28,7 @@ export const updateProfileRequestSchema = z
 
 export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>;
 
-/** `POST /users/me/password` body. */
+/** `POST /me/password` body. */
 export const changePasswordRequestSchema = z.object({
   currentPassword: z.string().min(1).max(128),
   newPassword: passwordSchema,

@@ -14,6 +14,13 @@ export default withBaseConfig({
       // Throwaway signing key for tests only.
       JWT_ACCESS_SECRET:
         process.env.JWT_ACCESS_SECRET ?? 'test-only-access-secret-0123456789abcdef',
+      // Mailpit (SMTP 1025, UI/API 8025) in dev and CI; see docs/runbooks/local-dev.md.
+      SMTP_HOST: process.env.SMTP_HOST ?? 'localhost',
+      SMTP_PORT: process.env.SMTP_PORT ?? '1025',
+      MAIL_FROM: process.env.MAIL_FROM ?? 'Najme <no-reply@najme.test>',
+      // Fixed: the Google e2e suite uses a fake verifier and asserts this audience list.
+      GOOGLE_CLIENT_IDS: 'test-web.apps.googleusercontent.com, test-ios.apps.googleusercontent.com',
+      APP_WEB_URL: process.env.APP_WEB_URL ?? 'http://localhost:3001',
     },
     testTimeout: 20_000,
     hookTimeout: 20_000,

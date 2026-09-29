@@ -1,5 +1,19 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
-import type { LoginRequest, RegisterRequest } from '@najme/contracts';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import type {
+  AuthProviders,
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
+  GoogleSignInRequest,
+  LoginRequest,
+  RegisterRequest,
+  ResetPasswordRequest,
+  UpdateProfileRequest,
+  VerifyEmailRequest,
+} from '@najme/contracts';
+import { resolveLocale } from '@najme/i18n';
+import type { Env } from '../config/env.schema.js';
+import { ENV } from '../config/env.token.js';
+import { MailService } from '../mail/mail.service.js';
 import { apiError } from '../common/errors/api-error.js';
 import { toMe } from '../users/me.mapper.js';
 import { EmailAlreadyRegisteredError } from '../users/users.errors.js';
@@ -7,17 +21,84 @@ import type { User } from '../users/users.types.js';
 import { UsersService } from '../users/users.service.js';
 import { AccessTokenService } from './access-token.service.js';
 import type { ClientContext, IssuedSession } from './auth.types.js';
+import { EmailTokenService, type EmailTokenPurpose } from './email-token.service.js';
+import { GoogleIdTokenVerifier, type GoogleIdentityClaims } from './google-id-token-verifier.js';
 import { PasswordService } from './password.service.js';
 import { RefreshTokenService } from './refresh-token.service.js';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly users: UsersService,
     private readonly passwords: PasswordService,
     private readonly accessTokens: AccessTokenService,
     private readonly refreshTokens: RefreshTokenService,
+    private readonly emailTokens: EmailTokenService,
+    private readonly mail: MailService,
+    private readonly googleVerifier: GoogleIdTokenVerifier,
+    @Inject(ENV) private readonly env: Env,
   ) {}
+
+  providers(): AuthProviders {
+    return { google: this.env.GOOGLE_CLIENT_IDS.length > 0 };
+  }
+
+  /**
+   * Signs in with a Google ID token (ADR-0010). Resolution (identity by `sub`, else link by
+   * verified email, else create) and the pre-hijacking protection live in
+   * `UsersService.findOrLinkByProvider`.
+   * @param locale already resolved: the request's `locale`, else from `Accept-Language`.
+   */
+  async googleSignIn(
+    input: GoogleSignInRequest,
+    locale: NonNullable<GoogleSignInRequest['locale']>,
+    context: ClientContext,
+  ): Promise<IssuedSession> {
+    const audiences = this.env.GOOGLE_CLIENT_IDS;
+    if (audiences.length === 0) {
+      throw apiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'GOOGLE_SIGN_IN_DISABLED',
+        'Google sign-in is not available.',
+      );
+    }
+    const claims = await this.verifyGoogleToken(input.idToken, audiences);
+    const user = await this.users.findOrLinkByProvider({
+      provider: 'GOOGLE',
+      providerAccountId: claims.sub,
+      email: claims.email,
+      emailVerified: true,
+      displayName: claims.name,
+      avatarUrl: claims.picture,
+      localePreference: locale,
+    });
+    return this.startSession(user, await this.users.hasPassword(user.id), context);
+  }
+
+  private async verifyGoogleToken(
+    idToken: string,
+    audiences: readonly string[],
+  ): Promise<GoogleIdentityClaims> {
+    const invalid = () =>
+      apiError(HttpStatus.UNAUTHORIZED, 'GOOGLE_TOKEN_INVALID', 'The sign-in token is invalid.');
+    let claims: GoogleIdentityClaims;
+    try {
+      claims = await this.googleVerifier.verify(idToken, audiences);
+    } catch (error) {
+      // Reason only (no token, no claims): verifier messages can echo token contents.
+      this.logger.warn(
+        `Google ID token rejected (${error instanceof Error ? error.name : 'unknown'})`,
+      );
+      throw invalid();
+    }
+    if (!claims.sub || !claims.email || !claims.emailVerified) {
+      this.logger.warn('Google ID token rejected (missing claim or unverified email)');
+      throw invalid();
+    }
+    return claims;
+  }
 
   /** @param locale already resolved: the request's `locale`, else from `Accept-Language`. */
   async register(
@@ -41,6 +122,7 @@ export class AuthService {
       }
       throw error;
     }
+    this.sendEmail('verifyEmail', user);
     return this.startSession(user, true, context);
   }
 
@@ -86,6 +168,113 @@ export class AuthService {
       throw apiError(HttpStatus.UNAUTHORIZED, 'UNAUTHENTICATED', 'Authentication is required.');
     }
     return toMe(user, await this.users.hasPassword(userId));
+  }
+
+  async updateProfile(
+    userId: string,
+    input: UpdateProfileRequest,
+  ): Promise<ReturnType<typeof toMe>> {
+    const user = await this.users.updateProfile(userId, {
+      ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+      ...(input.locale !== undefined ? { localePreference: input.locale } : {}),
+    });
+    if (!user) {
+      throw apiError(HttpStatus.UNAUTHORIZED, 'UNAUTHENTICATED', 'Authentication is required.');
+    }
+    return toMe(user, await this.users.hasPassword(userId));
+  }
+
+  /**
+   * Verifies the current password, stores the new one and ends every session; the caller gets a
+   * fresh session (ADR-0010, "Update"). 409 `PASSWORD_NOT_SET` without a password identity, 401
+   * `INVALID_CREDENTIALS` for a wrong current password.
+   */
+  async changePassword(
+    userId: string,
+    input: ChangePasswordRequest,
+    context: ClientContext,
+  ): Promise<IssuedSession> {
+    const user = await this.users.findById(userId);
+    if (!user) {
+      throw apiError(HttpStatus.UNAUTHORIZED, 'UNAUTHENTICATED', 'Authentication is required.');
+    }
+    const currentHash = await this.users.findPasswordHash(userId);
+    if (currentHash === null) {
+      throw apiError(HttpStatus.CONFLICT, 'PASSWORD_NOT_SET', 'This account has no password.');
+    }
+    if (!(await this.passwords.verify(currentHash, input.currentPassword))) {
+      throw apiError(
+        HttpStatus.UNAUTHORIZED,
+        'INVALID_CREDENTIALS',
+        'The current password is incorrect.',
+      );
+    }
+    const passwordHash = await this.passwords.hash(input.newPassword);
+    const refreshToken = await this.refreshTokens.replaceAllForUser(userId, context, async (tx) => {
+      if (!(await this.users.setPassword(userId, passwordHash, tx))) {
+        throw apiError(HttpStatus.CONFLICT, 'PASSWORD_NOT_SET', 'This account has no password.');
+      }
+    });
+    return this.buildSession(user, true, refreshToken);
+  }
+
+  /** Sets `emailVerifiedAt`. The token is single-use; 400 `TOKEN_INVALID`/`TOKEN_EXPIRED`. */
+  async verifyEmail(input: VerifyEmailRequest): Promise<void> {
+    await this.emailTokens.consume(input.token, 'VERIFY_EMAIL', (userId, tx) =>
+      this.users.markEmailVerified(userId, tx),
+    );
+  }
+
+  /** Sends a fresh verification link (older unused ones stop working). No-op once verified. */
+  async resendVerification(userId: string): Promise<void> {
+    const user = await this.users.findById(userId);
+    if (!user) {
+      throw apiError(HttpStatus.UNAUTHORIZED, 'UNAUTHENTICATED', 'Authentication is required.');
+    }
+    if (user.emailVerifiedAt === null) this.sendEmail('verifyEmail', user);
+  }
+
+  /**
+   * Never reveals whether the account exists: the lookup, token and email all happen in the
+   * background, so the response is identical in content and (roughly) in timing.
+   */
+  forgotPassword(input: ForgotPasswordRequest): void {
+    this.mail.defer('resetPassword', null, async () => {
+      const credential = await this.users.findPasswordCredentialByEmail(input.email);
+      if (credential) await this.issueAndSend('resetPassword', credential.user);
+    });
+  }
+
+  /** Sets the new password and signs the user out everywhere (all refresh tokens revoked). */
+  async resetPassword(input: ResetPasswordRequest): Promise<void> {
+    const passwordHash = await this.passwords.hash(input.newPassword);
+    await this.emailTokens.consume(input.token, 'RESET_PASSWORD', async (userId, tx) => {
+      // Rolls back the token claim too when the account has no password identity any more.
+      if (!(await this.users.setPassword(userId, passwordHash, tx))) {
+        throw apiError(HttpStatus.BAD_REQUEST, 'TOKEN_INVALID', 'This link is invalid.');
+      }
+      await this.refreshTokens.revokeAllForUser(userId, tx);
+      // The link only reached the mailbox owner, so this proves ownership of the address.
+      await this.users.markEmailVerified(userId, tx);
+    });
+  }
+
+  private sendEmail(kind: 'verifyEmail' | 'resetPassword', user: User): void {
+    this.mail.defer(kind, user.id, () => this.issueAndSend(kind, user));
+  }
+
+  private async issueAndSend(kind: 'verifyEmail' | 'resetPassword', user: User): Promise<void> {
+    const purpose: EmailTokenPurpose = kind === 'verifyEmail' ? 'VERIFY_EMAIL' : 'RESET_PASSWORD';
+    const token = await this.emailTokens.issue(user.id, purpose);
+    await this.mail.send(
+      kind,
+      {
+        userId: user.id,
+        email: user.email,
+        locale: resolveLocale([user.localePreference]),
+      },
+      token,
+    );
   }
 
   private async startSession(

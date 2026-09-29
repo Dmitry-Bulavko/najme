@@ -14,19 +14,20 @@
 corepack enable pnpm
 pnpm install
 cp .env.example .env
-docker compose -f compose.dev.yml up -d   # PostgreSQL on POSTGRES_PORT (default 5434)
+docker compose -f compose.dev.yml up -d   # PostgreSQL (POSTGRES_PORT, default 5434) + Mailpit
 pnpm --filter @najme/api db:migrate:deploy  # first run only: create the schema
 pnpm dev                                  # builds shared packages, then API + web
 ```
 
 `pnpm dev` builds `packages/*` first (turbo `dev` depends on `^build`), then starts:
 
-| Service  | URL                          | Notes                                        |
-| -------- | ---------------------------- | -------------------------------------------- |
-| API      | http://localhost:3000/api/v1 | `/health`, OpenAPI docs at `/api/v1/docs`    |
-| Web      | http://localhost:3001/en     | API badge shows "Online" when API + DB is up |
-| Postgres | localhost:5434               | from `compose.dev.yml`                       |
-| Metro    | http://localhost:8081        | mobile only, see below                       |
+| Service  | URL                          | Notes                                              |
+| -------- | ---------------------------- | -------------------------------------------------- |
+| API      | http://localhost:3000/api/v1 | `/health`, OpenAPI docs at `/api/v1/docs`          |
+| Web      | http://localhost:3001/en     | API badge shows "Online" when API + DB is up       |
+| Postgres | localhost:5434               | from `compose.dev.yml`                             |
+| Mailpit  | http://localhost:8025        | inbox for every email the API sends (SMTP on 1025) |
+| Metro    | http://localhost:8081        | mobile only, see below                             |
 
 Env: in development the API, web and the Prisma CLI (migrate/generate) load the root `.env` themselves (Node `--env-file-if-exists` /
 `process.loadEnvFile`); variables already set in the shell win over the file. Production and Docker
@@ -35,6 +36,17 @@ must be listed in that app's `turbo.json`.
 
 API code changes are recompiled with `tsc --watch` and the process restarts; changes to shared
 packages need `pnpm --filter @najme/<pkg> build` (no watch mode).
+
+## Email (Mailpit)
+
+In development the API sends email over SMTP to Mailpit (`compose.dev.yml`, `SMTP_HOST=localhost`,
+`SMTP_PORT=1025`). Open http://localhost:8025 to read them, e.g. the sign-up verification link
+(`http://localhost:3001/<locale>/verify-email?token=…`) or the password reset link. Nothing is
+delivered to real addresses. Mailpit keeps messages in memory; restart the container to clear them.
+
+The Mailpit-backed API e2e suite (`test/auth-mailpit.e2e-spec.ts`) runs when `MAILPIT_URL` is set
+(`MAILPIT_URL=http://localhost:8025 pnpm --filter @najme/api test`); without it the suite is skipped
+and the fake-mailer suite still covers the same flows. CI always sets it.
 
 ## Mobile
 

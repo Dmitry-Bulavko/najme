@@ -48,6 +48,15 @@ services:
       GIT_SHA: ${IMAGE_TAG}
       PUBLIC_URL: https://${DOMAIN}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      # Transactional email over SMTP; the real provider is chosen in M5 (docs/conventions/env-vars.md).
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required}
+      SMTP_PORT: ${SMTP_PORT:?SMTP_PORT is required}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:?MAIL_FROM is required}
+      APP_WEB_URL: https://${DOMAIN}
+      # Public OAuth client IDs; empty disables Google sign-in.
+      GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB}?schema=public
     expose:
       - '3000'

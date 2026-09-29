@@ -53,7 +53,7 @@ verification against a dummy hash when the email is unknown or has no password, 
 emails exist. Registration necessarily answers `409 EMAIL_TAKEN`.
 
 **Rate limiting.** `@nestjs/throttler`, in-memory, per client IP and route: register 5/min, login
-10/min, refresh 30/min, `429 RATE_LIMITED` with `Retry-After`. The API trusts one proxy hop
+10/min, refresh 30/min, change password (`/me/password`) 5/min, `429 RATE_LIMITED` with `Retry-After`. The API trusts one proxy hop
 (`trust proxy` = 1, Caddy) so the limiter sees real client IPs. In-memory state is per instance;
 move to a shared store if the API is ever scaled out.
 
@@ -61,6 +61,22 @@ move to a shared store if the API is ever scaled out.
 reaches the global filter anywhere else it is a generic `409 CONFLICT`.
 `UnverifiedProviderEmailError` is `401 GOOGLE_TOKEN_INVALID`; `IdentityConflictError` is
 `409 CONFLICT`. `UNAUTHORIZED` is no longer emitted (kept in the contract, deprecated).
+
+**Google sign-in (#50).** ID-token flow, no client secret: web (Google Identity Services) and
+mobile (`@react-native-google-signin`) obtain an ID token and `POST /auth/google {idToken, locale?}`
+turns it into the same `authSession` as login (cookie for web, body with `X-Client: mobile`).
+The API verifies it through a `GoogleIdTokenVerifier` seam (real implementation:
+`google-auth-library` `verifyIdToken`, which checks signature, `iss`, `exp` and `aud`; e2e tests use
+a fake). The audience is the comma-separated `GOOGLE_CLIENT_IDS` (public, optional); unset means
+`503 GOOGLE_SIGN_IN_DISABLED`, and `GET /auth/providers` returns `{ google: boolean }` so clients
+can hide the button. Any verifier failure, a missing `sub`/`email` or `email_verified !== true` is
+`401 GOOGLE_TOKEN_INVALID` (no details leaked; logs carry no token or PII). Resolution order:
+(1) a `GOOGLE` identity with that `sub` signs its user in, whatever the email says now;
+(2) else a user with the same normalized email gets a `GOOGLE` identity linked and
+`emailVerifiedAt` set; if that account was still unverified, the pre-hijacking protection wipes its
+password identity, refresh tokens and pending email tokens first (see the access-token note below);
+(3) else a user is created from the claims (`displayName`, `avatarUrl`, `emailVerifiedAt` set,
+`localePreference` from `locale`, else `Accept-Language`). An existing account keeps its locale.
 
 **Access tokens after an account wipe.** When `findOrLinkByProvider` wipes a pre-hijacked account
 (unverified password identity, refresh tokens), refresh tokens are revoked at once but access tokens
@@ -77,3 +93,27 @@ future feature needs instant revocation (e.g. admin actions), add `sessionsInval
 - Clients must implement single-flight refresh and handle `REFRESH_TOKEN_REUSED` by sending the user
   to sign-in.
 - Same-origin API access (Caddy `/api/*`, Next rewrite in dev) is assumed for the cookie flow.
+
+## Update: changing the password while signed in (#51)
+
+`POST /api/v1/me/password` cannot tell which refresh token is the caller's: the web cookie is only
+sent on `Path=/api/v1/auth`, and mobile sends its token only to refresh/logout. Options considered:
+(a) move the endpoint under `/auth` and send the token in the mobile body, (b) revoke all refresh
+tokens and return a fresh `authSession`, (c) a session id claim in the access token.
+
+Decision: **(b)**. After verifying the current password, one transaction stores the new hash,
+revokes every active refresh token of the user and issues a new one; the response is an
+`authSession` delivered like login (cookie for web, body with `X-Client: mobile`). Every other
+session ends, the caller stays signed in through the new token, and no request needs extra
+credentials. The access tokens already issued stay valid until they expire (at most 15 minutes, as
+above). Option (c) would keep the very same refresh token but needs a session id in the JWT and a
+guard lookup; revisit it if per-session management ("sign out other devices") is built.
+
+The endpoint is throttled (5/min per IP), answers `401 INVALID_CREDENTIALS` for a wrong current
+password and `409 PASSWORD_NOT_SET` for accounts without a password identity (e.g. Google-only).
+
+Client obligations (#52 web, #55 mobile): after `POST /me/password`, clients must replace their stored
+refresh token with the one from the response; mobile writes it to secure storage, web receives it
+automatically via `Set-Cookie`. Clients must not run a refresh concurrently with the change:
+presenting the pre-change token triggers `REFRESH_TOKEN_REUSED` and revokes all sessions, including
+the new one.

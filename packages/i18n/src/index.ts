@@ -12,6 +12,7 @@ export {
   catalogs,
   flattenMessages,
   type CommonMessages,
+  type EmailMessages,
   type LocaleCatalogs,
   type MessageKey,
   type MobileMessages,

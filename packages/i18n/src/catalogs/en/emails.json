@@ -1,0 +1,23 @@
+{
+  "layout": {
+    "brand": "Najme",
+    "linkFallback": "If the button does not work, copy this link into your browser:",
+    "footer": "You received this email because of activity on your Najme account."
+  },
+  "verifyEmail": {
+    "subject": "Confirm your email address",
+    "heading": "Confirm your email",
+    "intro": "Welcome to Najme! Please confirm your email address so we can reach you about your bookings.",
+    "action": "Confirm email",
+    "expiry": "This link is valid for {hours, plural, one {# hour} other {# hours}}.",
+    "ignore": "If you did not create a Najme account, you can safely ignore this email."
+  },
+  "resetPassword": {
+    "subject": "Reset your password",
+    "heading": "Reset your password",
+    "intro": "We received a request to reset the password of your Najme account. Use the button below to choose a new one.",
+    "action": "Choose a new password",
+    "expiry": "This link is valid for {hours, plural, one {# hour} other {# hours}} and can be used once.",
+    "ignore": "If you did not ask for this, ignore this email; your password will not change."
+  }
+}

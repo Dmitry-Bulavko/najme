@@ -34,6 +34,10 @@ export const googleSignInRequestSchema = z.object({
 });
 export type GoogleSignInRequest = z.infer<typeof googleSignInRequestSchema>;
 
+/** Which optional sign-in methods this deployment offers; clients hide unavailable buttons. */
+export const authProvidersSchema = z.object({ google: z.boolean() });
+export type AuthProviders = z.infer<typeof authProvidersSchema>;
+
 export const verifyEmailRequestSchema = z.object({ token: tokenSchema });
 export type VerifyEmailRequest = z.infer<typeof verifyEmailRequestSchema>;
 
