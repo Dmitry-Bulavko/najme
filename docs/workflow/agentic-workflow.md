@@ -2,6 +2,11 @@
 
 Decision record: ADR-0008. This document is the operating manual.
 
+> **Current mode (ADR-0012, 2026-09-29): Cursor implements, Claude reviews.** Cursor follows
+> `AGENTS.md` on the branch `cursor/alpha`; Claude reviews with `/review` and merges one phase PR
+> per phase. The owner's guide is `docs/workflow/cursor-handoff.md`. The subagent loop below is the
+> fallback mode and still applies whenever `/implement` is used.
+
 ## Roles
 
 | Role          | Where                                    | Model                 | Responsibilities                                                |

@@ -1,0 +1,31 @@
+---
+description: i18n rules — catalogs, namespaces, ICU plurals, wiring into web and mobile
+globs: packages/i18n/**, apps/web/src/**, apps/mobile/src/**, apps/api/src/mail/**
+alwaysApply: false
+---
+
+# i18n
+
+Read `docs/conventions/i18n.md` and ADR-0004.
+
+- No string literals in UI, emails or notifications. Keys are semantic and namespaced
+  (`booking.confirm.title`), never the English text.
+- Every key exists in **en, me, ru, tr** in the same commit; `en` is the source of truth; the parity
+  and ICU-syntax tests must pass. `me` is Latin script. Plurals: `me`/`ru` need `one`, `few`,
+  `other`; `ru` also `many`.
+- Catalogs: `packages/i18n/src/catalogs/<locale>/<namespace>.json`. Existing namespaces: `common`,
+  `errors` (key = bare error code), `shell` (web), `mobile`, `emails`.
+- **New namespace** (e.g. `business`): 1) JSON in all 4 locales; 2) in `src/messages.ts` import
+  it `with { type: 'json' }`, add `export type BusinessMessages = typeof businessEn`, add it to
+  `Namespaces` and `catalogs` (non-`en` entries cast `as BusinessMessages`); 3) export the type from
+  `src/index.ts`; 4) add it to the `describe.each([...])` list in `src/messages.test.ts`.
+- **Web**: load namespaces in `apps/web/src/i18n/request.ts` **nested** under their name
+  (`{ ...common, ...shell, errors, auth, business }` — only `common`/`shell` are spread for
+  historical reasons); use `useTranslations('business')` / `getTranslations(...)`. The
+  `request.test.ts` collision test must stay green.
+- **Mobile**: register namespaces in **both** `apps/mobile/src/i18n/index.ts` and
+  `src/test-utils/i18n.tsx`; use `t('business:key')`.
+- API errors on clients: show `errors.<CODE>` from the envelope `error.code`, never `message`.
+- Dates/times: `Intl` with the locale's BCP-47 tag (`me` → `sr-Latn-ME`) and the **business
+  timezone** (`Europe/Podgorica`).
+- List uncertain translations under "Translations to verify" in the handoff comment.

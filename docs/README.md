@@ -6,24 +6,25 @@ doc is worse than no doc.
 
 ## Read first (every task)
 
-1. `../CLAUDE.md` — golden rules and commands.
+1. `../AGENTS.md` (implementer: Cursor) or `../CLAUDE.md` (reviewer: Claude) — rules, workflow and
+   commands.
 2. `workflow/definition-of-done.md` — what "done" means.
 3. The issue itself, plus any spec in `specs/` that it links.
 
 ## Then read by task area
 
-| Task touches…                   | Read                                                                                      |
-| ------------------------------- | ----------------------------------------------------------------------------------------- |
-| Product behaviour, naming       | `product/vision.md`, `product/glossary.md`                                                |
-| Anything architectural          | `architecture/overview.md`, relevant `architecture/adr/*`                                 |
-| API endpoints / DTOs            | `conventions/api.md`, ADR-0002                                                            |
-| Database schema / booking logic | `architecture/data-model.md`, ADR-0005, ADR-0009                                          |
-| Web or mobile UI                | ADR-0003, `conventions/i18n.md`, ADR-0004                                                 |
-| Tests                           | `conventions/testing.md`                                                                  |
-| New env var / secret            | `conventions/env-vars.md`                                                                 |
-| CI, Docker, deploy              | ADR-0007, `runbooks/deploy.md`                                                            |
-| Notifications / background jobs | ADR-0006                                                                                  |
-| Issues, labels, PR process      | `workflow/task-tracking.md`, `workflow/agentic-workflow.md`, `workflow/github-tooling.md` |
+| Task touches…                   | Read                                                                                    |
+| ------------------------------- | --------------------------------------------------------------------------------------- |
+| Product behaviour, naming       | `product/vision.md`, `product/glossary.md`                                              |
+| Anything architectural          | `architecture/overview.md`, relevant `architecture/adr/*`                               |
+| API endpoints / DTOs            | `conventions/api.md`, ADR-0002                                                          |
+| Database schema / booking logic | `architecture/data-model.md`, ADR-0005, ADR-0009                                        |
+| Web or mobile UI                | ADR-0003, `conventions/i18n.md`, ADR-0004                                               |
+| Tests                           | `conventions/testing.md`                                                                |
+| New env var / secret            | `conventions/env-vars.md`                                                               |
+| CI, Docker, deploy              | ADR-0007, `runbooks/deploy.md`                                                          |
+| Notifications / background jobs | ADR-0006                                                                                |
+| Issues, labels, PR process      | `workflow/task-tracking.md`, `workflow/cursor-handoff.md`, `workflow/github-tooling.md` |
 
 ## Layout
 

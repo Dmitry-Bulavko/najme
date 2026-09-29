@@ -1,0 +1,32 @@
+---
+description: Next.js web app patterns (routing, features, UI kit, data fetching, tests, Tailwind gotchas)
+globs: apps/web/**
+alwaysApply: false
+---
+
+# Web (`apps/web`)
+
+Read ADR-0003 (clients) and `docs/specs/44-web-ui-kit.md`.
+
+- Routes under `src/app/[locale]/...`: thin async server components; the page container is
+  `mx-auto w-full max-w-6xl px-4 sm:px-6`. Unknown data → `notFound()`.
+- Features in `src/features/<feature>/` (`'use client'` components, hooks, api calls); primitives
+  in `src/components/ui/` (shadcn new-york, cva variants, Radix); shell in `src/components/shell/`.
+  New primitives get an entry in the dev showcase `/[locale]/dev/ui` (404 in production).
+- Class names through `cn()` from `src/lib/utils.ts` (extends tailwind-merge with the token font
+  sizes). Colors/spacing/radius/typography only from tokens (`bg-primary`, `p-md`, `text-title`…).
+- **Tailwind gotcha:** named spacing tokens (`xs`…`5xl`) are 4–48px; `w-md`/`p-md` are spacing.
+  `max-w-*`/`min-w-*` are pinned back to container sizes by the theme — keep it that way.
+- Contrast ≥ 4.5:1 (e.g. `text-primary` on `bg-secondary` fails — use `secondary-foreground`).
+- Server-side API calls use `API_INTERNAL_URL` (fallback `PUBLIC_URL` + `/api/v1`), `cache:
+  'no-store'` for user data, a timeout, and parse responses with the contract schema. Browser
+  calls go to same-origin `/api/v1` (dev rewrite in `next.config.ts`, Caddy in production).
+- Locale routing lives in `src/proxy.ts` (Next 16 middleware) and sets `x-next-intl-locale`; do not
+  add two-letter top-level routes (they would be treated as locales).
+- Forms: react-hook-form + the contract zod schema + `FormField`; map `VALIDATION_FAILED.details`
+  to fields; buttons show a loading state and are disabled while submitting; success → toast.
+- Every data view handles loading (skeleton), empty (with CTA) and error (message + retry); works
+  on narrow and wide layouts and with the keyboard (UI-STD).
+- Tests: Vitest + Testing Library (`vitest.setup.ts` registers `cleanup()`); wrap in
+  `NextIntlClientProvider` and assert catalog texts; mock `next/navigation` and `fetch`.
+- `@types/react` is pinned via `tsconfig.json` `paths` (mobile hoists another version) — keep it.

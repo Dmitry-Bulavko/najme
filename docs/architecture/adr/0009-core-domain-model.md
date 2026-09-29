@@ -100,3 +100,69 @@ shaping the schema from the start. The full entity list, fields and diagrams liv
   correctly, at the cost of moving booking logic into a database trigger that agents working in
   `apps/api` do not see by reading the codebase. Not adopted for M1–M3; revisit if the
   application-computed column proves error-prone in practice.
+
+## Amendment 2026-09-29
+
+The owner answered the open product questions on 2026-09-29 (`docs/product/open-questions.md`
+R10–R19; recorded in #67). The schema delta, with the task that lands each change, is authoritative
+in `docs/architecture/data-model.md`, section "Amendment 2026-09-29 (owner decisions)". Where the
+original decision text above disagrees, this amendment wins.
+
+- **Defaults are now decisions.** Q2, Q3, Q4, Q6 and Q8 are resolved (R10, R11, R18), so the
+  "Other open-question defaults" bullet above no longer describes assumptions, and the consequence
+  about answering them differently no longer applies. Custom booking fields stay generic. The
+  booking-policy defaults stay as modelled: `AUTO` confirmation, a 120-minute cancellation window,
+  60-minute minimum notice and a 60-day horizon, plus auto-complete 24 h after `endsAt` and
+  `PENDING` expiry at `startsAt`.
+- **Clients and guests (R10, R16).** Online self-booking requires a client account and an
+  `APPROVED` business. Walk-in and phone bookings that a business member creates need no client
+  account. `Booking` gains `source` (`CLIENT` | `BUSINESS`), a nullable `clientUserId`, a
+  `guestName` required for walk-ins, and one optional `contactPhone` for both sources (instead of a
+  walk-in-only `guestPhone`). The CHECK `bookings_client_or_guest` enforces the combination. This
+  replaces "`Booking.clientUserId` is required".
+- **Moderation (R11).** `Business.status` still defaults to `PENDING_APPROVAL`. A minimal
+  platform-admin flow arrives in M2: approve, reject with a reason, owner resubmit, and a web admin
+  page. The full admin area stays in M6. Before approval a business is fully configurable and can
+  create walk-in bookings, but it is not listed and clients can't self-book. A platform admin is a
+  user with the boolean `User.isPlatformAdmin`, not a role, and is unrelated to the membership role
+  `ADMIN`.
+- **Tenancy and roles (R12, R14).** `OWNER` may do everything, including deleting the business and
+  managing owners. `ADMIN` may do all operational work except deleting the business and changing
+  owners. `STAFF` manages their own calendar, bookings, working hours and time off, and reads
+  services and staff. Non-members get 404 and members without the role get 403. A cross-tenant id
+  in the path is 404; in the request body it is 422 `VALIDATION_FAILED`. Invitations are an email
+  link only, expire after 7 days, require a matching email, and are limited to one pending per
+  business and email; a business always keeps at least one `OWNER`. The authorization mechanism is
+  recorded in ADR-0013 (M2-02).
+- **Booking status machine (R15).** Walk-ins (`source = BUSINESS`) start `CONFIRMED`. Decline is
+  `CANCELLED` with reason `DECLINED`. A client reschedule in `MANUAL` mode moves a `CONFIRMED`
+  booking back to `PENDING` for re-confirmation; a business reschedule keeps the status. The
+  cancellation window applies only to `CONFIRMED` bookings; a client may withdraw a `PENDING`
+  request at any time. The system expires `PENDING` at `startsAt` (reason `EXPIRED`) and completes
+  `CONFIRMED` at `endsAt` + 24 h; only a business member marks `NO_SHOW`. `cancellationReason`
+  becomes an enum, with a separate `cancellationNote`.
+- **Reschedule history.** A reschedule still updates the same booking row, and each one also
+  writes a `BookingReschedule` row with the old and new times and staff member. This is the
+  "future `BookingReschedule` log" the original decision left open.
+- **`blocked_range` in Prisma.** Declared as `Unsupported("tstzrange")` so migrations keep it.
+  Create and reschedule go through a raw-SQL `BookingRepository` that computes it in the same
+  statement, as the decision above already requires.
+- **Custom-field history.** Definitions are upserted by `key`. `BookingCustomFieldValue` snapshots
+  the field's key, label and type, and its definition FK is nullable with `ON DELETE SET NULL`, so
+  deleting a definition keeps historic answers.
+- **Time and slots (R13).** `Business.timezone` is always `Europe/Podgorica`, not accepted by the
+  API and immutable in MVP. `WorkingHours` stores `startMinute`/`endMinute` (minutes since local
+  midnight, no overnight shifts) instead of `@db.Time` columns. The slot step is duration + buffer
+  before + buffer after, anchored at the working-interval start, and the client picks a specific
+  staff member (no "any staff").
+- **Business fields.** `city` is a NOT NULL enum of the 25 municipalities, with 8 featured cities.
+  Slugs follow fixed rules and are never reused after soft delete. Photos are stored as object
+  keys (ADR-0014). Categories are seeded by a migration in M2.
+- **FK delete policy.** `CASCADE` from the auth tables to users and from pure configuration
+  children to their parents; `RESTRICT` towards soft-deleted parents (users, businesses, services,
+  staff members); `SET NULL` for optional links.
+- **Later tables.** The placeholders in "Scope" are replaced by named tables: M5 adds
+  `NotificationDelivery`, `NotificationPreference`, `DevicePushToken`, `TelegramLink` and
+  `TelegramLinkToken` (plus `outbox_events` only if needed); M6 adds `Review`, `Report` and
+  `AdminAuditLog`. Reviews (R17) are published immediately and hidden only through reports; they
+  can be written up to 30 days after completion and edited for 7 days.

@@ -20,7 +20,7 @@ The product is **one app** (web + iOS + Android). Any signed-in user can switch 
 
 - Browse and search businesses by category, city and free text.
 - View a business page: services, prices, durations, staff, photos, address, reviews.
-- Pick a service → staff (or "any") → free slot → book.
+- Pick a service → staff member → free slot → book (online booking needs a client account).
 - Manage own bookings: upcoming/past, cancel or reschedule within the business's policy.
 - Receive confirmations and reminders (push, email, Telegram).
 - Leave a review after a completed booking.
@@ -36,7 +36,8 @@ business with one staff member).
 - Manage **services**: name, description, duration, price, which staff can perform them.
 - Manage **working hours** per staff member and **time off** (holidays, breaks).
 - **Calendar**: day/week view per staff member, create bookings manually (walk-ins, phone calls),
-  confirm/decline/cancel/reschedule bookings.
+  confirm/decline/cancel/reschedule bookings. A walk-in or phone booking needs no client account:
+  the business records the guest's name and, optionally, a phone number.
 - Receive notifications about new and changed bookings.
 
 ### Platform admin
