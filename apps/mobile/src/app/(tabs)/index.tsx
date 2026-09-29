@@ -1,12 +1,19 @@
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { PlaceholderScreen } from '@/features/placeholder-screen';
+import { EmptyState } from '@/components/empty-state';
+import { Screen } from '@/components/ui';
 
 /** Discover tab placeholder (real screen lands in M1 — business/service discovery). */
 export default function DiscoverScreen(): ReactElement {
-  const { t } = useTranslation();
+  const { t } = useTranslation(['common', 'mobile']);
   return (
-    <PlaceholderScreen title={t('screens.discover.title')} body={t('screens.discover.body')} />
+    <Screen>
+      <EmptyState
+        icon="compass-outline"
+        message={t('common:screens.discover.body')}
+        hint={t('mobile:empty.discover')}
+      />
+    </Screen>
   );
 }

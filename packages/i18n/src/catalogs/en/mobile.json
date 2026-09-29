@@ -1,0 +1,62 @@
+{
+  "ui": {
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "loading": "Loading",
+    "required": "Required"
+  },
+  "account": {
+    "signIn": {
+      "title": "Sign in to Najme",
+      "body": "Sign in to book services, manage your appointments and keep your details in one place.",
+      "action": "Sign in"
+    },
+    "language": "Language",
+    "apiSection": "Service status",
+    "developer": "Developer",
+    "uiKit": "UI kit showcase",
+    "uiKitHint": "Preview every component"
+  },
+  "showcase": {
+    "title": "UI kit",
+    "typography": "Typography",
+    "heading": "Heading text",
+    "titleSample": "Title text",
+    "body": "Body text sits at a comfortable reading size.",
+    "caption": "Caption text",
+    "buttons": "Buttons",
+    "primary": "Primary",
+    "secondary": "Secondary",
+    "outline": "Outline",
+    "ghost": "Ghost",
+    "destructive": "Destructive",
+    "loading": "Loading",
+    "disabled": "Disabled",
+    "small": "Small",
+    "large": "Large",
+    "fields": "Text fields",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "emailHelper": "We never share your email.",
+    "passwordLabel": "Password",
+    "errorLabel": "Phone number",
+    "errorMessage": "Enter a valid phone number.",
+    "banners": "Banners",
+    "info": "Heads up: this is an informational message.",
+    "success": "Success: your booking was saved.",
+    "warning": "Warning: this slot is almost full.",
+    "error": "Error: something went wrong.",
+    "avatars": "Avatars",
+    "cards": "Card and list",
+    "cardBody": "Cards group related content on a raised surface.",
+    "listNotifications": "Notifications",
+    "listPrivacy": "Privacy",
+    "listHelp": "Help and support",
+    "form": "Form field",
+    "formName": "Full name"
+  },
+  "empty": {
+    "discover": "Search and filters will appear here once businesses are published.",
+    "bookings": "When you book a service, it will show up here."
+  }
+}

@@ -9,7 +9,7 @@ import { tokens } from '@najme/ui-tokens';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
-import { I18nextProvider } from 'react-i18next';
+import { I18nextProvider, useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { i18next, initI18n } from '@/i18n';
@@ -54,8 +54,29 @@ export default function RootLayout() {
 
   return (
     <I18nextProvider i18n={i18next}>
-      <Stack screenOptions={{ headerShown: false }} />
+      <RootStack />
     </I18nextProvider>
+  );
+}
+
+/** Tabs plus, in development builds only, the UI kit showcase with a native header. */
+function RootStack() {
+  const { t } = useTranslation('mobile');
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      {__DEV__ ? (
+        <Stack.Screen
+          name="ui-showcase"
+          options={{
+            headerShown: true,
+            title: t('showcase.title'),
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: tokens.colors.background },
+            headerTitleStyle: { fontFamily: 'Manrope-ExtraBold' },
+          }}
+        />
+      ) : null}
+    </Stack>
   );
 }
 

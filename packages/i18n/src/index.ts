@@ -14,6 +14,7 @@ export {
   type CommonMessages,
   type LocaleCatalogs,
   type MessageKey,
+  type MobileMessages,
   type MessageTree,
   type ShellMessages,
   type Namespaces,

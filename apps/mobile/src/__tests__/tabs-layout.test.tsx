@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { catalogs, flattenMessages } from '@najme/i18n';
+import { tokens } from '@najme/ui-tokens';
 import { act, render } from '@testing-library/react-native';
 import i18next from 'i18next';
 import ICU from 'i18next-icu';
@@ -12,15 +13,32 @@ import TabsLayout from '../app/(tabs)/_layout';
 // unit test; this test double renders each screen's `options.title` as plain text so the localized
 // tab titles are observable via Testing Library, while exercising the real `TabsLayout` component
 // (and its `useTranslation()` call) end to end.
+const tabsScreenOptions: { current?: { tabBarActiveTintColor?: string } } = {};
+
 jest.mock('expo-router', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
 
-  function Tabs({ children }: { children: ReactNode }) {
+  function Tabs({
+    children,
+    screenOptions,
+  }: {
+    children: ReactNode;
+    screenOptions?: { tabBarActiveTintColor?: string };
+  }) {
+    tabsScreenOptions.current = screenOptions;
     return ReactActual.createElement(ReactActual.Fragment, null, children);
   }
-  Tabs.Screen = function Screen({ options }: { options?: { title?: string } }) {
-    return ReactActual.createElement(Text, null, options?.title ?? '');
+  Tabs.Screen = function Screen({
+    options,
+  }: {
+    options?: { title?: string; tabBarIcon?: unknown };
+  }) {
+    return ReactActual.createElement(
+      Text,
+      { testID: options?.tabBarIcon ? 'tab-with-icon' : 'tab-without-icon' },
+      options?.title ?? '',
+    );
   };
 
   return { Tabs };
@@ -53,6 +71,13 @@ function renderTabs() {
 }
 
 describe('TabsLayout', () => {
+  it('gives every tab an icon and tints the active tab with the primary token', async () => {
+    const { getAllByTestId } = await renderTabs();
+
+    expect(getAllByTestId('tab-with-icon')).toHaveLength(3);
+    expect(tabsScreenOptions.current?.tabBarActiveTintColor).toBe(tokens.colors.primary);
+  });
+
   it('renders the English tab titles by default', async () => {
     const { getByText } = await renderTabs();
 

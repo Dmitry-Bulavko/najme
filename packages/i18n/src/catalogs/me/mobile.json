@@ -1,0 +1,62 @@
+{
+  "ui": {
+    "showPassword": "Prikaži lozinku",
+    "hidePassword": "Sakrij lozinku",
+    "loading": "Učitavanje",
+    "required": "Obavezno"
+  },
+  "account": {
+    "signIn": {
+      "title": "Prijavite se na Najme",
+      "body": "Prijavite se da rezervišete usluge, upravljate terminima i imate sve podatke na jednom mjestu.",
+      "action": "Prijava"
+    },
+    "language": "Jezik",
+    "apiSection": "Status servisa",
+    "developer": "Za programere",
+    "uiKit": "Pregled UI kita",
+    "uiKitHint": "Pogledajte sve komponente"
+  },
+  "showcase": {
+    "title": "UI kit",
+    "typography": "Tipografija",
+    "heading": "Naslov",
+    "titleSample": "Podnaslov",
+    "body": "Osnovni tekst je udoban za čitanje.",
+    "caption": "Sitan tekst",
+    "buttons": "Dugmad",
+    "primary": "Primarno",
+    "secondary": "Sekundarno",
+    "outline": "Obrub",
+    "ghost": "Providno",
+    "destructive": "Brisanje",
+    "loading": "Učitavanje",
+    "disabled": "Onemogućeno",
+    "small": "Malo",
+    "large": "Veliko",
+    "fields": "Polja za unos",
+    "emailLabel": "E-pošta",
+    "emailPlaceholder": "vi@primjer.com",
+    "emailHelper": "Vašu e-poštu nikada ne dijelimo.",
+    "passwordLabel": "Lozinka",
+    "errorLabel": "Broj telefona",
+    "errorMessage": "Unesite ispravan broj telefona.",
+    "banners": "Obavještenja",
+    "info": "Napomena: ovo je informativna poruka.",
+    "success": "Uspjeh: vaša rezervacija je sačuvana.",
+    "warning": "Upozorenje: ovaj termin je skoro popunjen.",
+    "error": "Greška: nešto nije u redu.",
+    "avatars": "Avatari",
+    "cards": "Kartica i lista",
+    "cardBody": "Kartice grupišu srodan sadržaj na izdignutoj površini.",
+    "listNotifications": "Obavještenja",
+    "listPrivacy": "Privatnost",
+    "listHelp": "Pomoć i podrška",
+    "form": "Polje forme",
+    "formName": "Ime i prezime"
+  },
+  "empty": {
+    "discover": "Pretraga i filteri pojaviće se ovdje kada preduzeća budu objavljena.",
+    "bookings": "Kada rezervišete uslugu, pojaviće se ovdje."
+  }
+}
