@@ -7,6 +7,7 @@ import { z } from 'zod';
 export const ERROR_CODES = [
   // Generic
   'VALIDATION_FAILED',
+  /** @deprecated Never emitted: every 401 uses `UNAUTHENTICATED` (ADR-0010). Kept for old clients. */
   'UNAUTHORIZED',
   'FORBIDDEN',
   'NOT_FOUND',

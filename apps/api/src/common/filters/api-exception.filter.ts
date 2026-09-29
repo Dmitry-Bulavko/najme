@@ -7,11 +7,16 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import type { ApiErrorResponse } from '@najme/contracts';
+import type { ApiErrorResponse, ErrorCode } from '@najme/contracts';
+import {
+  EmailAlreadyRegisteredError,
+  IdentityConflictError,
+  UnverifiedProviderEmailError,
+} from '../../users/users.errors.js';
 
-const DEFAULT_CODES: Partial<Record<number, string>> = {
+const DEFAULT_CODES: Partial<Record<number, ErrorCode>> = {
   [HttpStatus.BAD_REQUEST]: 'VALIDATION_FAILED',
-  [HttpStatus.UNAUTHORIZED]: 'UNAUTHORIZED',
+  [HttpStatus.UNAUTHORIZED]: 'UNAUTHENTICATED',
   [HttpStatus.FORBIDDEN]: 'FORBIDDEN',
   [HttpStatus.NOT_FOUND]: 'NOT_FOUND',
   [HttpStatus.CONFLICT]: 'CONFLICT',
@@ -52,6 +57,25 @@ export class ApiExceptionFilter implements ExceptionFilter {
       const message = typeof payload === 'string' ? payload : exception.message;
       const code = DEFAULT_CODES[status] ?? 'HTTP_ERROR';
       return { status, body: { error: { code, message } } };
+    }
+
+    // Domain errors of the users module that reach the filter unhandled. `EMAIL_TAKEN` is only ever
+    // produced by the register endpoint itself; anywhere else the response must not reveal that an
+    // email exists (no user enumeration), hence the generic codes.
+    if (exception instanceof UnverifiedProviderEmailError) {
+      return {
+        status: HttpStatus.UNAUTHORIZED,
+        body: { error: { code: 'GOOGLE_TOKEN_INVALID', message: 'The sign-in token is invalid.' } },
+      };
+    }
+    if (
+      exception instanceof EmailAlreadyRegisteredError ||
+      exception instanceof IdentityConflictError
+    ) {
+      return {
+        status: HttpStatus.CONFLICT,
+        body: { error: { code: 'CONFLICT', message: 'The request conflicts with existing data.' } },
+      };
     }
 
     return {
