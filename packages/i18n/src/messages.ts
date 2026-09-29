@@ -1,16 +1,20 @@
 import commonEn from './catalogs/en/common.json' with { type: 'json' };
+import emailsEn from './catalogs/en/emails.json' with { type: 'json' };
 import errorsEn from './catalogs/en/errors.json' with { type: 'json' };
 import mobileEn from './catalogs/en/mobile.json' with { type: 'json' };
 import shellEn from './catalogs/en/shell.json' with { type: 'json' };
 import commonMe from './catalogs/me/common.json' with { type: 'json' };
+import emailsMe from './catalogs/me/emails.json' with { type: 'json' };
 import errorsMe from './catalogs/me/errors.json' with { type: 'json' };
 import mobileMe from './catalogs/me/mobile.json' with { type: 'json' };
 import shellMe from './catalogs/me/shell.json' with { type: 'json' };
 import commonRu from './catalogs/ru/common.json' with { type: 'json' };
+import emailsRu from './catalogs/ru/emails.json' with { type: 'json' };
 import errorsRu from './catalogs/ru/errors.json' with { type: 'json' };
 import mobileRu from './catalogs/ru/mobile.json' with { type: 'json' };
 import shellRu from './catalogs/ru/shell.json' with { type: 'json' };
 import commonTr from './catalogs/tr/common.json' with { type: 'json' };
+import emailsTr from './catalogs/tr/emails.json' with { type: 'json' };
 import errorsTr from './catalogs/tr/errors.json' with { type: 'json' };
 import mobileTr from './catalogs/tr/mobile.json' with { type: 'json' };
 import shellTr from './catalogs/tr/shell.json' with { type: 'json' };
@@ -34,6 +38,9 @@ export type ShellMessages = typeof shellEn;
 /** The `mobile` namespace (Expo app UI kit, shell and screens), typed from the `en` catalog. */
 export type MobileMessages = typeof mobileEn;
 
+/** The `emails` namespace: transactional email subjects and bodies (#49). */
+export type EmailMessages = typeof emailsEn;
+
 /** Union of every dot-separated leaf path in a message tree, e.g. `'languages.en'`. */
 export type MessageKey<T = CommonMessages, Prefix extends string = ''> = {
   [K in keyof T & string]: T[K] extends string
@@ -49,6 +56,7 @@ export interface Namespaces {
   readonly errors: ErrorMessages;
   readonly shell: ShellMessages;
   readonly mobile: MobileMessages;
+  readonly emails: EmailMessages;
 }
 
 /** All catalogs for a single locale. */
@@ -56,24 +64,27 @@ export type LocaleCatalogs = Namespaces;
 
 /** Every namespaced catalog for every supported locale, keyed by {@link Locale}. */
 export const catalogs: Readonly<Record<Locale, LocaleCatalogs>> = {
-  en: { common: commonEn, errors: errorsEn, shell: shellEn, mobile: mobileEn },
+  en: { common: commonEn, errors: errorsEn, shell: shellEn, mobile: mobileEn, emails: emailsEn },
   me: {
     common: commonMe as CommonMessages,
     errors: errorsMe,
     shell: shellMe,
     mobile: mobileMe as MobileMessages,
+    emails: emailsMe as EmailMessages,
   },
   ru: {
     common: commonRu as CommonMessages,
     errors: errorsRu,
     shell: shellRu,
     mobile: mobileRu as MobileMessages,
+    emails: emailsRu as EmailMessages,
   },
   tr: {
     common: commonTr as CommonMessages,
     errors: errorsTr,
     shell: shellTr,
     mobile: mobileTr as MobileMessages,
+    emails: emailsTr as EmailMessages,
   },
 };
 

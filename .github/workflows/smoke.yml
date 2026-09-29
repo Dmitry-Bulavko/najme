@@ -83,6 +83,9 @@ jobs:
           POSTGRES_PASSWORD=najme-smoke
           POSTGRES_DB=najme
           JWT_ACCESS_SECRET=smoke-only-secret-0123456789abcdef0123456789
+          SMTP_HOST=localhost
+          SMTP_PORT=1025
+          MAIL_FROM="Najme <no-reply@localhost>"
           EOF
 
       - name: Validate compose config

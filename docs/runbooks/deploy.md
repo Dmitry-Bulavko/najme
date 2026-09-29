@@ -71,6 +71,11 @@ Create the environment as described in `github-setup.md`, then add:
 | `GHCR_READ_TOKEN`       | secret   | PAT with `read:packages`                       |
 | `POSTGRES_PASSWORD`     | secret   | long random string (`openssl rand -hex 32`)    |
 | `JWT_ACCESS_SECRET`     | secret   | long random string (`openssl rand -base64 48`) |
+| `SMTP_HOST`             | variable | provider's SMTP host (M5; nothing sends yet)   |
+| `SMTP_PORT`             | variable | provider's SMTP port, e.g. `587`               |
+| `SMTP_USER`             | secret   | SMTP username (empty if none)                  |
+| `SMTP_PASSWORD`         | secret   | SMTP password, no `'` characters               |
+| `MAIL_FROM`             | variable | `Najme <no-reply@<domain>>`                    |
 
 Later features add more (OAuth, email, Telegram, Expo) — see
 `docs/conventions/env-vars.md`.

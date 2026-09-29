@@ -9,7 +9,18 @@
     },
     "build": {
       "dependsOn": ["^build", "db:generate"],
-      "env": ["DATABASE_URL", "GIT_SHA", "JWT_ACCESS_SECRET", "AUTH_COOKIE_SECURE"]
+      "env": [
+        "DATABASE_URL",
+        "GIT_SHA",
+        "JWT_ACCESS_SECRET",
+        "AUTH_COOKIE_SECURE",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_USER",
+        "SMTP_PASSWORD",
+        "MAIL_FROM",
+        "APP_WEB_URL"
+      ]
     },
     "lint": {
       "dependsOn": ["^build", "db:generate"]
@@ -27,7 +38,14 @@
         "PORT",
         "PUBLIC_URL",
         "JWT_ACCESS_SECRET",
-        "AUTH_COOKIE_SECURE"
+        "AUTH_COOKIE_SECURE",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_USER",
+        "SMTP_PASSWORD",
+        "MAIL_FROM",
+        "APP_WEB_URL",
+        "MAILPIT_URL"
       ]
     },
     "dev": {
@@ -39,7 +57,13 @@
         "PORT",
         "PUBLIC_URL",
         "JWT_ACCESS_SECRET",
-        "AUTH_COOKIE_SECURE"
+        "AUTH_COOKIE_SECURE",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_USER",
+        "SMTP_PASSWORD",
+        "MAIL_FROM",
+        "APP_WEB_URL"
       ]
     }
   }
