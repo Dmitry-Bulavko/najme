@@ -9,6 +9,10 @@ import { cn } from '@/lib/utils';
 
 import { NAV_ITEMS } from './nav-items';
 
+/**
+ * The active item uses `secondary-foreground` (#1B1F3B) on `secondary` (#EBEFFF), about 14:1 (AA needs
+ * 4.5:1); `text-primary` on that tint is only ~4.0:1. A primary inset bar marks the active item.
+ */
 /** Desktop primary navigation (hidden below `md`, where the mobile Sheet takes over). */
 export function MainNav({ className }: { className?: string }): ReactElement {
   const locale = useLocale();
@@ -28,7 +32,8 @@ export function MainNav({ className }: { className?: string }): ReactElement {
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'rounded-md px-3 py-2 text-sm font-bold text-muted-foreground transition-colors outline-none hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
-                  active && 'bg-secondary text-primary hover:text-primary',
+                  active &&
+                    'bg-secondary text-secondary-foreground shadow-[inset_0_-2px_0_0_var(--color-primary)] hover:text-secondary-foreground',
                 )}
               >
                 {t(labelKey)}

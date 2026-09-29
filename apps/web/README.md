@@ -29,3 +29,10 @@ In dev, `/api/*` is proxied to `http://localhost:3000` (mirrors Caddy routing).
 ## Scripts
 
 `dev`, `build`, `start`, `lint`, `typecheck`, `test` (Vitest + Testing Library).
+
+## Notes
+
+- `tsconfig.json` pins `react` types via `paths`: web uses `@types/react` ^19.3 while mobile pins
+  Expo's ~19.2, and pnpm hoists the mobile copy for Next's styled-jsx types (two `React` namespaces,
+  false type errors). Drop the pin once the versions align.
+- `next dev` generates `AGENTS.md`/`CLAUDE.md` here; they are gitignored.

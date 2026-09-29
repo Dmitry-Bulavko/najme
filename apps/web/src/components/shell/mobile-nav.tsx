@@ -51,7 +51,8 @@ export function MobileNav({ className }: { className?: string }): ReactElement {
                       aria-current={active ? 'page' : undefined}
                       className={cn(
                         'flex items-center gap-3 rounded-md px-3 py-3 text-base font-bold text-foreground transition-colors outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring',
-                        active && 'bg-secondary text-primary',
+                        active &&
+                          'bg-secondary text-secondary-foreground shadow-[inset_3px_0_0_0_var(--color-primary)]',
                       )}
                     >
                       <Icon className="size-5" aria-hidden="true" />
