@@ -34,6 +34,8 @@ export interface FindOrLinkByProviderInput {
   emailVerified: boolean;
   displayName?: string | null;
   avatarUrl?: string | null;
+  /** Only used when a new user is created; an existing account keeps its preference. */
+  localePreference?: LocaleCode;
 }
 
 export interface UpdateProfileInput {

@@ -23,6 +23,11 @@ export const envSchema = z
     SMTP_PASSWORD: z.string().min(1).optional(),
     /** Sender shown to recipients, e.g. `Najme <no-reply@example.com>`. */
     MAIL_FROM: z.string().min(3),
+    /**
+     * Comma-separated public OAuth client IDs (web, iOS, Android) accepted as the `aud` of Google
+     * ID tokens (ADR-0010). Not a secret. Unset or empty disables Google sign-in.
+     */
+    GOOGLE_CLIENT_IDS: z.string().optional(),
     /** Origin of the web app; base of the links in emails (`${APP_WEB_URL}/<locale>/...`). */
     APP_WEB_URL: z.url(),
   })
@@ -32,6 +37,10 @@ export const envSchema = z
   })
   .transform((env) => ({
     ...env,
+    GOOGLE_CLIENT_IDS: (env.GOOGLE_CLIENT_IDS ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0),
     AUTH_COOKIE_SECURE: env.AUTH_COOKIE_SECURE ?? env.NODE_ENV !== 'development',
     // No trailing slash, so links can be built with a plain `${APP_WEB_URL}/...`.
     APP_WEB_URL: env.APP_WEB_URL.replace(/\/+$/, ''),

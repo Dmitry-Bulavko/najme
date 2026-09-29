@@ -28,3 +28,15 @@ describe('envSchema mail settings', () => {
     expect(envSchema.safeParse({ ...base, SMTP_USER: 'u', SMTP_PASSWORD: 'p' }).success).toBe(true);
   });
 });
+
+describe('envSchema GOOGLE_CLIENT_IDS', () => {
+  it('is an empty list when unset or blank', () => {
+    expect(envSchema.parse(base).GOOGLE_CLIENT_IDS).toEqual([]);
+    expect(envSchema.parse({ ...base, GOOGLE_CLIENT_IDS: ' ' }).GOOGLE_CLIENT_IDS).toEqual([]);
+  });
+
+  it('splits and trims a comma-separated list', () => {
+    const env = envSchema.parse({ ...base, GOOGLE_CLIENT_IDS: ' a.apps , b.apps,,' });
+    expect(env.GOOGLE_CLIENT_IDS).toEqual(['a.apps', 'b.apps']);
+  });
+});

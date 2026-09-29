@@ -62,6 +62,22 @@ reaches the global filter anywhere else it is a generic `409 CONFLICT`.
 `UnverifiedProviderEmailError` is `401 GOOGLE_TOKEN_INVALID`; `IdentityConflictError` is
 `409 CONFLICT`. `UNAUTHORIZED` is no longer emitted (kept in the contract, deprecated).
 
+**Google sign-in (#50).** ID-token flow, no client secret: web (Google Identity Services) and
+mobile (`@react-native-google-signin`) obtain an ID token and `POST /auth/google {idToken, locale?}`
+turns it into the same `authSession` as login (cookie for web, body with `X-Client: mobile`).
+The API verifies it through a `GoogleIdTokenVerifier` seam (real implementation:
+`google-auth-library` `verifyIdToken`, which checks signature, `iss`, `exp` and `aud`; e2e tests use
+a fake). The audience is the comma-separated `GOOGLE_CLIENT_IDS` (public, optional); unset means
+`503 GOOGLE_SIGN_IN_DISABLED`, and `GET /auth/providers` returns `{ google: boolean }` so clients
+can hide the button. Any verifier failure, a missing `sub`/`email` or `email_verified !== true` is
+`401 GOOGLE_TOKEN_INVALID` (no details leaked; logs carry no token or PII). Resolution order:
+(1) a `GOOGLE` identity with that `sub` signs its user in, whatever the email says now;
+(2) else a user with the same normalized email gets a `GOOGLE` identity linked and
+`emailVerifiedAt` set; if that account was still unverified, the pre-hijacking protection wipes its
+password identity, refresh tokens and pending email tokens first (see the access-token note below);
+(3) else a user is created from the claims (`displayName`, `avatarUrl`, `emailVerifiedAt` set,
+`localePreference` from `locale`, else `Accept-Language`). An existing account keeps its locale.
+
 **Access tokens after an account wipe.** When `findOrLinkByProvider` wipes a pre-hijacked account
 (unverified password identity, refresh tokens), refresh tokens are revoked at once but access tokens
 already issued stay valid until they expire (at most 15 minutes). We accept this window instead of

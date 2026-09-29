@@ -19,15 +19,18 @@ import { parseAcceptLanguage, resolveLocale } from '@najme/i18n';
 import {
   changePasswordRequestSchema,
   forgotPasswordRequestSchema,
+  googleSignInRequestSchema,
   loginRequestSchema,
   refreshRequestSchema,
   registerRequestSchema,
   resetPasswordRequestSchema,
   updateProfileRequestSchema,
   verifyEmailRequestSchema,
+  type AuthProviders,
   type AuthSession,
   type ChangePasswordRequest,
   type ForgotPasswordRequest,
+  type GoogleSignInRequest,
   type LoginRequest,
   type Me,
   type RegisterRequest,
@@ -54,6 +57,8 @@ const MINUTE_MS = 60_000;
 // Per client IP and route, in memory (single API instance, ADR-0007).
 const REGISTER_LIMIT = { default: { limit: 5, ttl: MINUTE_MS } };
 const LOGIN_LIMIT = { default: { limit: 10, ttl: MINUTE_MS } };
+const GOOGLE_LIMIT = { default: { limit: 10, ttl: MINUTE_MS } };
+const PROVIDERS_LIMIT = { default: { limit: 60, ttl: MINUTE_MS } };
 const REFRESH_LIMIT = { default: { limit: 30, ttl: MINUTE_MS } };
 const VERIFY_LIMIT = { default: { limit: 10, ttl: MINUTE_MS } };
 const RESEND_LIMIT = { default: { limit: 3, ttl: MINUTE_MS } };
@@ -113,6 +118,20 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthSession> {
     return this.deliver(req, res, await this.auth.login(body, clientContext(req)));
+  }
+
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  @Throttle(GOOGLE_LIMIT)
+  @ApiOperation({ summary: 'Sign in (or sign up) with a Google ID token' })
+  async google(
+    @Body(new ZodValidationPipe(googleSignInRequestSchema)) body: GoogleSignInRequest,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthSession> {
+    const locale =
+      body.locale ?? resolveLocale(parseAcceptLanguage(req.header('accept-language') ?? ''));
+    return this.deliver(req, res, await this.auth.googleSignIn(body, locale, clientContext(req)));
   }
 
   @Post('refresh')
@@ -203,6 +222,22 @@ export class AuthController {
 
   private deliver(req: Request, res: Response, session: IssuedSession): AuthSession {
     return deliverSession(req, res, session, this.env.AUTH_COOKIE_SECURE);
+  }
+}
+
+/** Separate from `AuthController` because that one requires a JSON body (`RequireJsonGuard`). */
+@ApiTags('auth')
+@Public()
+@UseGuards(ThrottlerGuard)
+@Controller('auth/providers')
+export class AuthProvidersController {
+  constructor(private readonly auth: AuthService) {}
+
+  @Get()
+  @Throttle(PROVIDERS_LIMIT)
+  @ApiOperation({ summary: 'Which optional sign-in methods are enabled' })
+  providers(): AuthProviders {
+    return this.auth.providers();
   }
 }
 

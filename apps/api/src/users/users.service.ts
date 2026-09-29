@@ -231,6 +231,7 @@ export class UsersService {
         emailVerifiedAt: input.emailVerified ? new Date() : null,
         displayName: input.displayName ?? null,
         avatarUrl: input.avatarUrl ?? null,
+        ...(input.localePreference ? { localePreference: input.localePreference } : {}),
         authIdentities: { create: identity },
       },
       select: userSelect,

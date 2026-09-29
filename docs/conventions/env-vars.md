@@ -43,6 +43,7 @@ mode: declare every variable a task reads in that app's `turbo.json`.
 | `SMTP_USER`             | secret | api           | SMTP username; leave empty for an unauthenticated relay (set together with the password)           |
 | `SMTP_PASSWORD`         | secret | api           | SMTP password; must not contain `'` (the server `.env` is sourced by bash)                         |
 | `MAIL_FROM`             | var    | api           | Sender, e.g. `Najme <no-reply@najme.example>`; the domain needs SPF/DKIM at the provider           |
+| `GOOGLE_CLIENT_IDS`     | var    | api           | Comma-separated public Google OAuth client IDs (web/iOS/Android); unset disables Google sign-in    |
 | `APP_WEB_URL`           | var    | api           | Origin for links in emails; set to `https://${DOMAIN}` in `infra/compose.prod.yml`                 |
 | `LIGHTSAIL_HOST`        | secret | deploy        | Server IP / hostname for SSH                                                                       |
 | `LIGHTSAIL_USER`        | secret | deploy        | SSH user (`deploy`)                                                                                |

@@ -76,6 +76,7 @@ Create the environment as described in `github-setup.md`, then add:
 | `SMTP_USER`             | secret   | SMTP username (empty if none)                  |
 | `SMTP_PASSWORD`         | secret   | SMTP password, no `'` characters               |
 | `MAIL_FROM`             | variable | `Najme <no-reply@<domain>>`                    |
+| `GOOGLE_CLIENT_IDS`     | variable | comma-separated Google OAuth client IDs (#58)  |
 
 Later features add more (OAuth, email, Telegram, Expo) — see
 `docs/conventions/env-vars.md`.

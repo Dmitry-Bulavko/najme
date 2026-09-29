@@ -1,7 +1,9 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import type {
+  AuthProviders,
   ChangePasswordRequest,
   ForgotPasswordRequest,
+  GoogleSignInRequest,
   LoginRequest,
   RegisterRequest,
   ResetPasswordRequest,
@@ -9,6 +11,8 @@ import type {
   VerifyEmailRequest,
 } from '@najme/contracts';
 import { resolveLocale } from '@najme/i18n';
+import type { Env } from '../config/env.schema.js';
+import { ENV } from '../config/env.token.js';
 import { MailService } from '../mail/mail.service.js';
 import { apiError } from '../common/errors/api-error.js';
 import { toMe } from '../users/me.mapper.js';
@@ -18,11 +22,14 @@ import { UsersService } from '../users/users.service.js';
 import { AccessTokenService } from './access-token.service.js';
 import type { ClientContext, IssuedSession } from './auth.types.js';
 import { EmailTokenService, type EmailTokenPurpose } from './email-token.service.js';
+import { GoogleIdTokenVerifier, type GoogleIdentityClaims } from './google-id-token-verifier.js';
 import { PasswordService } from './password.service.js';
 import { RefreshTokenService } from './refresh-token.service.js';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly users: UsersService,
     private readonly passwords: PasswordService,
@@ -30,7 +37,68 @@ export class AuthService {
     private readonly refreshTokens: RefreshTokenService,
     private readonly emailTokens: EmailTokenService,
     private readonly mail: MailService,
+    private readonly googleVerifier: GoogleIdTokenVerifier,
+    @Inject(ENV) private readonly env: Env,
   ) {}
+
+  providers(): AuthProviders {
+    return { google: this.env.GOOGLE_CLIENT_IDS.length > 0 };
+  }
+
+  /**
+   * Signs in with a Google ID token (ADR-0010). Resolution (identity by `sub`, else link by
+   * verified email, else create) and the pre-hijacking protection live in
+   * `UsersService.findOrLinkByProvider`.
+   * @param locale already resolved: the request's `locale`, else from `Accept-Language`.
+   */
+  async googleSignIn(
+    input: GoogleSignInRequest,
+    locale: NonNullable<GoogleSignInRequest['locale']>,
+    context: ClientContext,
+  ): Promise<IssuedSession> {
+    const audiences = this.env.GOOGLE_CLIENT_IDS;
+    if (audiences.length === 0) {
+      throw apiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'GOOGLE_SIGN_IN_DISABLED',
+        'Google sign-in is not available.',
+      );
+    }
+    const claims = await this.verifyGoogleToken(input.idToken, audiences);
+    const user = await this.users.findOrLinkByProvider({
+      provider: 'GOOGLE',
+      providerAccountId: claims.sub,
+      email: claims.email,
+      emailVerified: true,
+      displayName: claims.name,
+      avatarUrl: claims.picture,
+      localePreference: locale,
+    });
+    return this.startSession(user, await this.users.hasPassword(user.id), context);
+  }
+
+  private async verifyGoogleToken(
+    idToken: string,
+    audiences: readonly string[],
+  ): Promise<GoogleIdentityClaims> {
+    const invalid = () =>
+      apiError(HttpStatus.UNAUTHORIZED, 'GOOGLE_TOKEN_INVALID', 'The sign-in token is invalid.');
+    let claims: GoogleIdentityClaims;
+    try {
+      claims = await this.googleVerifier.verify(idToken, audiences);
+    } catch (error) {
+      // Reason only (no token, no claims): verifier messages can echo token contents.
+      this.logger.warn(
+        `Google ID token rejected (${error instanceof Error ? error.name : 'unknown'})`,
+      );
+      throw invalid();
+    }
+    if (!claims.sub || !claims.email || !claims.emailVerified) {
+      this.logger.warn('Google ID token rejected (missing claim or unverified email)');
+      throw invalid();
+    }
+    return claims;
+  }
 
   /** @param locale already resolved: the request's `locale`, else from `Accept-Language`. */
   async register(

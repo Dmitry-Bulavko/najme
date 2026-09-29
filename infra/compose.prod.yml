@@ -55,6 +55,8 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:?MAIL_FROM is required}
       APP_WEB_URL: https://${DOMAIN}
+      # Public OAuth client IDs; empty disables Google sign-in.
+      GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB}?schema=public
     expose:
       - '3000'

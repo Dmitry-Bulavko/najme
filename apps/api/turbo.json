@@ -19,7 +19,8 @@
         "SMTP_USER",
         "SMTP_PASSWORD",
         "MAIL_FROM",
-        "APP_WEB_URL"
+        "APP_WEB_URL",
+        "GOOGLE_CLIENT_IDS"
       ]
     },
     "lint": {
@@ -45,6 +46,7 @@
         "SMTP_PASSWORD",
         "MAIL_FROM",
         "APP_WEB_URL",
+        "GOOGLE_CLIENT_IDS",
         "MAILPIT_URL"
       ]
     },
@@ -63,7 +65,8 @@
         "SMTP_USER",
         "SMTP_PASSWORD",
         "MAIL_FROM",
-        "APP_WEB_URL"
+        "APP_WEB_URL",
+        "GOOGLE_CLIENT_IDS"
       ]
     }
   }
