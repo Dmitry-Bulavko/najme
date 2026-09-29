@@ -2,16 +2,28 @@
   "$schema": "https://turborepo.com/schema.json",
   "extends": ["//"],
   "tasks": {
+    "db:generate": {
+      "inputs": ["prisma/schema.prisma", "prisma.config.ts"],
+      "outputs": ["generated/**"],
+      "env": ["DATABASE_URL"]
+    },
     "build": {
+      "dependsOn": ["^build", "db:generate"],
       "env": ["DATABASE_URL", "GIT_SHA"]
     },
+    "lint": {
+      "dependsOn": ["^build", "db:generate"]
+    },
     "typecheck": {
+      "dependsOn": ["^build", "db:generate"],
       "env": ["DATABASE_URL"]
     },
     "test": {
+      "dependsOn": ["^build", "db:generate"],
       "env": ["DATABASE_URL", "GIT_SHA", "NODE_ENV", "PORT", "PUBLIC_URL"]
     },
     "dev": {
+      "dependsOn": ["^build", "db:generate"],
       "env": ["DATABASE_URL", "GIT_SHA", "NODE_ENV", "PORT", "PUBLIC_URL"]
     }
   }
