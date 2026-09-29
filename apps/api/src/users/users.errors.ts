@@ -12,3 +12,11 @@ export class UnverifiedProviderEmailError extends Error {
     this.name = 'UnverifiedProviderEmailError';
   }
 }
+
+/** The user already has a different identity for this provider (or the account is taken). */
+export class IdentityConflictError extends Error {
+  constructor() {
+    super('Identity conflicts with an existing one');
+    this.name = 'IdentityConflictError';
+  }
+}

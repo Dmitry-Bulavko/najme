@@ -1,5 +1,6 @@
 /** Domain types of the users module. Prisma types never leave the module. */
 
+// Mirrors `Locale` from @najme/i18n (api does not depend on that package; see ADR-0004).
 export type LocaleCode = 'en' | 'me' | 'ru' | 'tr';
 
 export type AuthProviderName = 'PASSWORD' | 'GOOGLE' | 'APPLE';

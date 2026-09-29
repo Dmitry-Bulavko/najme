@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client.js';
 import { newId } from '../common/id.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { EmailAlreadyRegisteredError, UnverifiedProviderEmailError } from './users.errors.js';
+import {
+  EmailAlreadyRegisteredError,
+  IdentityConflictError,
+  UnverifiedProviderEmailError,
+} from './users.errors.js';
 import type {
   CreateWithPasswordInput,
   FindOrLinkByProviderInput,
@@ -70,9 +74,39 @@ export class UsersService {
   /**
    * Resolves the user for an external identity: returns the user already linked to it, else links
    * it to the existing user with the same (verified) email, else creates a new user.
+   *
+   * When the existing account's email was never verified, its password identity, refresh tokens and
+   * pending email tokens are removed before linking: whoever registered the address first may not
+   * be its owner (pre-hijacking), so nothing they set up may survive the provider verifying it.
+   *
    * @throws UnverifiedProviderEmailError when linking would rely on an unverified provider email.
+   * @throws IdentityConflictError when the user already has a different identity for the provider.
+   * @throws EmailAlreadyRegisteredError on an email conflict with a deleted user.
    */
   async findOrLinkByProvider(input: FindOrLinkByProviderInput): Promise<User> {
+    try {
+      return await this.resolveProviderUser(input);
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+    }
+    // Lost a race with a concurrent first login: retry once, now the identity may exist.
+    try {
+      return await this.resolveProviderUser(input);
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      throw this.classifyConflict(error);
+    }
+  }
+
+  private classifyConflict(error: unknown): Error {
+    // With the pg driver adapter the violated index is reported in `meta.driverAdapterError`.
+    const fields = JSON.stringify((error as Prisma.PrismaClientKnownRequestError).meta ?? {});
+    return fields.includes('users_email_key')
+      ? new EmailAlreadyRegisteredError()
+      : new IdentityConflictError();
+  }
+
+  private async resolveProviderUser(input: FindOrLinkByProviderInput): Promise<User> {
     const linked = await this.prisma.authIdentity.findFirst({
       where: {
         provider: input.provider,
@@ -96,32 +130,39 @@ export class UsersService {
     });
     if (existing) {
       if (!input.emailVerified) throw new UnverifiedProviderEmailError();
-      return this.prisma.user.update({
-        where: { id: existing.id },
-        data: {
-          emailVerifiedAt: existing.emailVerifiedAt ?? new Date(),
-          authIdentities: { create: identity },
-        },
-        select: userSelect,
+      return this.prisma.$transaction(async (tx) => {
+        if (existing.emailVerifiedAt === null) {
+          await tx.authIdentity.deleteMany({
+            where: { userId: existing.id, provider: 'PASSWORD' },
+          });
+          await tx.refreshToken.updateMany({
+            where: { userId: existing.id, revokedAt: null },
+            data: { revokedAt: new Date() },
+          });
+          await tx.emailToken.deleteMany({ where: { userId: existing.id, usedAt: null } });
+        }
+        return tx.user.update({
+          where: { id: existing.id },
+          data: {
+            emailVerifiedAt: existing.emailVerifiedAt ?? new Date(),
+            authIdentities: { create: identity },
+          },
+          select: userSelect,
+        });
       });
     }
 
-    try {
-      return await this.prisma.user.create({
-        data: {
-          id: newId(),
-          email,
-          emailVerifiedAt: input.emailVerified ? new Date() : null,
-          displayName: input.displayName ?? null,
-          avatarUrl: input.avatarUrl ?? null,
-          authIdentities: { create: identity },
-        },
-        select: userSelect,
-      });
-    } catch (error) {
-      if (isUniqueViolation(error)) throw new EmailAlreadyRegisteredError();
-      throw error;
-    }
+    return this.prisma.user.create({
+      data: {
+        id: newId(),
+        email,
+        emailVerifiedAt: input.emailVerified ? new Date() : null,
+        displayName: input.displayName ?? null,
+        avatarUrl: input.avatarUrl ?? null,
+        authIdentities: { create: identity },
+      },
+      select: userSelect,
+    });
   }
 
   /** @returns the updated user, or null when it does not exist or is deleted. */
