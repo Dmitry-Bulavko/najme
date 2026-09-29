@@ -1,0 +1,20 @@
+---
+description: Shared zod contracts (naming, error codes, pagination, money, dual build)
+globs: packages/contracts/**
+alwaysApply: false
+---
+
+# Contracts (`packages/contracts`)
+
+- One file per domain (`auth.ts`, `users.ts`, `business.ts`, …), re-exported from `src/index.ts`
+  with `.js` extensions. Naming: `xxxSchema` + `export type Xxx = z.infer<typeof xxxSchema>` right
+  after it. Shared building blocks live in `primitives.ts`, `money.ts`, `pagination.ts`,
+  `locale.ts`.
+- API JSON is camelCase; times are ISO-8601 UTC strings; money is `{ amount, currency }` in minor
+  units (`moneySchema`); lists use `paginationQuerySchema` + `paginated(item)` →
+  `{ items, nextCursor }`.
+- Error codes: add to `ERROR_CODES` in `src/error.ts` (grouped by comment) **and** add
+  `errors.<CODE>` to `packages/i18n/src/catalogs/<locale>/errors.json` for en/me/ru/tr — the
+  contracts test enforces the match.
+- Never import Prisma or Nest here; contracts are consumed by api, web and mobile.
+- Dual ESM/CJS build via tsup; `dual-module.test.ts` checks `dist` — do not break `exports`.

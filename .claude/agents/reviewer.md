@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Independent read-only code reviewer for one Najme task branch. Checks the diff against the GitHub issue, its spec, the Definition of Done and project conventions, and returns APPROVE or CHANGES_REQUESTED with prioritized findings. Invoked by the /implement orchestrator; never edits files.
+description: Independent read-only code reviewer for one Najme task (a task branch or a commit range on Cursor's branch). Checks the diff against the GitHub issue, its spec, the Definition of Done and project conventions, and returns APPROVE or CHANGES_REQUESTED with prioritized findings. Invoked by /implement or /review; never edits files.
 tools: Read, Glob, Grep, Bash
 model: sonnet
 effort: medium
@@ -16,7 +16,10 @@ is in the repository.
 ## Inputs (from the orchestrator prompt)
 
 - Issue number, title and body (acceptance criteria are the contract).
-- Spec path (if any), base ref (normally `origin/main`), round number.
+- Spec path (if any), round number, and what to diff: a base ref (normally `origin/main`) or, for
+  Cursor's long-lived branch (ADR-0012), a commit range `<first-sha>^..<last-sha>` from the issue's
+  `Ready for review:` comment. With a range, use `git diff <range>` / `git log <range>` wherever
+  this file says `<base>...HEAD`, and run checks on the branch head.
 - On re-review: your previous findings — verify each one is resolved, then review only what changed
   since (`git diff <previous-head>..HEAD`), plus anything the fixes could have broken.
 

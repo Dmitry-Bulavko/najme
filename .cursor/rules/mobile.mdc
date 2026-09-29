@@ -1,0 +1,27 @@
+---
+description: Expo mobile app patterns (expo-router, UI primitives, theme constants, i18n, jest)
+globs: apps/mobile/**
+alwaysApply: false
+---
+
+# Mobile (`apps/mobile`)
+
+Read ADR-0003 and `docs/specs/45-mobile-ui-kit.md`.
+
+- Routes in `src/app/` (expo-router, default exports, thin, wrapped in `<Screen>`); tabs in
+  `src/app/(tabs)/`. Features in `src/features/<feature>/`; primitives in `src/components/ui/`
+  (Button, Text, TextField, FormField, Card, ListItem/ListGroup, Banner, Avatar, Divider, Screen).
+- Styling: `StyleSheet.create` with `tokens` from `@najme/ui-tokens`; sizes from
+  `src/components/ui/theme.ts` (`CONTROL_HEIGHT`, `ICON_SIZE`, `MIN_TOUCH_TARGET`…) — no magic
+  numbers. Fonts via `fontFamilies.*` (`fontWeight` does not select custom weights on Android).
+- Accessibility role and label on every interactive element; touch targets ≥ 44dp; text scales
+  with dynamic type (capped at 1.6x); keyboard avoidance and safe areas via `Screen`.
+- API base URL: `process.env.EXPO_PUBLIC_API_URL` (inlined at bundle time; never a secret). Parse
+  responses with contract schemas; time out requests; clean up on unmount.
+- Secrets/tokens in `expo-secure-store`, never AsyncStorage. Native-only modules must degrade
+  gracefully in Expo Go and in the web export.
+- i18n: register namespaces in `src/i18n/index.ts` and `src/test-utils/i18n.tsx`.
+- Dev-only screens load through a `__DEV__`-guarded `require`.
+- Tests: jest-expo + RNTL (`@jest/globals`, `renderWithI18n`, awaited `render`/`fireEvent`).
+- `pnpm --filter @najme/mobile build` (`expo export --platform web`) is part of `pnpm check` and
+  must keep passing.

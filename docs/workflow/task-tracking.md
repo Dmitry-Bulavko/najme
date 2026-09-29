@@ -10,14 +10,14 @@ All work is tracked in GitHub Issues of `Dmitry-Bulavko/najme`. No code change w
 
 ## Labels
 
-| Group       | Labels                                                                                     | Rule                                 |
-| ----------- | ------------------------------------------------------------------------------------------ | ------------------------------------ |
-| `type:`     | `feature`, `bug`, `chore`, `docs`, `infra`, `epic`                                         | exactly one                          |
-| `area:`     | `api`, `web`, `mobile`, `contracts`, `i18n`, `infra`, `agents`                             | one or more                          |
-| `priority:` | `P0` (critical path), `P1` (needed for phase exit), `P2` (nice to have), `P3` (someday)    | exactly one on tasks                 |
-| `status:`   | `backlog`, `ready`, `in-progress`, `in-review`, `blocked`, `needs-human`                   | exactly one on open tasks            |
-| `size:`     | `S` (≤ ~200 lines, one area), `M` (≤ ~600 lines or 2 areas), `L` (too big — must be split) | exactly one on tasks                 |
-| `phase:`    | `M0` … `M7`                                                                                | exactly one; matches the parent epic |
+| Group       | Labels                                                                                                    | Rule                                 |
+| ----------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `type:`     | `feature`, `bug`, `chore`, `docs`, `infra`, `epic`                                                        | exactly one                          |
+| `area:`     | `api`, `web`, `mobile`, `contracts`, `i18n`, `infra`, `agents`                                            | one or more                          |
+| `priority:` | `P0` (critical path), `P1` (needed for phase exit), `P2` (nice to have), `P3` (someday)                   | exactly one on tasks                 |
+| `status:`   | `backlog`, `ready`, `in-progress`, `in-review`, `changes-requested`, `approved`, `blocked`, `needs-human` | exactly one on open tasks            |
+| `size:`     | `S` (≤ ~200 lines, one area), `M` (≤ ~600 lines or 2 areas), `L` (too big — must be split)                | exactly one on tasks                 |
+| `phase:`    | `M0` … `M7`                                                                                               | exactly one; matches the parent epic |
 
 Labels are defined in `.github/labels.yml` and synced by the `labels` workflow.
 
@@ -33,7 +33,10 @@ needs-human: waiting for a human action (secrets, accounts, product decision). A
 - `backlog` — idea captured, not refined. `/manager groom` refines it to `ready`.
 - `ready` — has goal, acceptance criteria, size S/M, dependencies listed. Agents may pick it.
 - `in-progress` — claimed by `/implement`; branch exists.
-- `in-review` — PR open, waiting for CI/merge.
+- `in-review` — PR open, waiting for CI/merge; in Cursor mode: handed off for Claude's review with
+  a `Ready for review: <range>` comment.
+- `changes-requested` — (Cursor mode) review found BLOCKER/MAJOR issues; fixing them comes first.
+- `approved` — (Cursor mode) review passed; the task closes when its phase PR is merged.
 - `blocked` — agent could not finish; the last comment explains why and what is needed.
 - `needs-human` — requires the user (secrets, account setup, decision). Checklist in the body.
 
@@ -78,6 +81,17 @@ Bugs use the same sections but replace Goal/Context with **Steps to reproduce / 
 3. Drop issues whose `## Dependencies` section lists `Blocked by #N` where #N is still open.
 4. Sort by phase (`M0` first) → priority (`P0` first) → issue number (oldest first).
 5. Take the first. If none remain, report that and suggest `/manager groom` or `/manager advance`.
+
+## Cursor mode (ADR-0012)
+
+- Cursor takes tasks per `AGENTS.md`: `changes-requested` first, then interrupted `in-progress`,
+  then the rules above — where a dependency also counts as satisfied when it is `status:approved`
+  (its code is already on the shared branch).
+- Only the current phase is `ready`; later phases stay `backlog` until Claude grooms them at the
+  phase boundary.
+- One phase PR `cursor/alpha → main` per phase lists `Closes #N` for its tasks and is merged by
+  Claude with a **merge commit** after every task is approved, CI is green and the epic's exit
+  criteria are verified.
 
 ## Pull requests
 

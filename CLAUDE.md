@@ -8,15 +8,16 @@ web (Next.js) and mobile (Expo). UI locales: `en` (default), `me` (Crnogorski/Sr
 
 ## Where things are
 
-| Path                     | What                                                                  |
-| ------------------------ | --------------------------------------------------------------------- |
-| `apps/api`               | NestJS + Prisma + PostgreSQL REST API (`/api/v1`)                     |
-| `apps/web`               | Next.js App Router web app (public pages + business dashboard)        |
-| `apps/mobile`            | Expo + expo-router app (iOS/Android)                                  |
-| `packages/*`             | Shared code: `config`, `contracts` (zod), `i18n`, `ui-tokens`         |
-| `infra/`                 | Production Docker Compose, Caddy, server scripts                      |
-| `docs/`                  | Knowledge base for agents — **start at `docs/README.md`**             |
-| `.claude/agents, skills` | Agentic workflow: `implementer`, `reviewer`, `/implement`, `/manager` |
+| Path                     | What                                                                         |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| `apps/api`               | NestJS + Prisma + PostgreSQL REST API (`/api/v1`)                            |
+| `apps/web`               | Next.js App Router web app (public pages + business dashboard)               |
+| `apps/mobile`            | Expo + expo-router app (iOS/Android)                                         |
+| `packages/*`             | Shared code: `config`, `contracts` (zod), `i18n`, `ui-tokens`                |
+| `infra/`                 | Production Docker Compose, Caddy, server scripts                             |
+| `docs/`                  | Knowledge base for agents — **start at `docs/README.md`**                    |
+| `.claude/agents, skills` | Claude workflow: `/review`, `/manager`, `reviewer` (+ fallback `/implement`) |
+| `AGENTS.md`, `.cursor/`  | Implementer briefing, rules and commands for Cursor (ADR-0012)               |
 
 Apps and packages are scaffolded by roadmap tasks; if a path does not exist yet, it has not been
 built.
@@ -52,7 +53,13 @@ Local services and env: `docs/runbooks/local-dev.md`. Deploy: `docs/runbooks/dep
 
 ## Agentic workflow (short)
 
-- `/implement [issue]` — orchestrator: picks the next ready task, runs `implementer` → `reviewer`
-  loop, opens the PR, waits for CI, squash-merges.
+Since 2026-09-29 (ADR-0012) **Cursor implements and Claude reviews**: Cursor works on the branch
+`cursor/alpha` following `AGENTS.md`; Claude reviews handed-off tasks with `/review`, merges the
+phase PR (merge commit) and grooms the next phase with `/manager`. Claude does not write feature
+code in this mode.
+
+- `/review [issue… | phase]` — review Cursor's handed-off tasks; close a phase.
+- `/implement [issue]` — fallback orchestrator: picks the next ready task, runs `implementer` →
+  `reviewer` loop, opens the PR, waits for CI, squash-merges.
 - `/manager [status|plan|new|groom|advance|release]` — backlog and roadmap owner.
-- Details: `docs/workflow/agentic-workflow.md`.
+- Details: `docs/workflow/cursor-handoff.md`, `docs/workflow/agentic-workflow.md`.

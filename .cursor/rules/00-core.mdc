@@ -1,0 +1,27 @@
+---
+description: Core rules for every task in the Najme monorepo (workflow, hard rules, Definition of Done)
+alwaysApply: true
+---
+
+# Najme — core rules
+
+- `AGENTS.md` is the briefing: task cycle on branch `cursor/alpha`, claiming with `gh`, handoff
+  comment `Ready for review: <first-sha>^..<last-sha>`, phase PRs. Follow it exactly.
+- Every change belongs to a GitHub issue. Stay inside its scope; put anything else in the handoff
+  comment under "Follow-ups" instead of the diff.
+- Read before writing: the issue (with comments), `docs/README.md` for the area map, the ADRs the
+  issue names, and the code you touch. Reuse existing helpers instead of adding new ones.
+- Order of work: `packages/contracts` → `apps/api` → `apps/web` / `apps/mobile`.
+- Spec first for `size:M` or any schema/contract change: `docs/specs/<N>-<slug>.md`.
+- Done = `docs/workflow/definition-of-done.md` (+ API-STD / UI-STD when the issue says so) and a
+  green `pnpm check`.
+- Commits: Conventional Commits with the issue number, e.g. `fix(web): keep locale on redirect (#52)`.
+  Stage files explicitly. Never amend/rebase/force-push pushed commits. Never push to `main`.
+- English everywhere (code, comments, docs, commits, GitHub).
+- Never read or print `.env` files or secrets. `.env.example` is fine and must list every variable.
+- No `any`, no `catch {}`, no non-null `!` without a justifying comment, no skipped/weakened tests,
+  no hardcoded UI strings, no hand-edited `pnpm-lock.yaml`.
+- Unsure about a product rule? Do not guess: label the issue `status:blocked` and ask in a comment.
+- Prettier formats everything (`pnpm format`); ESLint/TS configs come from `@najme/config` — do
+  not redefine them. Named exports only (framework default exports excepted). `kebab-case` files.
+- Comment the *why*, not the *what*. Keep functions small; thin controllers and route files.

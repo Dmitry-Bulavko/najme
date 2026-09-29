@@ -1,0 +1,24 @@
+---
+description: Testing rules (layers, determinism, time and DST, e2e isolation)
+globs: "**/*.spec.ts, **/*.test.ts, **/*.test.tsx, apps/api/test/**, apps/web/e2e/**"
+alwaysApply: false
+---
+
+# Testing
+
+Read `docs/conventions/testing.md`.
+
+- Every task ships tests for new/changed behaviour; a bug fix starts with a failing test.
+- Layers: packages → Vitest; API unit → Vitest (`src/**/*.spec.ts`); API e2e → Vitest + supertest
+  on real Postgres (`test/**/*.e2e-spec.ts`: status codes, validation, authorization, DB
+  constraints); web → Vitest + Testing Library; mobile → jest-expo + RNTL; browser flows →
+  Playwright (`apps/web/e2e`, #57).
+- Deterministic: no real network (fakes for mailer, Google, storage, push, Telegram), injected
+  clock, seeded data. Never `Date.now()` in scheduling code under test.
+- Time zones: business logic runs in `Europe/Podgorica`; cover the DST days (last Sunday of March
+  and October, e.g. 2026-03-29 and 2026-10-25) whenever local wall-clock time is converted.
+- Business-scoped endpoints: e2e proves 404 for non-members, 403 for disallowed roles, and
+  rejection of cross-tenant ids (API-STD).
+- Concurrency-sensitive code (bookings, invitations, token claims) gets a parallel-requests test.
+- e2e isolation: unique suffixes per test file, delete what you created in `afterEach`.
+- Never skip, `.only`, weaken or delete a test to make CI green.

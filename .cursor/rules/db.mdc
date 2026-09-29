@@ -1,0 +1,26 @@
+---
+description: Prisma schema and migration rules (naming, raw SQL constraints, backward compatibility)
+globs: apps/api/prisma/**
+alwaysApply: false
+---
+
+# Database (`apps/api/prisma`)
+
+Source of truth: `docs/architecture/data-model.md` (read the **Amendment 2026-09-29** section) and
+ADR-0005 / ADR-0009. Update `data-model.md` in the same task when the schema changes.
+
+- Models PascalCase with `@@map("snake_plural")`; columns `@map("snake_case")`; enums `@@map`.
+- `id String @id @db.Uuid` with **no DB default** (the app sets `newId()`); timestamps
+  `@db.Timestamptz(3)`; soft delete via `deletedAt` where the model says so.
+- FK delete policy per the amendment: CASCADE for pure configuration children, RESTRICT towards
+  soft-deleted parents and users, SET NULL for optional links.
+- Anything Prisma cannot express (CHECK, partial unique indexes, EXCLUDE, tstzrange) goes into the
+  migration SQL with a `-- Prisma cannot express …` comment, and a schema comment points to it.
+- **Booking overlap:** `bookings.blocked_range tstzrange` is declared `Unsupported("tstzrange")`
+  and written only through raw SQL in the same statement as `starts_at`/`ends_at`; the constraint
+  `bookings_no_overlap` must survive every later migration (CI diffs migrations vs schema).
+- Migrations are created with `prisma migrate dev --name <snake_desc>`, committed, and must be
+  backward compatible with the previous app version (expand → migrate → contract, ADR-0007).
+  Reference data needed in production (categories…) is seeded **in a migration**, not in `db seed`.
+- After changing `schema.prisma` run `pnpm --filter @najme/api db:generate` (or any turbo task).
+- `btree_gist` is already enabled by the init migration.

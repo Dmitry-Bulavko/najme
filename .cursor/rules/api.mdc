@@ -1,0 +1,62 @@
+---
+description: NestJS API patterns (modules, validation, errors, auth, Prisma, env, e2e tests)
+globs: apps/api/**
+alwaysApply: false
+---
+
+# API (`apps/api`) — follow the existing patterns
+
+Read `docs/conventions/api.md`, ADR-0002, ADR-0010 (auth), ADR-0013 (tenancy, once written).
+
+**Modules.** One folder per bounded context: `x.module.ts`, `x.controller.ts`, `x.service.ts`,
+optional `x.types.ts` (domain types), `x.errors.ts` (domain errors), `x.mapper.ts` (domain →
+contract). Register in `src/app.module.ts`. `ConfigModule` and `PrismaModule` are global: inject
+`@Inject(ENV) env: Env` and `PrismaService`. ESM: relative imports end in `.js`.
+
+**Validation.** Per parameter with the contract schema:
+`@Body(new ZodValidationPipe(createBusinessRequestSchema)) body: CreateBusinessRequest` (same for
+`@Query`) — `src/common/pipes/zod-validation.pipe.ts`. Invalid input → 400 `VALIDATION_FAILED`
+with `details.issues`. Controllers only validate, call the service and return contract types; use
+`@HttpCode` explicitly; Swagger via `@ApiTags`/`@ApiOperation`.
+
+**Errors.** Services throw `apiError(HttpStatus.X, 'CODE', 'English message')`
+(`src/common/errors/api-error.ts`) or typed domain errors (plain `Error` subclasses in
+`x.errors.ts`) that the calling service or `src/common/filters/api-exception.filter.ts` maps.
+Every new code: add to `ERROR_CODES` in `packages/contracts/src/error.ts` **and** to `errors.json`
+in all 4 locales (a test enforces parity). Unmapped errors become 500 — map them.
+
+**Auth.** A global JWT guard protects everything; opt out with `@Public()`; current user via
+`@CurrentUser()`. Throttling is opt-in: `@UseGuards(ThrottlerGuard)` + `@Throttle(...)` with named
+limit constants. Mutating JSON endpoints that may be called with cookies also use
+`RequireJsonGuard`.
+
+**Tenancy (M2+).** Business-scoped routes live under `/businesses/:businessId/...` and use the
+business access guard + roles decorator (added in M2-02). Non-member or unknown/deleted business →
+**404**; member without the role → **403**; resource checks (STAFF-own, cross-tenant ids) in the
+service. Cross-tenant ids in the body → 422 `VALIDATION_FAILED`. Public routes live under
+`/public/...`, the caller's own data under `/me/...`, platform admin under `/admin/...`.
+
+**Prisma.** Only inside the owning module. Select explicit fields (`xSelect satisfies
+Prisma.XSelect`); Prisma types never leave the module. IDs: `id: newId()` (UUID v7,
+`src/common/id.ts`) — the schema has no DB default. Soft-deleted rows: filter `deletedAt: null`.
+Conditional state changes with `updateMany({ where: { id, status } })` and check `count`.
+Composable writes accept `db: Prisma.TransactionClient = this.prisma`; row locks via
+`tx.$queryRaw ... FOR UPDATE`. Unique violations: `P2002` → domain error; constraint names are in
+`meta.driverAdapterError`.
+
+**Time.** Inject the clock (`Clock` provider, added in M2-02) — never `Date.now()` in business
+logic. Store UTC `timestamptz`; business-local conversions only through the shared time helpers.
+
+**Env vars.** Add to `src/config/env.schema.ts` (+ spec), `apps/api/turbo.json` env lists, root
+`.env.example`, the vitest configs if required, CI env / dev-smoke `.env` if needed, and for
+production `.github/workflows/deploy.yml`, `infra/compose.prod.yml`, `docs/conventions/env-vars.md`.
+Empty compose values (`${X:-}`) must mean "unset". A new runtime workspace dependency must also be
+copied in `apps/api/Dockerfile`.
+
+**Tests.** Unit: `src/**/*.spec.ts`, services built by hand with `vi.fn()` stubs.
+e2e: `test/**/*.e2e-spec.ts` — `Test.createTestingModule({ imports: [AppModule] })`, override seams
+with `.overrideProvider(X).useValue(fake)` (mailer, Google verifier, storage…), then
+`createNestApplication()`, `configureApp(app)`, `app.init()`; supertest against `/api/v1/...`.
+Isolation: unique suffixes (`randomUUID()`), track created rows and delete them in `afterEach`
+(children must cascade). Different `X-Forwarded-For` per test when throttling applies. Mailpit
+tests are gated with `describe.skipIf(!process.env.MAILPIT_URL)`. Run with `DATABASE_URL` exported.
