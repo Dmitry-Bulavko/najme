@@ -7,6 +7,9 @@ import { defaultLocale, isSupportedLocale } from './routing';
  * Supplies `next-intl` with messages for the current request. Locale resolution itself happens in
  * `proxy.ts` (ADR-0004: cookie -> Accept-Language -> en) before this ever runs; by the time a
  * request reaches a `[locale]` route, the segment is already a supported locale.
+ *
+ * The `common` and `shell` namespaces are merged at the top level (their root keys do not overlap),
+ * so components use e.g. `useTranslations('nav')` or `useTranslations('apiStatus')`.
  */
 export default getRequestConfig(async ({ requestLocale }) => {
   const requested = await requestLocale;
@@ -14,6 +17,6 @@ export default getRequestConfig(async ({ requestLocale }) => {
 
   return {
     locale,
-    messages: catalogs[locale].common,
+    messages: { ...catalogs[locale].common, ...catalogs[locale].shell },
   };
 });
