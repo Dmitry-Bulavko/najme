@@ -32,9 +32,14 @@ assumptions, not product decisions — confirm (or override) before the listed t
 
 ## Resolved
 
-| #   | Question                          | Decision                                                              | Date       |
-| --- | --------------------------------- | --------------------------------------------------------------------- | ---------- |
-| R1  | Solo specialists or salons?       | Salons with multiple staff from the first release (solo = one staff). | 2026-09-28 |
-| R2  | Notification channels in MVP      | Expo push, email, Telegram bot. SMS/WhatsApp/Viber after MVP.         | 2026-09-28 |
-| R3  | One app or separate business app? | One app on web and mobile; business users switch into business mode.  | 2026-09-28 |
-| R4  | Default UI language               | English; plus Crnogorski/Srpski (Latin), Russian, Turkish.            | 2026-09-28 |
+| #   | Question                             | Decision                                                                                                                 | Date       |
+| --- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| R1  | Solo specialists or salons?          | Salons with multiple staff from the first release (solo = one staff).                                                    | 2026-09-28 |
+| R2  | Notification channels in MVP         | Expo push, email, Telegram bot. SMS/WhatsApp/Viber after MVP.                                                            | 2026-09-28 |
+| R3  | One app or separate business app?    | One app on web and mobile; business users switch into business mode.                                                     | 2026-09-28 |
+| R4  | Default UI language                  | English; plus Crnogorski/Srpski (Latin), Russian, Turkish.                                                               | 2026-09-28 |
+| R5  | When is the first production deploy? | Not until the UI is complete; the first Lightsail deploy (#18) moves to M7.                                              | 2026-09-29 |
+| R6  | Sign-in methods in M1                | Email+password and Google (web + mobile). Apple sign-in moves to M7.                                                     | 2026-09-29 |
+| R7  | UI approach                          | Component kits on the shared tokens: shadcn/ui (Radix + Tailwind) on web, own primitives on mobile; no mockups up front. | 2026-09-29 |
+| R8  | Email verification                   | Soft: unverified users can use the app; key actions may require verification later.                                      | 2026-09-29 |
+| R9  | Platform order in M1                 | Web and mobile in parallel within each phase.                                                                            | 2026-09-29 |
