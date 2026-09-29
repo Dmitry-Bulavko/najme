@@ -1,9 +1,11 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import type {
+  ChangePasswordRequest,
   ForgotPasswordRequest,
   LoginRequest,
   RegisterRequest,
   ResetPasswordRequest,
+  UpdateProfileRequest,
   VerifyEmailRequest,
 } from '@najme/contracts';
 import { resolveLocale } from '@najme/i18n';
@@ -98,6 +100,54 @@ export class AuthService {
       throw apiError(HttpStatus.UNAUTHORIZED, 'UNAUTHENTICATED', 'Authentication is required.');
     }
     return toMe(user, await this.users.hasPassword(userId));
+  }
+
+  async updateProfile(
+    userId: string,
+    input: UpdateProfileRequest,
+  ): Promise<ReturnType<typeof toMe>> {
+    const user = await this.users.updateProfile(userId, {
+      ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+      ...(input.locale !== undefined ? { localePreference: input.locale } : {}),
+    });
+    if (!user) {
+      throw apiError(HttpStatus.UNAUTHORIZED, 'UNAUTHENTICATED', 'Authentication is required.');
+    }
+    return toMe(user, await this.users.hasPassword(userId));
+  }
+
+  /**
+   * Verifies the current password, stores the new one and ends every session; the caller gets a
+   * fresh session (ADR-0010, "Update"). 409 `PASSWORD_NOT_SET` without a password identity, 401
+   * `INVALID_CREDENTIALS` for a wrong current password.
+   */
+  async changePassword(
+    userId: string,
+    input: ChangePasswordRequest,
+    context: ClientContext,
+  ): Promise<IssuedSession> {
+    const user = await this.users.findById(userId);
+    if (!user) {
+      throw apiError(HttpStatus.UNAUTHORIZED, 'UNAUTHENTICATED', 'Authentication is required.');
+    }
+    const currentHash = await this.users.findPasswordHash(userId);
+    if (currentHash === null) {
+      throw apiError(HttpStatus.CONFLICT, 'PASSWORD_NOT_SET', 'This account has no password.');
+    }
+    if (!(await this.passwords.verify(currentHash, input.currentPassword))) {
+      throw apiError(
+        HttpStatus.UNAUTHORIZED,
+        'INVALID_CREDENTIALS',
+        'The current password is incorrect.',
+      );
+    }
+    const passwordHash = await this.passwords.hash(input.newPassword);
+    const refreshToken = await this.refreshTokens.replaceAllForUser(userId, context, async (tx) => {
+      if (!(await this.users.setPassword(userId, passwordHash, tx))) {
+        throw apiError(HttpStatus.CONFLICT, 'PASSWORD_NOT_SET', 'This account has no password.');
+      }
+    });
+    return this.buildSession(user, true, refreshToken);
   }
 
   /** Sets `emailVerifiedAt`. The token is single-use; 400 `TOKEN_INVALID`/`TOKEN_EXPIRED`. */

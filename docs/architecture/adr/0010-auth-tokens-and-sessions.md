@@ -77,3 +77,21 @@ future feature needs instant revocation (e.g. admin actions), add `sessionsInval
 - Clients must implement single-flight refresh and handle `REFRESH_TOKEN_REUSED` by sending the user
   to sign-in.
 - Same-origin API access (Caddy `/api/*`, Next rewrite in dev) is assumed for the cookie flow.
+
+## Update: changing the password while signed in (#51)
+
+`POST /api/v1/me/password` cannot tell which refresh token is the caller's: the web cookie is only
+sent on `Path=/api/v1/auth`, and mobile sends its token only to refresh/logout. Options considered:
+(a) move the endpoint under `/auth` and send the token in the mobile body, (b) revoke all refresh
+tokens and return a fresh `authSession`, (c) a session id claim in the access token.
+
+Decision: **(b)**. After verifying the current password, one transaction stores the new hash,
+revokes every active refresh token of the user and issues a new one; the response is an
+`authSession` delivered like login (cookie for web, body with `X-Client: mobile`). Every other
+session ends, the caller stays signed in through the new token, and no request needs extra
+credentials. The access tokens already issued stay valid until they expire (at most 15 minutes, as
+above). Option (c) would keep the very same refresh token but needs a session id in the JWT and a
+guard lookup; revisit it if per-session management ("sign out other devices") is built.
+
+The endpoint is throttled (5/min per IP), answers `401 INVALID_CREDENTIALS` for a wrong current
+password and `409 PASSWORD_NOT_SET` for accounts without a password identity (e.g. Google-only).

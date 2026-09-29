@@ -6,6 +6,7 @@ import {
   HttpException,
   HttpStatus,
   Inject,
+  Patch,
   Post,
   Req,
   Res,
@@ -16,18 +17,22 @@ import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { parseAcceptLanguage, resolveLocale } from '@najme/i18n';
 import {
+  changePasswordRequestSchema,
   forgotPasswordRequestSchema,
   loginRequestSchema,
   refreshRequestSchema,
   registerRequestSchema,
   resetPasswordRequestSchema,
+  updateProfileRequestSchema,
   verifyEmailRequestSchema,
   type AuthSession,
+  type ChangePasswordRequest,
   type ForgotPasswordRequest,
   type LoginRequest,
   type Me,
   type RegisterRequest,
   type ResetPasswordRequest,
+  type UpdateProfileRequest,
   type VerifyEmailRequest,
 } from '@najme/contracts';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
@@ -54,9 +59,23 @@ const VERIFY_LIMIT = { default: { limit: 10, ttl: MINUTE_MS } };
 const RESEND_LIMIT = { default: { limit: 3, ttl: MINUTE_MS } };
 const FORGOT_LIMIT = { default: { limit: 5, ttl: MINUTE_MS } };
 const RESET_LIMIT = { default: { limit: 10, ttl: MINUTE_MS } };
+const CHANGE_PASSWORD_LIMIT = { default: { limit: 5, ttl: MINUTE_MS } };
 
 function clientContext(req: Request): ClientContext {
   return { userAgent: req.header('user-agent') ?? null, ipAddress: req.ip ?? null };
+}
+
+/** Web gets the refresh token as httpOnly cookie, mobile in the body (ADR-0010). */
+function deliverSession(
+  req: Request,
+  res: Response,
+  session: IssuedSession,
+  cookieSecure: boolean,
+): AuthSession {
+  const { refreshToken, ...rest } = session;
+  if (isMobileClient(req)) return { ...rest, refreshToken };
+  setRefreshCookie(res, refreshToken, cookieSecure);
+  return rest;
 }
 
 @ApiTags('auth')
@@ -183,21 +202,48 @@ export class AuthController {
   }
 
   private deliver(req: Request, res: Response, session: IssuedSession): AuthSession {
-    const { refreshToken, ...rest } = session;
-    if (isMobileClient(req)) return { ...rest, refreshToken };
-    setRefreshCookie(res, refreshToken, this.env.AUTH_COOKIE_SECURE);
-    return rest;
+    return deliverSession(req, res, session, this.env.AUTH_COOKIE_SECURE);
   }
 }
 
 @ApiTags('users')
 @Controller('me')
 export class MeController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    @Inject(ENV) private readonly env: Env,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'The signed-in user' })
   me(@CurrentUser() user: AuthenticatedUser): Promise<Me> {
     return this.auth.me(user.id);
+  }
+
+  @Patch()
+  @UseGuards(ThrottlerGuard, RequireJsonGuard)
+  @ApiOperation({ summary: 'Update display name and/or account language' })
+  updateProfile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(updateProfileRequestSchema)) body: UpdateProfileRequest,
+  ): Promise<Me> {
+    return this.auth.updateProfile(user.id, body);
+  }
+
+  @Post('password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard, RequireJsonGuard)
+  @Throttle(CHANGE_PASSWORD_LIMIT)
+  @ApiOperation({
+    summary: 'Change the password; ends all sessions and returns a fresh one for the caller',
+  })
+  async changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(changePasswordRequestSchema)) body: ChangePasswordRequest,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthSession> {
+    const session = await this.auth.changePassword(user.id, body, clientContext(req));
+    return deliverSession(req, res, session, this.env.AUTH_COOKIE_SECURE);
   }
 }

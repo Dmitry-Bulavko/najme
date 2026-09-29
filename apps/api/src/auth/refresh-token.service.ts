@@ -93,6 +93,25 @@ export class RefreshTokenService {
     });
   }
 
+  /**
+   * Revokes every active refresh token of the user and issues one new token, atomically. Used when
+   * a signed-in user changes their password: all other sessions end, the caller gets a fresh one.
+   * `beforeRevoke` runs first in the same transaction (e.g. to store the new password hash).
+   */
+  async replaceAllForUser(
+    userId: string,
+    context: ClientContext,
+    beforeRevoke: (tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<string> {
+    const raw = generateRefreshToken();
+    await this.prisma.$transaction(async (tx) => {
+      await beforeRevoke(tx);
+      await this.revokeAllForUser(userId, tx);
+      await tx.refreshToken.create({ data: this.row(newId(), userId, raw, context) });
+    });
+    return raw;
+  }
+
   private async reuse(userId: string): Promise<never> {
     await this.revokeAllForUser(userId);
     throw apiError(

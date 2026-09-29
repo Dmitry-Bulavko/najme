@@ -59,6 +59,20 @@ export class UsersService {
     return identity !== null;
   }
 
+  /** The stored password hash, or null when the user has no password identity. */
+  async findPasswordHash(userId: string): Promise<string | null> {
+    const identity = await this.prisma.authIdentity.findFirst({
+      where: {
+        userId,
+        provider: 'PASSWORD',
+        passwordHash: { not: null },
+        user: { deletedAt: null },
+      },
+      select: { passwordHash: true },
+    });
+    return identity?.passwordHash ?? null;
+  }
+
   /** The user and their password hash for an email login; null if either does not exist. */
   async findPasswordCredentialByEmail(
     email: string,
