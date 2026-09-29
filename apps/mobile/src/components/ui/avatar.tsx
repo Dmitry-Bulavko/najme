@@ -3,7 +3,12 @@ import { useState, type ReactElement } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
 import { Text } from './text';
-import { fontFamilies } from './theme';
+import {
+  AVATAR_DEFAULT_SIZE,
+  AVATAR_INITIALS_FONT_RATIO,
+  AVATAR_INITIALS_LINE_RATIO,
+  fontFamilies,
+} from './theme';
 
 export interface AvatarProps {
   name: string;
@@ -21,7 +26,7 @@ export function getInitials(name: string): string {
 }
 
 /** Round avatar: shows the image, or initials when there is no image or it fails to load. */
-export function Avatar({ name, uri, size = 48 }: AvatarProps): ReactElement {
+export function Avatar({ name, uri, size = AVATAR_DEFAULT_SIZE }: AvatarProps): ReactElement {
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const showImage = Boolean(uri) && failedUri !== uri;
   const dimension = { width: size, height: size, borderRadius: size / 2 };
@@ -39,7 +44,11 @@ export function Avatar({ name, uri, size = 48 }: AvatarProps): ReactElement {
         <Text
           variant="body"
           color="primary"
-          style={{ fontFamily: fontFamilies.bold, fontSize: size * 0.38, lineHeight: size * 0.5 }}
+          style={{
+            fontFamily: fontFamilies.bold,
+            fontSize: size * AVATAR_INITIALS_FONT_RATIO,
+            lineHeight: size * AVATAR_INITIALS_LINE_RATIO,
+          }}
           allowFontScaling={false}
         >
           {getInitials(name)}

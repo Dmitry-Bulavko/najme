@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Card, Text } from '@/components/ui';
+import { ICON_BADGE_SIZE, ICON_SIZE } from '@/components/ui/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -20,7 +21,7 @@ export function EmptyState({
   return (
     <Card style={styles.card}>
       <View style={styles.iconWrap}>
-        <Ionicons name={icon} size={36} color={tokens.colors.primary} />
+        <Ionicons name={icon} size={ICON_SIZE.xl} color={tokens.colors.primary} />
       </View>
       <Text variant="title" style={styles.centered}>
         {message}
@@ -35,8 +36,8 @@ export function EmptyState({
 const styles = StyleSheet.create({
   card: { alignItems: 'center', paddingVertical: tokens.spacing['4xl'], gap: tokens.spacing.lg },
   iconWrap: {
-    width: 72,
-    height: 72,
+    width: ICON_BADGE_SIZE.lg,
+    height: ICON_BADGE_SIZE.lg,
     borderRadius: tokens.radius.full,
     alignItems: 'center',
     justifyContent: 'center',

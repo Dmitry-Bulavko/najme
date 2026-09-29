@@ -10,8 +10,10 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { useTranslation } from 'react-i18next';
+
 import { Text } from './text';
-import { fontFamilies, MIN_TOUCH_TARGET } from './theme';
+import { CONTROL_BORDER_WIDTH, CONTROL_HEIGHT, fontFamilies } from './theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -28,17 +30,44 @@ export interface ButtonProps extends Omit<PressableProps, 'children' | 'style'> 
 const { colors, spacing, radius } = tokens;
 
 const variantColors = {
-  primary: { bg: colors.primary, pressed: colors.primaryHover, fg: colors.primaryForeground },
-  secondary: { bg: colors.secondary, pressed: colors.base04, fg: colors.secondaryForeground },
-  outline: { bg: 'transparent', pressed: colors.secondary, fg: colors.primary },
-  ghost: { bg: 'transparent', pressed: colors.secondary, fg: colors.primary },
-  destructive: { bg: colors.danger, pressed: colors.danger, fg: colors.dangerForeground },
+  primary: {
+    bg: colors.primary,
+    pressed: colors.primaryHover,
+    fg: colors.primaryForeground,
+    pressedFg: colors.primaryForeground,
+  },
+  secondary: {
+    bg: colors.secondary,
+    pressed: colors.base04,
+    fg: colors.secondaryForeground,
+    pressedFg: colors.secondaryForeground,
+  },
+  // Pressed outline/ghost sit on `secondary` (#EBEFFF), where `primary` text is only 4.05:1 (below
+  // AA). `primaryHover` (#4560C4) on `secondary` is 4.92:1, so it is the pressed foreground.
+  outline: {
+    bg: 'transparent',
+    pressed: colors.secondary,
+    fg: colors.primary,
+    pressedFg: colors.primaryHover,
+  },
+  ghost: {
+    bg: 'transparent',
+    pressed: colors.secondary,
+    fg: colors.primary,
+    pressedFg: colors.primaryHover,
+  },
+  destructive: {
+    bg: colors.danger,
+    pressed: colors.danger,
+    fg: colors.dangerForeground,
+    pressedFg: colors.dangerForeground,
+  },
 } as const;
 
 const sizeStyles = StyleSheet.create({
-  sm: { minHeight: MIN_TOUCH_TARGET, paddingHorizontal: spacing.lg },
-  md: { minHeight: 48, paddingHorizontal: spacing['2xl'] },
-  lg: { minHeight: 56, paddingHorizontal: spacing['3xl'] },
+  sm: { minHeight: CONTROL_HEIGHT.sm, paddingHorizontal: spacing.lg },
+  md: { minHeight: CONTROL_HEIGHT.md, paddingHorizontal: spacing['2xl'] },
+  lg: { minHeight: CONTROL_HEIGHT.lg, paddingHorizontal: spacing['3xl'] },
 });
 
 /**
@@ -57,13 +86,14 @@ export function Button({
   accessibilityLabel,
   ...rest
 }: ButtonProps): ReactElement {
+  const { t } = useTranslation('mobile');
   const inactive = disabled || loading;
   const palette = variantColors[variant];
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityLabel={accessibilityLabel ?? (loading ? `${label}, ${t('ui.loading')}` : label)}
       accessibilityState={{ disabled: inactive, busy: loading }}
       disabled={inactive}
       onPress={onPress}
@@ -80,12 +110,17 @@ export function Button({
       ]}
       {...rest}
     >
-      <View style={styles.content}>
-        {loading ? <ActivityIndicator color={palette.fg} size="small" /> : null}
-        <Text variant="body" numberOfLines={1} style={[styles.label, { color: palette.fg }]}>
-          {label}
-        </Text>
-      </View>
+      {({ pressed }) => {
+        const foreground = pressed && !inactive ? palette.pressedFg : palette.fg;
+        return (
+          <View style={styles.content}>
+            {loading ? <ActivityIndicator color={foreground} size="small" /> : null}
+            <Text variant="body" numberOfLines={1} style={[styles.label, { color: foreground }]}>
+              {label}
+            </Text>
+          </View>
+        );
+      }}
     </Pressable>
   );
 }
@@ -95,7 +130,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.md,
-    borderWidth: 1.5,
+    borderWidth: CONTROL_BORDER_WIDTH,
     alignSelf: 'flex-start',
   },
   fullWidth: { alignSelf: 'stretch' },

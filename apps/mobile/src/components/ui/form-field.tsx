@@ -44,6 +44,7 @@ export function FormField<TValues extends FieldValues, TName extends FieldPath<T
           onChangeText={field.onChange}
           onBlur={field.onBlur}
           error={fieldState.error?.message}
+          required={fieldProps.required ?? Boolean(rules?.required)}
         />
       )}
     />

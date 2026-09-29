@@ -4,7 +4,7 @@ import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { ColorValue } from 'react-native';
 
-import { fontFamilies } from '@/components/ui/theme';
+import { fontFamilies, TAB_LABEL_FONT_SIZE } from '@/components/ui/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -39,7 +39,7 @@ export default function TabsLayout() {
         headerTitleStyle: { fontFamily: fontFamilies.extrabold, color: tokens.colors.text01 },
         tabBarActiveTintColor: tokens.colors.primary,
         tabBarInactiveTintColor: tokens.colors.text03,
-        tabBarLabelStyle: { fontFamily: fontFamilies.bold, fontSize: 11 },
+        tabBarLabelStyle: { fontFamily: fontFamilies.bold, fontSize: TAB_LABEL_FONT_SIZE },
         tabBarStyle: {
           backgroundColor: tokens.colors.base01,
           borderTopColor: tokens.colors.base04,

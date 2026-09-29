@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View, type AccessibilityRole } from 'react-nativ
 
 import { Divider } from './divider';
 import { Text } from './text';
-import { MIN_TOUCH_TARGET } from './theme';
+import { ICON_BADGE_SIZE, ICON_SIZE, MIN_TOUCH_TARGET } from './theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -50,7 +50,7 @@ export function ListItem({
     >
       {icon ? (
         <View style={styles.iconWrap}>
-          <Ionicons name={icon} size={20} color={tokens.colors.primary} />
+          <Ionicons name={icon} size={ICON_SIZE.sm} color={tokens.colors.primary} />
         </View>
       ) : null}
       <View style={styles.body}>
@@ -63,9 +63,9 @@ export function ListItem({
       </View>
       {trailing ??
         (selected ? (
-          <Ionicons name="checkmark" size={22} color={tokens.colors.primary} />
+          <Ionicons name="checkmark" size={ICON_SIZE.md} color={tokens.colors.primary} />
         ) : pressable && selected === undefined ? (
-          <Ionicons name="chevron-forward" size={20} color={tokens.colors.text03} />
+          <Ionicons name="chevron-forward" size={ICON_SIZE.sm} color={tokens.colors.text03} />
         ) : null)}
     </Pressable>
   );
@@ -95,10 +95,12 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.spacing.sm,
     paddingHorizontal: tokens.spacing.lg,
   },
+  // Pressed rows sit on `secondary` (#EBEFFF): `text01` is 14.6:1 and the `text03` subtitle
+  // (composited, ~#646880) is 4.78:1, both AA, so text colours need no pressed override.
   pressed: { backgroundColor: tokens.colors.secondary },
   iconWrap: {
-    width: 36,
-    height: 36,
+    width: ICON_BADGE_SIZE.sm,
+    height: ICON_BADGE_SIZE.sm,
     borderRadius: tokens.radius.sm,
     alignItems: 'center',
     justifyContent: 'center',

@@ -44,4 +44,11 @@ describe('TextField', () => {
     await renderWithI18n(<TextField label="Name" />);
     expect(screen.queryByRole('button')).toBeNull();
   });
+
+  it('marks required fields visually and for assistive technology', async () => {
+    await renderWithI18n(<TextField label="Email" required />);
+
+    expect(screen.getByText('Email *')).toBeTruthy();
+    expect(screen.getByLabelText(`Email, ${catalogs.en.mobile.ui.required}`)).toBeTruthy();
+  });
 });

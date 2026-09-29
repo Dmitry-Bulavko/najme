@@ -5,6 +5,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
+import { ICON_BADGE_SIZE, ICON_SIZE } from '@/components/ui/theme';
 import { Button, Card, ListGroup, ListItem, Screen, Text } from '@/components/ui';
 import { ApiStatusBadge } from '@/features/health/api-status-badge';
 import { LanguageSwitcher } from '@/features/locale/language-switcher';
@@ -21,7 +22,7 @@ export default function AccountScreen(): ReactElement {
     <Screen>
       <Card style={styles.signIn}>
         <View style={styles.iconWrap}>
-          <Ionicons name="person" size={28} color={tokens.colors.primary} />
+          <Ionicons name="person" size={ICON_SIZE.lg} color={tokens.colors.primary} />
         </View>
         <Text variant="title">{t('mobile:account.signIn.title')}</Text>
         <Text variant="body" color="text03">
@@ -71,8 +72,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 const styles = StyleSheet.create({
   signIn: { gap: tokens.spacing.md },
   iconWrap: {
-    width: 52,
-    height: 52,
+    width: ICON_BADGE_SIZE.md,
+    height: ICON_BADGE_SIZE.md,
     borderRadius: tokens.radius.full,
     alignItems: 'center',
     justifyContent: 'center',

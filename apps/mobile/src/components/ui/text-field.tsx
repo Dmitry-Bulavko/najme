@@ -13,7 +13,14 @@ import {
 } from 'react-native';
 
 import { Text } from './text';
-import { fontFamilies, MAX_FONT_SIZE_MULTIPLIER, MIN_TOUCH_TARGET } from './theme';
+import {
+  CONTROL_BORDER_WIDTH,
+  CONTROL_HEIGHT,
+  fontFamilies,
+  ICON_SIZE,
+  MAX_FONT_SIZE_MULTIPLIER,
+  MIN_TOUCH_TARGET,
+} from './theme';
 
 export interface TextFieldProps extends TextInputProps {
   label: string;
@@ -21,6 +28,8 @@ export interface TextFieldProps extends TextInputProps {
   helperText?: string;
   /** Validation message; puts the field into its error state. */
   error?: string;
+  /** Marks the field as required: adds a visual asterisk and announces it to screen readers. */
+  required?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
 }
 
@@ -34,6 +43,7 @@ export function TextField({
   label,
   helperText,
   error,
+  required = false,
   secureTextEntry,
   containerStyle,
   onFocus,
@@ -50,7 +60,7 @@ export function TextField({
   return (
     <View style={containerStyle}>
       <Text variant="caption" color="text02" style={styles.label}>
-        {label}
+        {required ? `${label} *` : label}
       </Text>
       <View
         style={[
@@ -61,7 +71,7 @@ export function TextField({
         ]}
       >
         <TextInput
-          accessibilityLabel={label}
+          accessibilityLabel={required ? `${label}, ${t('ui.required')}` : label}
           accessibilityHint={message}
           accessibilityState={{ disabled: !editable }}
           allowFontScaling
@@ -91,7 +101,7 @@ export function TextField({
           >
             <Ionicons
               name={revealed ? 'eye-off-outline' : 'eye-outline'}
-              size={22}
+              size={ICON_SIZE.md}
               color={colors.text03}
             />
           </Pressable>
@@ -116,9 +126,9 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 48,
+    minHeight: CONTROL_HEIGHT.md,
     borderRadius: radius.md,
-    borderWidth: 1.5,
+    borderWidth: CONTROL_BORDER_WIDTH,
     borderColor: colors.base04,
     backgroundColor: colors.base01,
     paddingHorizontal: spacing.lg,
