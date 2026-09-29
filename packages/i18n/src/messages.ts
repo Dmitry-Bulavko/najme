@@ -1,14 +1,18 @@
 import commonEn from './catalogs/en/common.json' with { type: 'json' };
 import errorsEn from './catalogs/en/errors.json' with { type: 'json' };
+import mobileEn from './catalogs/en/mobile.json' with { type: 'json' };
 import shellEn from './catalogs/en/shell.json' with { type: 'json' };
 import commonMe from './catalogs/me/common.json' with { type: 'json' };
 import errorsMe from './catalogs/me/errors.json' with { type: 'json' };
+import mobileMe from './catalogs/me/mobile.json' with { type: 'json' };
 import shellMe from './catalogs/me/shell.json' with { type: 'json' };
 import commonRu from './catalogs/ru/common.json' with { type: 'json' };
 import errorsRu from './catalogs/ru/errors.json' with { type: 'json' };
+import mobileRu from './catalogs/ru/mobile.json' with { type: 'json' };
 import shellRu from './catalogs/ru/shell.json' with { type: 'json' };
 import commonTr from './catalogs/tr/common.json' with { type: 'json' };
 import errorsTr from './catalogs/tr/errors.json' with { type: 'json' };
+import mobileTr from './catalogs/tr/mobile.json' with { type: 'json' };
 import shellTr from './catalogs/tr/shell.json' with { type: 'json' };
 import type { Locale } from './locales.js';
 
@@ -27,6 +31,9 @@ export type ErrorMessages = typeof errorsEn;
 /** The `shell` namespace: app shell, navigation, home page and dev showcase strings. */
 export type ShellMessages = typeof shellEn;
 
+/** The `mobile` namespace (Expo app UI kit, shell and screens), typed from the `en` catalog. */
+export type MobileMessages = typeof mobileEn;
+
 /** Union of every dot-separated leaf path in a message tree, e.g. `'languages.en'`. */
 export type MessageKey<T = CommonMessages, Prefix extends string = ''> = {
   [K in keyof T & string]: T[K] extends string
@@ -41,6 +48,7 @@ export interface Namespaces {
   readonly common: CommonMessages;
   readonly errors: ErrorMessages;
   readonly shell: ShellMessages;
+  readonly mobile: MobileMessages;
 }
 
 /** All catalogs for a single locale. */
@@ -48,10 +56,25 @@ export type LocaleCatalogs = Namespaces;
 
 /** Every namespaced catalog for every supported locale, keyed by {@link Locale}. */
 export const catalogs: Readonly<Record<Locale, LocaleCatalogs>> = {
-  en: { common: commonEn, errors: errorsEn, shell: shellEn },
-  me: { common: commonMe as CommonMessages, errors: errorsMe, shell: shellMe },
-  ru: { common: commonRu as CommonMessages, errors: errorsRu, shell: shellRu },
-  tr: { common: commonTr as CommonMessages, errors: errorsTr, shell: shellTr },
+  en: { common: commonEn, errors: errorsEn, shell: shellEn, mobile: mobileEn },
+  me: {
+    common: commonMe as CommonMessages,
+    errors: errorsMe,
+    shell: shellMe,
+    mobile: mobileMe as MobileMessages,
+  },
+  ru: {
+    common: commonRu as CommonMessages,
+    errors: errorsRu,
+    shell: shellRu,
+    mobile: mobileRu as MobileMessages,
+  },
+  tr: {
+    common: commonTr as CommonMessages,
+    errors: errorsTr,
+    shell: shellTr,
+    mobile: mobileTr as MobileMessages,
+  },
 };
 
 /**

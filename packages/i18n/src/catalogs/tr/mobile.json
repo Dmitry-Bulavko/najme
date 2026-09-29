@@ -1,0 +1,62 @@
+{
+  "ui": {
+    "showPassword": "Şifreyi göster",
+    "hidePassword": "Şifreyi gizle",
+    "loading": "Yükleniyor",
+    "required": "Zorunlu"
+  },
+  "account": {
+    "signIn": {
+      "title": "Najme'ye giriş yapın",
+      "body": "Hizmet rezervasyonu yapmak, randevularınızı yönetmek ve bilgilerinizi tek yerde tutmak için giriş yapın.",
+      "action": "Giriş yap"
+    },
+    "language": "Dil",
+    "apiSection": "Servis durumu",
+    "developer": "Geliştirici",
+    "uiKit": "UI kit vitrini",
+    "uiKitHint": "Tüm bileşenleri önizleyin"
+  },
+  "showcase": {
+    "title": "UI kit",
+    "typography": "Tipografi",
+    "heading": "Başlık metni",
+    "titleSample": "Alt başlık metni",
+    "body": "Gövde metni rahat okunan bir boyuttadır.",
+    "caption": "Açıklama metni",
+    "buttons": "Düğmeler",
+    "primary": "Birincil",
+    "secondary": "İkincil",
+    "outline": "Çerçeveli",
+    "ghost": "Saydam",
+    "destructive": "Yıkıcı",
+    "loading": "Yükleniyor",
+    "disabled": "Devre dışı",
+    "small": "Küçük",
+    "large": "Büyük",
+    "fields": "Metin alanları",
+    "emailLabel": "E-posta",
+    "emailPlaceholder": "siz@ornek.com",
+    "emailHelper": "E-postanızı asla paylaşmayız.",
+    "passwordLabel": "Şifre",
+    "errorLabel": "Telefon numarası",
+    "errorMessage": "Geçerli bir telefon numarası girin.",
+    "banners": "Bannerlar",
+    "info": "Bilgi: bu bir bilgilendirme mesajıdır.",
+    "success": "Başarılı: rezervasyonunuz kaydedildi.",
+    "warning": "Uyarı: bu saat neredeyse dolu.",
+    "error": "Hata: bir şeyler ters gitti.",
+    "avatars": "Avatarlar",
+    "cards": "Kart ve liste",
+    "cardBody": "Kartlar ilgili içeriği yükseltilmiş bir yüzeyde toplar.",
+    "listNotifications": "Bildirimler",
+    "listPrivacy": "Gizlilik",
+    "listHelp": "Yardım ve destek",
+    "form": "Form alanı",
+    "formName": "Ad soyad"
+  },
+  "empty": {
+    "discover": "İşletmeler yayınlandığında arama ve filtreler burada görünecek.",
+    "bookings": "Bir hizmet rezerve ettiğinizde burada görünecek."
+  }
+}

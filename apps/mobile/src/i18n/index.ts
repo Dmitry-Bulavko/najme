@@ -10,9 +10,9 @@ import { initReactI18next } from 'react-i18next';
 export const LOCALE_STORAGE_KEY = 'najme.locale';
 
 const resources = Object.fromEntries(
-  Object.entries(catalogs).map(([locale, { common }]) => [
+  Object.entries(catalogs).map(([locale, { common, mobile }]) => [
     locale,
-    { common: flattenMessages(common) },
+    { common: flattenMessages(common), mobile: flattenMessages(mobile) },
   ]),
 );
 
@@ -48,7 +48,7 @@ export async function initI18n(): Promise<Locale> {
         lng: locale,
         fallbackLng: DEFAULT_LOCALE,
         defaultNS: 'common',
-        ns: ['common'],
+        ns: ['common', 'mobile'],
         interpolation: { escapeValue: false },
         returnNull: false,
       });

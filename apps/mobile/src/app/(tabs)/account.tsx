@@ -1,17 +1,83 @@
+import { Ionicons } from '@expo/vector-icons';
+import { tokens } from '@najme/ui-tokens';
+import { useRouter } from 'expo-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+import { StyleSheet, View } from 'react-native';
 
+import { Button, Card, ListGroup, ListItem, Screen, Text } from '@/components/ui';
 import { ApiStatusBadge } from '@/features/health/api-status-badge';
-import { PlaceholderScreen } from '@/features/placeholder-screen';
 import { LanguageSwitcher } from '@/features/locale/language-switcher';
 
-/** Account tab: no auth yet (out of scope, see issue #15), but hosts the language switcher and API status. */
+/**
+ * Account tab: a sign-in call-to-action (placeholder until the auth task), the language switcher
+ * and the API status. In development builds it also links to the UI kit showcase.
+ */
 export default function AccountScreen(): ReactElement {
-  const { t } = useTranslation();
+  const { t } = useTranslation(['common', 'mobile']);
+  const router = useRouter();
+
   return (
-    <PlaceholderScreen title={t('screens.account.title')}>
-      <LanguageSwitcher />
-      <ApiStatusBadge />
-    </PlaceholderScreen>
+    <Screen>
+      <Card style={styles.signIn}>
+        <View style={styles.iconWrap}>
+          <Ionicons name="person" size={28} color={tokens.colors.primary} />
+        </View>
+        <Text variant="title">{t('mobile:account.signIn.title')}</Text>
+        <Text variant="body" color="text03">
+          {t('mobile:account.signIn.body')}
+        </Text>
+        {/* Placeholder: the auth screens are a separate task. */}
+        <Button label={t('mobile:account.signIn.action')} fullWidth />
+      </Card>
+
+      <Section title={t('mobile:account.language')}>
+        <LanguageSwitcher />
+      </Section>
+
+      <Section title={t('mobile:account.apiSection')}>
+        <ListGroup>
+          <ApiStatusBadge />
+        </ListGroup>
+      </Section>
+
+      {__DEV__ ? (
+        <Section title={t('mobile:account.developer')}>
+          <ListGroup>
+            <ListItem
+              icon="color-palette-outline"
+              title={t('mobile:account.uiKit')}
+              subtitle={t('mobile:account.uiKitHint')}
+              onPress={() => router.push('/ui-showcase')}
+            />
+          </ListGroup>
+        </Section>
+      ) : null}
+    </Screen>
   );
 }
+
+function Section({ title, children }: { title: string; children: React.ReactNode }): ReactElement {
+  return (
+    <View style={styles.section}>
+      <Text variant="caption" color="text03" accessibilityRole="header" style={styles.sectionTitle}>
+        {title}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  signIn: { gap: tokens.spacing.md },
+  iconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: tokens.radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: tokens.colors.secondary,
+  },
+  section: { gap: tokens.spacing.sm },
+  sectionTitle: { textTransform: 'uppercase', letterSpacing: 0.6, marginLeft: tokens.spacing.xs },
+});
