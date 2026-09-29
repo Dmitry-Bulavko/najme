@@ -3,6 +3,9 @@ import { type NextRequest, NextResponse } from 'next/server';
 
 import { isSupportedLocale, LOCALE_COOKIE_MAX_AGE, LOCALE_COOKIE_NAME } from './i18n/routing';
 
+/** Header next-intl reads to determine the locale of the current request. */
+const NEXT_INTL_LOCALE_HEADER = 'x-next-intl-locale';
+
 export const config = {
   // Skip Next.js internals, static files and the API dev-proxy path. `api`, `_next` and `_vercel`
   // are excluded only as whole first segments, so `/apiary` and `/api-docs` still get a locale.
@@ -30,7 +33,11 @@ export function proxy(request: NextRequest): NextResponse {
   const firstSegment = pathname.split('/')[1] ?? '';
 
   if (isSupportedLocale(firstSegment)) {
-    return NextResponse.next();
+    // next-intl (without its own middleware) reads the request locale from this header; without it
+    // server components fall back to the default locale regardless of the URL segment.
+    const headers = new Headers(request.headers);
+    headers.set(NEXT_INTL_LOCALE_HEADER, firstSegment);
+    return NextResponse.next({ request: { headers } });
   }
 
   const cookieLocale = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
