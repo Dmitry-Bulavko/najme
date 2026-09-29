@@ -28,3 +28,13 @@ business pages need SEO. The user base is small, so one coherent product beats t
 - UI work is done twice (web + mobile) for features needed on both; issues should state which
   clients are in scope.
 - Web can ship features faster; mobile may lag by design when an issue says so.
+
+## Update (2026-09-29, owner decision R7)
+
+- **Web UI kit:** shadcn/ui (Radix primitives + Tailwind v4 + `class-variance-authority`), with the
+  components living in `apps/web/src/components/ui/`. shadcn's CSS variables (`--primary`,
+  `--radius`, ...) are aliases of `@najme/ui-tokens` values, so the tokens remain the single source of
+  truth. Toasts use `sonner`, icons `lucide-react`.
+- **Mobile** keeps its own primitives on the same tokens; still no component sharing between web and
+  mobile.
+- Details: `docs/specs/44-web-ui-kit.md`.

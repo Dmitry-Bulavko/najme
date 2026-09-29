@@ -1,8 +1,65 @@
 @import 'tailwindcss';
 @import '@najme/ui-tokens/theme.css';
+@import 'tw-animate-css';
 
-body {
-  background-color: var(--color-background);
-  color: var(--color-text01);
-  font-family: var(--font-sans);
+/*
+ * shadcn/ui semantic variables, mapped onto @najme/ui-tokens (ADR-0003). The tokens stay the single
+ * source of truth: nothing here hardcodes a brand value. Tailwind utilities for primary, secondary,
+ * accent and their foregrounds come straight from the generated theme (`--color-primary`, ...);
+ * the `@theme inline` block below only adds the shadcn names the tokens do not define.
+ */
+:root {
+  --background: var(--color-background);
+  --foreground: var(--color-text01);
+  --card: var(--color-base01);
+  --card-foreground: var(--color-text01);
+  --popover: var(--color-base01);
+  --popover-foreground: var(--color-text01);
+  --primary: var(--color-primary);
+  --primary-foreground: var(--color-primary-foreground);
+  --secondary: var(--color-secondary);
+  --secondary-foreground: var(--color-secondary-foreground);
+  --muted: var(--color-secondary);
+  --muted-foreground: var(--color-text03);
+  --accent: var(--color-accent);
+  --accent-foreground: var(--color-accent-foreground);
+  --destructive: var(--color-danger);
+  --destructive-foreground: var(--color-danger-foreground);
+  --border: color-mix(in srgb, var(--color-text02) 14%, transparent);
+  --input: color-mix(in srgb, var(--color-text02) 22%, transparent);
+  --ring: var(--color-primary);
+  --radius: var(--radius-md);
+}
+
+@theme inline {
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 }

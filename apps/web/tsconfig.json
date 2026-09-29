@@ -12,7 +12,12 @@
     "resolveJsonModule": true,
     "plugins": [{ "name": "next" }],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      // Pin React types to web's own @types/react (^19.3). apps/mobile pins Expo's ~19.2, which pnpm
+      // hoists for Next's styled-jsx types, producing two `React` namespaces and false errors on
+      // ComponentProps<'div'>. Drop this pin once web and mobile resolve the same @types/react.
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

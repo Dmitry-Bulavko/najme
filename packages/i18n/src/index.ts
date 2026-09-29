@@ -15,6 +15,7 @@ export {
   type LocaleCatalogs,
   type MessageKey,
   type MessageTree,
+  type ShellMessages,
   type Namespaces,
 } from './messages.js';
 export { resolveLocale } from './resolve-locale.js';

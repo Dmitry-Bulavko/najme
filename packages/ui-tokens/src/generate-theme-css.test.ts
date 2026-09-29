@@ -55,6 +55,17 @@ describe('generateThemeCss', () => {
     }
   });
 
+  it('pins max-width/min-width to container sizes where a spacing name shadows one', () => {
+    // Tailwind resolves `max-w-md` via --max-width, then --spacing, then --container.
+    expect(css).toContain('--max-width-md: 28rem;');
+    expect(css).toContain('--min-width-md: 28rem;');
+    expect(css).toContain('--max-width-xl: 36rem;');
+    expect(css).toContain('--max-width-5xl: 64rem;');
+    for (const name of Object.keys(spacing)) {
+      expect(css).toContain(`--max-width-${kebab(name)}: `);
+    }
+  });
+
   it('never emits a unitless length for radius or spacing', () => {
     const lengthVarLine = /^\s*--(radius|spacing)-[^:]+:\s*(-?[\d.]+);/m;
     expect(lengthVarLine.test(css)).toBe(false);

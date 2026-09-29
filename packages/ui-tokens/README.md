@@ -38,6 +38,10 @@ See ADR-0003: tokens are shared, UI components are not.
 - `--color-<name>` — e.g. `--color-primary: #526ED3;`.
 - `--radius-<name>` — e.g. `--radius-md: 12px;`.
 - `--spacing-<name>` — e.g. `--spacing-md: 12px;`.
+- `--max-width-<name>` / `--min-width-<name>` — Tailwind resolves `max-w-*`/`min-w-*` from
+  `--spacing-*` before `--container-*`, so for every spacing name that is also a container size
+  (`xs`…`5xl`) the theme pins these back to the container value (`--max-width-md: 28rem;`). Without
+  this, `max-w-md` would be 12px. `p-md`, `gap-md` and `w-md` still use the spacing tokens.
 
 All length values (radius, spacing, font sizes, line heights) carry an explicit `px` unit —
 unitless lengths are invalid in CSS and get dropped by browsers.

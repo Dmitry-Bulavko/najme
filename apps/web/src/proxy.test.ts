@@ -32,6 +32,11 @@ describe('proxy', () => {
     expect(response.headers.get('location')).toBeNull();
   });
 
+  it('forwards the URL locale to next-intl as a request header', () => {
+    const response = proxy(new NextRequest('https://najme.example/ru/foo'));
+    expect(response.headers.get('x-middleware-request-x-next-intl-locale')).toBe('ru');
+  });
+
   it('replaces an unsupported locale segment instead of prefixing it', () => {
     expect(redirectPath('/xx/foo')).toBe('/en/foo');
     expect(redirectPath('/xx-YY/foo/bar', { 'accept-language': 'tr' })).toBe('/tr/foo/bar');

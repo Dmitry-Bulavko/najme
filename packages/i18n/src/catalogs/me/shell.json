@@ -1,0 +1,60 @@
+{
+  "nav": {
+    "label": "Glavna navigacija",
+    "discover": "Otkrijte",
+    "bookings": "Rezervacije",
+    "openMenu": "Otvori meni",
+    "menuTitle": "Meni"
+  },
+  "shell": {
+    "logoLabel": "Najme početna",
+    "skipToContent": "Pređi na sadržaj",
+    "signIn": "Prijavi se",
+    "close": "Zatvori",
+    "footer": {
+      "tagline": "Rezervišite lokalne usluge u Crnoj Gori u nekoliko dodira.",
+      "rights": "© {year} Najme. Sva prava zadržana."
+    }
+  },
+  "home": {
+    "hero": {
+      "title": "Pronađite i rezervišite lokalne usluge",
+      "subtitle": "Saloni, stručnjaci, transferi i klinike širom Crne Gore — izaberite termin koji vam odgovara."
+    },
+    "search": {
+      "label": "Pretraga usluga",
+      "placeholder": "Potražite uslugu ili kompaniju",
+      "submit": "Traži"
+    },
+    "categories": {
+      "title": "Popularne kategorije",
+      "salons": "Saloni ljepote",
+      "barbers": "Berberi",
+      "wellness": "Wellness i spa",
+      "clinics": "Klinike",
+      "transfers": "Transferi",
+      "fitness": "Fitnes"
+    }
+  },
+  "devUi": {
+    "title": "Prikaz UI kompleta",
+    "description": "Pregled svih komponenti i varijanti, samo za razvoj.",
+    "loading": "Učitavanje",
+    "showToast": "Prikaži obavještenje",
+    "toastMessage": "Uspješno sačuvano",
+    "openSheet": "Otvori panel",
+    "openDropdown": "Otvori padajući meni",
+    "emailLabel": "E-pošta",
+    "emailError": "Unesite ispravnu adresu e-pošte",
+    "nameLabel": "Ime i prezime",
+    "nameHint": "Kako piše u ličnom dokumentu",
+    "alertTitle": "Napomena",
+    "alertBody": "Ovo je informativno obavještenje.",
+    "alertErrorTitle": "Nešto je pošlo naopako",
+    "alertErrorBody": "Pokušajte ponovo za trenutak.",
+    "cardTitle": "Naslov kartice",
+    "cardBody": "Ovdje ide sadržaj kartice.",
+    "itemOne": "Profil",
+    "itemTwo": "Podešavanja"
+  }
+}

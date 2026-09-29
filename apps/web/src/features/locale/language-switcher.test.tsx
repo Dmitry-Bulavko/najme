@@ -29,21 +29,22 @@ describe('LanguageSwitcher', () => {
     document.cookie = '';
   });
 
-  it('lists every supported locale with its native label', () => {
+  it('lists every supported locale with its native label and marks the current one', async () => {
     renderSwitcher();
 
-    const select = screen.getByRole('combobox', { name: messages.languageSwitcher.label });
+    await userEvent.click(screen.getByRole('button', { name: messages.languageSwitcher.label }));
+
     for (const meta of Object.values(LOCALE_META)) {
-      expect(screen.getByRole('option', { name: meta.label })).toBeInTheDocument();
+      expect(screen.getByRole('menuitemradio', { name: meta.label })).toBeInTheDocument();
     }
-    expect(select).toHaveValue('en');
+    expect(screen.getByRole('menuitemradio', { name: LOCALE_META.en.label })).toBeChecked();
   });
 
   it('navigates to the same path under the new locale and remembers the choice in a cookie', async () => {
     renderSwitcher();
 
-    const select = screen.getByRole('combobox', { name: messages.languageSwitcher.label });
-    await userEvent.selectOptions(select, 'ru');
+    await userEvent.click(screen.getByRole('button', { name: messages.languageSwitcher.label }));
+    await userEvent.click(screen.getByRole('menuitemradio', { name: LOCALE_META.ru.label }));
 
     expect(replace).toHaveBeenCalledWith('/ru/some/path');
     expect(document.cookie).toContain('NEXT_LOCALE=ru');
