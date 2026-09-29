@@ -34,12 +34,17 @@ export class RefreshTokenService {
    * Presenting a token that is already rotated or revoked is treated as theft: every active
    * refresh token of that user is revoked (ADR-0010).
    *
+   * `prepare` runs after the token is validated but before it is rotated, so a failing lookup
+   * (e.g. a transient DB error) cannot lose the freshly issued token. Returning false means the
+   * account is gone: all its tokens are revoked and the request is rejected.
+   *
    * @throws HttpException 401 `UNAUTHENTICATED` for unknown/expired tokens, 401
    * `REFRESH_TOKEN_REUSED` on reuse.
    */
   async rotate(
     presented: string,
     context: ClientContext,
+    prepare: (userId: string) => Promise<boolean>,
   ): Promise<{ userId: string; refreshToken: string }> {
     const current = await this.prisma.refreshToken.findUnique({
       where: { tokenHash: hashRefreshToken(presented) },
@@ -47,6 +52,10 @@ export class RefreshTokenService {
     if (!current) throw this.unauthenticated();
     if (current.revokedAt) return this.reuse(current.userId);
     if (current.expiresAt.getTime() <= Date.now()) throw this.unauthenticated();
+    if (!(await prepare(current.userId))) {
+      await this.revokeAllForUser(current.userId);
+      throw this.unauthenticated();
+    }
 
     const nextRaw = generateRefreshToken();
     const nextId = newId();

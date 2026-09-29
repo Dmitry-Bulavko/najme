@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpException,
   HttpStatus,
   Inject,
   Post,
@@ -98,8 +99,15 @@ export class AuthController {
       const presented = this.presentedToken(req, body);
       return this.deliver(req, res, await this.auth.refresh(presented, clientContext(req)));
     } catch (error) {
-      // A rejected refresh token is dead either way; do not keep sending it.
-      if (!isMobileClient(req)) clearRefreshCookie(res, this.env.AUTH_COOKIE_SECURE);
+      // A rejected refresh token is dead either way; do not keep sending it. A transient failure
+      // (5xx) leaves the cookie alone so the client can retry.
+      if (
+        !isMobileClient(req) &&
+        error instanceof HttpException &&
+        error.getStatus() === HttpStatus.UNAUTHORIZED
+      ) {
+        clearRefreshCookie(res, this.env.AUTH_COOKIE_SECURE);
+      }
       throw error;
     }
   }

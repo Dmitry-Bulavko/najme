@@ -65,13 +65,15 @@ export class AuthService {
     if (!presented) {
       throw apiError(HttpStatus.UNAUTHORIZED, 'UNAUTHENTICATED', 'The refresh token is missing.');
     }
-    const { userId, refreshToken } = await this.refreshTokens.rotate(presented, context);
-    const user = await this.users.findById(userId);
-    if (!user) {
-      await this.refreshTokens.revokeAllForUser(userId);
-      throw apiError(HttpStatus.UNAUTHORIZED, 'UNAUTHENTICATED', 'The refresh token is invalid.');
-    }
-    return this.buildSession(user, await this.users.hasPassword(userId), refreshToken);
+    let account: { user: User; hasPassword: boolean } | undefined;
+    const { refreshToken } = await this.refreshTokens.rotate(presented, context, async (userId) => {
+      const user = await this.users.findById(userId);
+      if (!user) return false;
+      account = { user, hasPassword: await this.users.hasPassword(userId) };
+      return true;
+    });
+    // `prepare` returned true, so the account is set.
+    return this.buildSession(account!.user, account!.hasPassword, refreshToken);
   }
 
   async logout(presented: string | undefined): Promise<void> {

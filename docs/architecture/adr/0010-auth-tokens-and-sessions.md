@@ -25,7 +25,11 @@ concurrent rotations of the same token mutually exclusive.
 
 **Reuse detection.** Presenting a token that is already rotated or revoked revokes all active
 refresh tokens of that user and returns `401 REFRESH_TOKEN_REUSED`. Unknown, expired or missing
-tokens return `401 UNAUTHENTICATED`. Logout is idempotent and never counts as reuse. Trade-off: two
+tokens return `401 UNAUTHENTICATED`. Logout is idempotent and never counts as reuse itself. Conversely, a token that was revoked by
+logout and is presented again later (for example a stale tab or a replayed request) is
+indistinguishable from a rotated one and also counts as reuse: it revokes all of that user's
+sessions. We accept this over storing a revocation reason (`LOGOUT` vs `ROTATED`), because a
+logged-out token still being presented is itself suspicious and clients drop it on logout. Trade-off: two
 tabs refreshing with the same cookie at the same moment sign the user out everywhere; clients must
 serialize refreshes (single-flight).
 

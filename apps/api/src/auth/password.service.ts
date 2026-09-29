@@ -8,8 +8,11 @@ import { hash, verify } from '@node-rs/argon2';
  */
 @Injectable()
 export class PasswordService {
-  /** Verified against when the account does not exist, to equalize login timing. */
-  private dummyHash: Promise<string> | undefined;
+  /**
+   * Verified against when the account does not exist, to equalize login timing. Computed eagerly
+   * so the first unknown-email login does not pay for an extra hash.
+   */
+  private readonly dummyHash: Promise<string> = hash('najme-timing-equalizer');
 
   hash(password: string): Promise<string> {
     return hash(password);
@@ -26,7 +29,6 @@ export class PasswordService {
 
   /** Burns the same time as a real verification and always returns false. */
   async verifyDummy(password: string): Promise<false> {
-    this.dummyHash ??= hash('najme-timing-equalizer');
     await this.verify(await this.dummyHash, password);
     return false;
   }

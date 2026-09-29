@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { SignJWT } from 'jose';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { authSessionSchema, meSchema } from '@najme/contracts';
@@ -163,6 +164,24 @@ describe('Auth (e2e)', () => {
       expect(bad.body.error.code).toBe('UNAUTHENTICATED');
     });
 
+    it('returns 401 UNAUTHENTICATED for an expired access token', async () => {
+      const key = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET);
+      const now = Math.floor(Date.now() / 1000);
+      const token = await new SignJWT({})
+        .setProtectedHeader({ alg: 'HS256' })
+        .setSubject(randomUUID())
+        .setIssuer('najme')
+        .setAudience('najme-api')
+        .setIssuedAt(now - 3600)
+        .setExpirationTime(now - 60)
+        .sign(key);
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/me')
+        .set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('UNAUTHENTICATED');
+    });
+
     it('keeps the health endpoint public', async () => {
       const res = await request(app.getHttpServer()).get('/api/v1/health');
       expect(res.status).toBe(200);
@@ -287,6 +306,20 @@ describe('Auth (e2e)', () => {
 
       const refresh = await c.web('/auth/refresh').set('Cookie', cookie).send({});
       expect(refresh.status).toBe(401);
+    });
+
+    it('revokes only the current session, not the user’s other sessions', async () => {
+      const address = email('two');
+      const { cookie: cookieA } = await registerWeb(address);
+      const c = client();
+      const loginB = await c.web('/auth/login').send({ email: address, password: PASSWORD });
+      const cookieB = cookieOf(loginB)!;
+
+      const out = await c.web('/auth/logout').set('Cookie', cookieA).send({});
+      expect(out.status).toBe(204);
+
+      const b = await c.web('/auth/refresh').set('Cookie', cookieB).send({});
+      expect(b.status).toBe(200);
     });
 
     it('is idempotent and needs no session', async () => {
