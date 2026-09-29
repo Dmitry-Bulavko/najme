@@ -27,6 +27,13 @@ describe('envSchema mail settings', () => {
     expect(envSchema.safeParse({ ...base, SMTP_USER: 'u' }).success).toBe(false);
     expect(envSchema.safeParse({ ...base, SMTP_USER: 'u', SMTP_PASSWORD: 'p' }).success).toBe(true);
   });
+
+  it('treats empty SMTP credentials as unset (compose passes `${SMTP_USER:-}` as "")', () => {
+    const env = envSchema.parse({ ...base, SMTP_USER: '', SMTP_PASSWORD: '' });
+    expect(env.SMTP_USER).toBeUndefined();
+    expect(env.SMTP_PASSWORD).toBeUndefined();
+    expect(envSchema.safeParse({ ...base, SMTP_USER: 'u', SMTP_PASSWORD: '' }).success).toBe(false);
+  });
 });
 
 describe('envSchema GOOGLE_CLIENT_IDS', () => {

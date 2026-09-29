@@ -4,6 +4,12 @@ import { z } from 'zod';
  * Startup environment configuration, validated with zod (ADR-0002). Invalid or missing values make
  * the process exit with a clear message instead of starting in a broken state.
  */
+/** An optional string where "" (an unset compose `${VAR:-}`) means "not set". */
+const optionalNonEmpty = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().min(1).optional(),
+);
+
 export const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -18,9 +24,12 @@ export const envSchema = z
     /** SMTP relay for transactional email: Mailpit in dev and CI, a provider later (M5). */
     SMTP_HOST: z.string().min(1),
     SMTP_PORT: z.coerce.number().int().min(1).max(65535),
-    /** Both or neither; unset means an unauthenticated relay (Mailpit). */
-    SMTP_USER: z.string().min(1).optional(),
-    SMTP_PASSWORD: z.string().min(1).optional(),
+    /**
+     * Both or neither; unset means an unauthenticated relay (Mailpit). Empty counts as unset, since
+     * `infra/compose.prod.yml` passes `${SMTP_USER:-}` through as "".
+     */
+    SMTP_USER: optionalNonEmpty,
+    SMTP_PASSWORD: optionalNonEmpty,
     /** Sender shown to recipients, e.g. `Najme <no-reply@example.com>`. */
     MAIL_FROM: z.string().min(3),
     /**
