@@ -104,6 +104,7 @@ jobs:
         env:
           DOMAIN: ${{ vars.DOMAIN }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
           GHCR_USER: ${{ github.repository_owner }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
         run: |
@@ -114,6 +115,7 @@ jobs:
             printf 'POSTGRES_USER=najme\n'
             printf 'POSTGRES_DB=najme\n'
             printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
+            printf 'JWT_ACCESS_SECRET=%s\n' "$JWT_ACCESS_SECRET"
             printf 'GHCR_USER=%s\n' "$GHCR_USER"
             printf 'GHCR_READ_TOKEN=%s\n' "$GHCR_READ_TOKEN"
           } > server.env
