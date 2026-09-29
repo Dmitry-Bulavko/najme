@@ -52,10 +52,15 @@ pnpm --filter @najme/mobile start
 ## Other API commands
 
 ```bash
+pnpm --filter @najme/api run db:generate        # regenerate the Prisma client
 pnpm --filter @najme/api run db:migrate:dev     # create/apply a dev migration
 pnpm --filter @najme/api run db:migrate:deploy  # apply pending migrations (CI/prod contract)
 pnpm --filter @najme/api test                   # unit + e2e (needs DATABASE_URL, real Postgres)
 ```
+
+The package scripts (`test`, `typecheck`, `build`) no longer regenerate the Prisma client. After a
+schema change, run `pnpm --filter @najme/api db:generate`, or any turbo task such as
+`pnpm turbo run typecheck --filter=@najme/api`, which runs `db:generate` first.
 
 ## Troubleshooting
 

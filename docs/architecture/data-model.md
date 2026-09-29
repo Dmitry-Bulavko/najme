@@ -35,7 +35,7 @@ String @db.Char(3)`. Never floating point.
 | createdAt/updatedAt | DateTime         | no    |                                                     |
 | deletedAt           | DateTime         | yes   | soft delete                                         |
 
-Relations: has many `AuthIdentity`, `RefreshToken`, `Membership`, `Booking` (as client), `Review`.
+Relations: has many `AuthIdentity`, `RefreshToken`, `EmailToken`, `Membership`, `Booking` (as client), `Review`.
 
 ### AuthIdentity
 
@@ -67,6 +67,20 @@ Constraints: unique `(userId, provider)`; unique `(provider, providerAccountId)`
 | userAgent         | String           | yes   |                                |
 | ipAddress         | String           | yes   |                                |
 | createdAt         | DateTime         | no    |                                |
+
+### EmailToken
+
+Single-use token for email verification and password reset (raw token only ever sent by email).
+
+| Field     | Type                   | Null? | Notes                            |
+| --------- | ---------------------- | ----- | -------------------------------- |
+| id        | String (uuid v7)       | no    | PK                               |
+| userId    | String                 | no    | FK → User                        |
+| purpose   | enum EmailTokenPurpose | no    | `VERIFY_EMAIL`, `RESET_PASSWORD` |
+| tokenHash | String                 | no    | unique; raw token never stored   |
+| expiresAt | DateTime               | no    |                                  |
+| usedAt    | DateTime               | yes   | set when consumed                |
+| createdAt | DateTime               | no    |                                  |
 
 ### Business
 

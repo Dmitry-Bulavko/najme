@@ -10,5 +10,87 @@ datasource db {
   provider = "postgresql"
 }
 
-// No domain models yet (scaffolded in #13; domain models land in later M0/M1 tasks). The initial
-// migration only enables extensions relied on by future scheduling constraints (ADR-0005).
+enum AuthProvider {
+  PASSWORD
+  GOOGLE
+  APPLE
+
+  @@map("auth_provider")
+}
+
+enum EmailTokenPurpose {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+
+  @@map("email_token_purpose")
+}
+
+// IDs are UUID v7 generated application-side (`newId()`), so there is no DB default.
+model User {
+  id               String    @id @db.Uuid
+  email            String    @unique
+  emailVerifiedAt  DateTime? @map("email_verified_at") @db.Timestamptz(3)
+  displayName      String?   @map("display_name")
+  avatarUrl        String?   @map("avatar_url")
+  localePreference String    @default("en") @map("locale_preference")
+  isPlatformAdmin  Boolean   @default(false) @map("is_platform_admin")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  authIdentities AuthIdentity[]
+  refreshTokens  RefreshToken[]
+  emailTokens    EmailToken[]
+
+  @@map("users")
+}
+
+// Partial unique index on (provider, provider_account_id) WHERE provider_account_id IS NOT NULL
+// is created with raw SQL in the migration; Prisma cannot express it.
+model AuthIdentity {
+  id                String       @id @db.Uuid
+  userId            String       @map("user_id") @db.Uuid
+  provider          AuthProvider
+  providerAccountId String?      @map("provider_account_id")
+  passwordHash      String?      @map("password_hash")
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@map("auth_identities")
+}
+
+model RefreshToken {
+  id                String    @id @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  tokenHash         String    @unique @map("token_hash")
+  issuedAt          DateTime  @default(now()) @map("issued_at") @db.Timestamptz(3)
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(3)
+  replacedByTokenId String?   @map("replaced_by_token_id") @db.Uuid
+  userAgent         String?   @map("user_agent")
+  ipAddress         String?   @map("ip_address")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model EmailToken {
+  id        String            @id @db.Uuid
+  userId    String            @map("user_id") @db.Uuid
+  purpose   EmailTokenPurpose
+  tokenHash String            @unique @map("token_hash")
+  expiresAt DateTime          @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime?         @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_tokens")
+}
