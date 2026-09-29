@@ -127,7 +127,7 @@ jobs:
             printf "SMTP_USER='%s'\n" "$SMTP_USER"
             printf "SMTP_PASSWORD='%s'\n" "$SMTP_PASSWORD"
             printf 'MAIL_FROM="%s"\n' "$MAIL_FROM"
-            printf 'GOOGLE_CLIENT_IDS=%s\n' "$GOOGLE_CLIENT_IDS"
+            printf 'GOOGLE_CLIENT_IDS="%s"\n' "$GOOGLE_CLIENT_IDS"
             printf 'GHCR_USER=%s\n' "$GHCR_USER"
             printf 'GHCR_READ_TOKEN=%s\n' "$GHCR_READ_TOKEN"
           } > server.env

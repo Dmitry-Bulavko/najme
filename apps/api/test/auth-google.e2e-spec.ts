@@ -154,6 +154,43 @@ describe('Google sign-in (e2e)', () => {
     expect(await prisma.authIdentity.count({ where: { userId: first.body.user.id } })).toBe(1);
   });
 
+  it('keeps signing in by sub and leaves the account owning the new email untouched', async () => {
+    const x = email('conflict-a-x');
+    const y = email('conflict-a-y');
+    const other = await post('/auth/register').send({ email: y, password: PASSWORD });
+    expect(other.status).toBe(201);
+    const first = await google(verifier.issue('t-ca1', { sub: `sub-${suffix}-ca`, email: x }));
+    const second = await google(verifier.issue('t-ca2', { sub: `sub-${suffix}-ca`, email: y }));
+
+    expect(second.status).toBe(200);
+    expect(second.body.user.id).toBe(first.body.user.id);
+    expect(second.body.user.id).not.toBe(other.body.user.id);
+    expect(
+      await prisma.authIdentity.findMany({
+        where: { userId: other.body.user.id },
+        select: { provider: true },
+      }),
+    ).toEqual([{ provider: 'PASSWORD' }]);
+    const login = await post('/auth/login').send({ email: y, password: PASSWORD });
+    expect(login.status).toBe(200);
+    expect(login.body.user.id).toBe(other.body.user.id);
+  });
+
+  it('answers 409 when another Google account claims an already linked email', async () => {
+    const x = email('conflict-b');
+    const first = await google(verifier.issue('t-cb1', { sub: `sub-${suffix}-cb-a`, email: x }));
+    expect(first.status).toBe(200);
+    const res = await google(verifier.issue('t-cb2', { sub: `sub-${suffix}-cb-b`, email: x }));
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('CONFLICT');
+    const identities = await prisma.authIdentity.findMany({
+      where: { userId: first.body.user.id },
+      select: { provider: true, providerAccountId: true },
+    });
+    expect(identities).toEqual([{ provider: 'GOOGLE', providerAccountId: `sub-${suffix}-cb-a` }]);
+  });
+
   it('links to an existing verified password user, whose password keeps working', async () => {
     const address = email('verified');
     const reg = await post('/auth/register').send({ email: address, password: PASSWORD });
