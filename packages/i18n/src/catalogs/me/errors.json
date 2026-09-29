@@ -1,0 +1,21 @@
+{
+  "VALIDATION_FAILED": "Provjerite označena polja i pokušajte ponovo.",
+  "UNAUTHORIZED": "Niste ovlašćeni za ovu radnju.",
+  "FORBIDDEN": "Nemate dozvolu za ovu radnju.",
+  "NOT_FOUND": "Nismo pronašli ono što tražite.",
+  "CONFLICT": "Ovo je u sukobu sa trenutnim stanjem. Osvježite stranicu i pokušajte ponovo.",
+  "UNPROCESSABLE_ENTITY": "Ova radnja se ne može izvršiti.",
+  "HTTP_ERROR": "Zahtjev nije uspio. Pokušajte ponovo.",
+  "INTERNAL_ERROR": "Došlo je do greške na našoj strani. Pokušajte ponovo kasnije.",
+  "SLOT_TAKEN": "Ovaj termin je upravo zauzet. Izaberite drugi.",
+  "EMAIL_TAKEN": "Nalog sa ovom e-poštom već postoji.",
+  "INVALID_CREDENTIALS": "Pogrešna e-pošta ili lozinka.",
+  "UNAUTHENTICATED": "Prijavite se da biste nastavili.",
+  "TOKEN_INVALID": "Ovaj link nije važeći.",
+  "TOKEN_EXPIRED": "Ovaj link je istekao. Zatražite novi.",
+  "REFRESH_TOKEN_REUSED": "Vaša sesija više nije važeća. Prijavite se ponovo.",
+  "PASSWORD_NOT_SET": "Ovaj nalog nema lozinku. Prijavite se preko Googlea ili postavite lozinku putem resetovanja lozinke.",
+  "GOOGLE_SIGN_IN_DISABLED": "Prijava preko Googlea trenutno nije dostupna.",
+  "GOOGLE_TOKEN_INVALID": "Prijava preko Googlea nije uspjela. Pokušajte ponovo.",
+  "RATE_LIMITED": "Previše pokušaja. Sačekajte trenutak i pokušajte ponovo."
+}

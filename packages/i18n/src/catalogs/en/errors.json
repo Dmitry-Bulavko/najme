@@ -1,0 +1,21 @@
+{
+  "VALIDATION_FAILED": "Please check the highlighted fields and try again.",
+  "UNAUTHORIZED": "You are not authorized to do this.",
+  "FORBIDDEN": "You don't have permission to do this.",
+  "NOT_FOUND": "We couldn't find what you were looking for.",
+  "CONFLICT": "This conflicts with the current state. Please refresh and try again.",
+  "UNPROCESSABLE_ENTITY": "This action can't be completed.",
+  "HTTP_ERROR": "The request failed. Please try again.",
+  "INTERNAL_ERROR": "Something went wrong on our side. Please try again later.",
+  "SLOT_TAKEN": "This time slot has just been taken. Please choose another one.",
+  "EMAIL_TAKEN": "An account with this email already exists.",
+  "INVALID_CREDENTIALS": "Incorrect email or password.",
+  "UNAUTHENTICATED": "Please sign in to continue.",
+  "TOKEN_INVALID": "This link is invalid.",
+  "TOKEN_EXPIRED": "This link has expired. Please request a new one.",
+  "REFRESH_TOKEN_REUSED": "Your session is no longer valid. Please sign in again.",
+  "PASSWORD_NOT_SET": "This account has no password. Sign in with Google or set a password via password reset.",
+  "GOOGLE_SIGN_IN_DISABLED": "Google sign-in is not available right now.",
+  "GOOGLE_TOKEN_INVALID": "Google sign-in failed. Please try again.",
+  "RATE_LIMITED": "Too many attempts. Please wait a moment and try again."
+}
