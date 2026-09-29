@@ -1,5 +1,13 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import type { LoginRequest, RegisterRequest } from '@najme/contracts';
+import type {
+  ForgotPasswordRequest,
+  LoginRequest,
+  RegisterRequest,
+  ResetPasswordRequest,
+  VerifyEmailRequest,
+} from '@najme/contracts';
+import { resolveLocale } from '@najme/i18n';
+import { MailService } from '../mail/mail.service.js';
 import { apiError } from '../common/errors/api-error.js';
 import { toMe } from '../users/me.mapper.js';
 import { EmailAlreadyRegisteredError } from '../users/users.errors.js';
@@ -7,6 +15,7 @@ import type { User } from '../users/users.types.js';
 import { UsersService } from '../users/users.service.js';
 import { AccessTokenService } from './access-token.service.js';
 import type { ClientContext, IssuedSession } from './auth.types.js';
+import { EmailTokenService, type EmailTokenPurpose } from './email-token.service.js';
 import { PasswordService } from './password.service.js';
 import { RefreshTokenService } from './refresh-token.service.js';
 
@@ -17,6 +26,8 @@ export class AuthService {
     private readonly passwords: PasswordService,
     private readonly accessTokens: AccessTokenService,
     private readonly refreshTokens: RefreshTokenService,
+    private readonly emailTokens: EmailTokenService,
+    private readonly mail: MailService,
   ) {}
 
   /** @param locale already resolved: the request's `locale`, else from `Accept-Language`. */
@@ -41,6 +52,7 @@ export class AuthService {
       }
       throw error;
     }
+    this.sendEmail('verifyEmail', user);
     return this.startSession(user, true, context);
   }
 
@@ -86,6 +98,63 @@ export class AuthService {
       throw apiError(HttpStatus.UNAUTHORIZED, 'UNAUTHENTICATED', 'Authentication is required.');
     }
     return toMe(user, await this.users.hasPassword(userId));
+  }
+
+  /** Sets `emailVerifiedAt`. The token is single-use; 400 `TOKEN_INVALID`/`TOKEN_EXPIRED`. */
+  async verifyEmail(input: VerifyEmailRequest): Promise<void> {
+    await this.emailTokens.consume(input.token, 'VERIFY_EMAIL', (userId, tx) =>
+      this.users.markEmailVerified(userId, tx),
+    );
+  }
+
+  /** Sends a fresh verification link (older unused ones stop working). No-op once verified. */
+  async resendVerification(userId: string): Promise<void> {
+    const user = await this.users.findById(userId);
+    if (!user) {
+      throw apiError(HttpStatus.UNAUTHORIZED, 'UNAUTHENTICATED', 'Authentication is required.');
+    }
+    if (user.emailVerifiedAt === null) this.sendEmail('verifyEmail', user);
+  }
+
+  /**
+   * Never reveals whether the account exists: the lookup, token and email all happen in the
+   * background, so the response is identical in content and (roughly) in timing.
+   */
+  forgotPassword(input: ForgotPasswordRequest): void {
+    this.mail.defer('resetPassword', 'unknown', async () => {
+      const credential = await this.users.findPasswordCredentialByEmail(input.email);
+      if (credential) await this.issueAndSend('resetPassword', credential.user);
+    });
+  }
+
+  /** Sets the new password and signs the user out everywhere (all refresh tokens revoked). */
+  async resetPassword(input: ResetPasswordRequest): Promise<void> {
+    const passwordHash = await this.passwords.hash(input.newPassword);
+    await this.emailTokens.consume(input.token, 'RESET_PASSWORD', async (userId, tx) => {
+      // Rolls back the token claim too when the account has no password identity any more.
+      if (!(await this.users.setPassword(userId, passwordHash, tx))) {
+        throw apiError(HttpStatus.BAD_REQUEST, 'TOKEN_INVALID', 'This link is invalid.');
+      }
+      await this.refreshTokens.revokeAllForUser(userId, tx);
+    });
+  }
+
+  private sendEmail(kind: 'verifyEmail' | 'resetPassword', user: User): void {
+    this.mail.defer(kind, user.id, () => this.issueAndSend(kind, user));
+  }
+
+  private async issueAndSend(kind: 'verifyEmail' | 'resetPassword', user: User): Promise<void> {
+    const purpose: EmailTokenPurpose = kind === 'verifyEmail' ? 'VERIFY_EMAIL' : 'RESET_PASSWORD';
+    const token = await this.emailTokens.issue(user.id, purpose);
+    await this.mail.send(
+      kind,
+      {
+        userId: user.id,
+        email: user.email,
+        locale: resolveLocale([user.localePreference]),
+      },
+      token,
+    );
   }
 
   private async startSession(

@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { apiError } from '../common/errors/api-error.js';
 import { newId } from '../common/id.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -81,8 +82,12 @@ export class RefreshTokenService {
     });
   }
 
-  async revokeAllForUser(userId: string): Promise<void> {
-    await this.prisma.refreshToken.updateMany({
+  /** Pass `db` to run inside a caller's transaction. */
+  async revokeAllForUser(
+    userId: string,
+    db: Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    await db.refreshToken.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });

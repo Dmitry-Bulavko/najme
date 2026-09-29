@@ -16,13 +16,19 @@ import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { parseAcceptLanguage, resolveLocale } from '@najme/i18n';
 import {
+  forgotPasswordRequestSchema,
   loginRequestSchema,
   refreshRequestSchema,
   registerRequestSchema,
+  resetPasswordRequestSchema,
+  verifyEmailRequestSchema,
   type AuthSession,
+  type ForgotPasswordRequest,
   type LoginRequest,
   type Me,
   type RegisterRequest,
+  type ResetPasswordRequest,
+  type VerifyEmailRequest,
 } from '@najme/contracts';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import type { Env } from '../config/env.schema.js';
@@ -44,6 +50,10 @@ const MINUTE_MS = 60_000;
 const REGISTER_LIMIT = { default: { limit: 5, ttl: MINUTE_MS } };
 const LOGIN_LIMIT = { default: { limit: 10, ttl: MINUTE_MS } };
 const REFRESH_LIMIT = { default: { limit: 30, ttl: MINUTE_MS } };
+const VERIFY_LIMIT = { default: { limit: 10, ttl: MINUTE_MS } };
+const RESEND_LIMIT = { default: { limit: 3, ttl: MINUTE_MS } };
+const FORGOT_LIMIT = { default: { limit: 5, ttl: MINUTE_MS } };
+const RESET_LIMIT = { default: { limit: 10, ttl: MINUTE_MS } };
 
 function clientContext(req: Request): ClientContext {
   return { userAgent: req.header('user-agent') ?? null, ipAddress: req.ip ?? null };
@@ -122,6 +132,45 @@ export class AuthController {
   ): Promise<void> {
     await this.auth.logout(this.presentedToken(req, body));
     clearRefreshCookie(res, this.env.AUTH_COOKIE_SECURE);
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle(VERIFY_LIMIT)
+  @ApiOperation({ summary: 'Confirm the email address with the emailed token' })
+  async verifyEmail(
+    @Body(new ZodValidationPipe(verifyEmailRequestSchema)) body: VerifyEmailRequest,
+  ): Promise<void> {
+    await this.auth.verifyEmail(body);
+  }
+
+  @Post('verify-email/resend')
+  @Public(false)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Throttle(RESEND_LIMIT)
+  @ApiOperation({ summary: 'Send the verification email again (signed-in user)' })
+  async resendVerification(@CurrentUser() user: AuthenticatedUser): Promise<void> {
+    await this.auth.resendVerification(user.id);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Throttle(FORGOT_LIMIT)
+  @ApiOperation({ summary: 'Email a password reset link (always 202, never reveals the account)' })
+  forgotPassword(
+    @Body(new ZodValidationPipe(forgotPasswordRequestSchema)) body: ForgotPasswordRequest,
+  ): void {
+    this.auth.forgotPassword(body);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle(RESET_LIMIT)
+  @ApiOperation({ summary: 'Set a new password with the emailed token; revokes all sessions' })
+  async resetPassword(
+    @Body(new ZodValidationPipe(resetPasswordRequestSchema)) body: ResetPasswordRequest,
+  ): Promise<void> {
+    await this.auth.resetPassword(body);
   }
 
   /** Web reads the httpOnly cookie, mobile the body (ADR-0010). */
