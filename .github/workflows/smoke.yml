@@ -82,6 +82,7 @@ jobs:
           POSTGRES_USER=najme
           POSTGRES_PASSWORD=najme-smoke
           POSTGRES_DB=najme
+          JWT_ACCESS_SECRET=smoke-only-secret-0123456789abcdef0123456789
           EOF
 
       - name: Validate compose config

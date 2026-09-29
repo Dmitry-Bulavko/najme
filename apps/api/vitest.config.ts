@@ -10,5 +10,9 @@ export default withBaseConfig({
   plugins: [tsconfigPaths(), swc.vite()],
   test: {
     include: ['src/**/*.spec.ts'],
+    env: {
+      JWT_ACCESS_SECRET:
+        process.env.JWT_ACCESS_SECRET ?? 'test-only-access-secret-0123456789abcdef',
+    },
   },
 });

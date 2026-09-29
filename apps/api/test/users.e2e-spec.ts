@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { newId } from '../src/common/id.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
@@ -212,6 +212,33 @@ describe('UsersService (e2e)', () => {
       expect(identities.map((i) => i.provider).sort()).toEqual(['GOOGLE', 'PASSWORD']);
       const token = await prisma.refreshToken.findFirstOrThrow({ where: { userId: existing.id } });
       expect(token.revokedAt).toBeNull();
+    });
+
+    it('keeps the password identity when the email is verified between the read and the transaction', async () => {
+      const input = google('race');
+      const existing = await users.createWithPassword({ email: input.email, passwordHash: 'h' });
+      const original = prisma.user.findFirst.bind(prisma.user);
+      let verified = false;
+      vi.spyOn(prisma.user, 'findFirst').mockImplementation(((args: unknown) => {
+        const result = original(args as never);
+        if (verified) return result;
+        verified = true;
+        // The owner verifies right after the (still unverified) row was read.
+        return result.then(async (row) => {
+          await prisma.user.update({
+            where: { id: existing.id },
+            data: { emailVerifiedAt: new Date('2026-01-01T00:00:00Z') },
+          });
+          return row;
+        });
+      }) as never);
+
+      const linked = await users.findOrLinkByProvider(input);
+
+      expect(verified).toBe(true);
+      expect(linked.emailVerifiedAt).toEqual(new Date('2026-01-01T00:00:00Z'));
+      const identities = await prisma.authIdentity.findMany({ where: { userId: existing.id } });
+      expect(identities.map((i) => i.provider).sort()).toEqual(['GOOGLE', 'PASSWORD']);
     });
 
     it('ignores identities of soft-deleted users', async () => {

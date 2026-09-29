@@ -47,6 +47,7 @@ services:
       PORT: '3000'
       GIT_SHA: ${IMAGE_TAG}
       PUBLIC_URL: https://${DOMAIN}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB}?schema=public
     expose:
       - '3000'

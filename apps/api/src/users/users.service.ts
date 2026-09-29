@@ -50,6 +50,32 @@ export class UsersService {
     });
   }
 
+  /** Whether the user has a password identity (drives `Me.hasPassword`). */
+  async hasPassword(userId: string): Promise<boolean> {
+    const identity = await this.prisma.authIdentity.findFirst({
+      where: { userId, provider: 'PASSWORD', passwordHash: { not: null } },
+      select: { id: true },
+    });
+    return identity !== null;
+  }
+
+  /** The user and their password hash for an email login; null if either does not exist. */
+  async findPasswordCredentialByEmail(
+    email: string,
+  ): Promise<{ user: User; passwordHash: string } | null> {
+    const identity = await this.prisma.authIdentity.findFirst({
+      where: {
+        provider: 'PASSWORD',
+        passwordHash: { not: null },
+        user: { email: normalizeEmail(email), deletedAt: null },
+      },
+      select: { passwordHash: true, user: { select: userSelect } },
+    });
+    return identity?.passwordHash
+      ? { user: identity.user, passwordHash: identity.passwordHash }
+      : null;
+  }
+
   /** @throws EmailAlreadyRegisteredError when the email is taken (including by a deleted user). */
   async createWithPassword(input: CreateWithPasswordInput): Promise<User> {
     try {
@@ -131,7 +157,15 @@ export class UsersService {
     if (existing) {
       if (!input.emailVerified) throw new UnverifiedProviderEmailError();
       return this.prisma.$transaction(async (tx) => {
-        if (existing.emailVerifiedAt === null) {
+        // Lock the row and re-read: the owner may have verified the email since the read above
+        // (#49); wiping a just-verified account's password would be wrong, and the lock makes a
+        // concurrent verification wait until this transaction has committed.
+        const current = await tx.$queryRaw<
+          { email_verified_at: Date | null }[]
+        >`SELECT email_verified_at FROM users WHERE id = ${existing.id}::uuid AND deleted_at IS NULL FOR UPDATE`;
+        if (current.length === 0) throw new EmailAlreadyRegisteredError();
+        const emailVerifiedAt = current[0]?.email_verified_at ?? null;
+        if (emailVerifiedAt === null) {
           await tx.authIdentity.deleteMany({
             where: { userId: existing.id, provider: 'PASSWORD' },
           });
@@ -144,7 +178,7 @@ export class UsersService {
         return tx.user.update({
           where: { id: existing.id },
           data: {
-            emailVerifiedAt: existing.emailVerifiedAt ?? new Date(),
+            emailVerifiedAt: emailVerifiedAt ?? new Date(),
             authIdentities: { create: identity },
           },
           select: userSelect,

@@ -1,23 +1,21 @@
 import 'reflect-metadata';
 import { ConsoleLogger, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
-import { ApiExceptionFilter } from './common/filters/api-exception.filter.js';
+import { API_PREFIX, configureApp } from './app.setup.js';
 import { loadEnv } from './config/env.schema.js';
-
-const API_PREFIX = 'api/v1';
 
 async function bootstrap(): Promise<void> {
   const env = loadEnv();
 
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // Structured JSON logging (one line per event); no secrets are ever passed as log context.
     logger: new ConsoleLogger({ json: true }),
     bufferLogs: true,
   });
-  app.setGlobalPrefix(API_PREFIX);
-  app.useGlobalFilters(new ApiExceptionFilter());
+  configureApp(app);
 
   if (env.NODE_ENV !== 'production') {
     const document = SwaggerModule.createDocument(

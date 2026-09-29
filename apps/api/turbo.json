@@ -9,7 +9,7 @@
     },
     "build": {
       "dependsOn": ["^build", "db:generate"],
-      "env": ["DATABASE_URL", "GIT_SHA"]
+      "env": ["DATABASE_URL", "GIT_SHA", "JWT_ACCESS_SECRET", "AUTH_COOKIE_SECURE"]
     },
     "lint": {
       "dependsOn": ["^build", "db:generate"]
@@ -20,11 +20,27 @@
     },
     "test": {
       "dependsOn": ["^build", "db:generate"],
-      "env": ["DATABASE_URL", "GIT_SHA", "NODE_ENV", "PORT", "PUBLIC_URL"]
+      "env": [
+        "DATABASE_URL",
+        "GIT_SHA",
+        "NODE_ENV",
+        "PORT",
+        "PUBLIC_URL",
+        "JWT_ACCESS_SECRET",
+        "AUTH_COOKIE_SECURE"
+      ]
     },
     "dev": {
       "dependsOn": ["^build", "db:generate"],
-      "env": ["DATABASE_URL", "GIT_SHA", "NODE_ENV", "PORT", "PUBLIC_URL"]
+      "env": [
+        "DATABASE_URL",
+        "GIT_SHA",
+        "NODE_ENV",
+        "PORT",
+        "PUBLIC_URL",
+        "JWT_ACCESS_SECRET",
+        "AUTH_COOKIE_SECURE"
+      ]
     }
   }
 }
