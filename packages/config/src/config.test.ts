@@ -44,6 +44,13 @@ describe('eslint base config', () => {
 
     expect(withRule?.rules?.['@typescript-eslint/no-explicit-any']).toBe('error');
   });
+
+  it('ignores the temporary config bundles tsup and Vite write during parallel builds', () => {
+    const ignores = eslintBaseConfig.flatMap((entry) => entry.ignores ?? []);
+
+    expect(ignores).toContain('**/*.bundled_*.{js,mjs,cjs}');
+    expect(ignores).toContain('**/*.timestamp-*.{js,mjs,cjs}');
+  });
 });
 
 describe('vitest base config', () => {

@@ -18,7 +18,17 @@ import tseslint from 'typescript-eslint';
  */
 export const baseConfig = tseslint.config(
   {
-    ignores: ['dist/**', 'coverage/**', '.turbo/**', '.next/**', 'node_modules/**'],
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      '.turbo/**',
+      '.next/**',
+      'node_modules/**',
+      // Short-lived files tsup (bundle-require) and Vite write next to their configs while loading
+      // them; a parallel `eslint .` can glob one and then fail to read it once it is deleted.
+      '**/*.bundled_*.{js,mjs,cjs}',
+      '**/*.timestamp-*.{js,mjs,cjs}',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
