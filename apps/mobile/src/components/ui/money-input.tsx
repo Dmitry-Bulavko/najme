@@ -6,6 +6,7 @@ import {
 } from '@najme/contracts';
 import { tokens } from '@najme/ui-tokens';
 import { useState, type ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from './text';
@@ -22,7 +23,10 @@ export interface MoneyInputProps {
   value: number | null;
   onChange: (minor: number | null) => void;
   currency?: Money['currency'];
-  /** UI locale used to detect the decimal separator; defaults to `'en'`. */
+  /**
+   * UI locale used to detect the decimal separator. Defaults to the active i18next language.
+   * Provide explicitly in tests or when rendering outside an I18nextProvider.
+   */
   locale?: ContractLocale;
   helperText?: string;
   error?: string;
@@ -36,22 +40,29 @@ const { colors, spacing, radius } = tokens;
 /**
  * Edits a major-unit amount (`,` / `.`) and emits integer minor units.
  * Draft text is kept only while focused; otherwise the controlled value is shown.
+ * The decimal separator follows the active i18next language unless overridden via `locale`.
  */
 export function MoneyInput({
   label,
   value,
   onChange,
   currency = 'EUR',
-  locale = 'en',
+  locale: localeProp,
   helperText,
   error,
   disabled = false,
   containerStyle,
   testID,
 }: MoneyInputProps): ReactElement {
+  // i18n.language is the active locale; map unknown values to 'en' for safety.
+  const { i18n } = useTranslation();
+  const lang = i18n.language;
+  const uiLocale: ContractLocale =
+    lang === 'en' || lang === 'me' || lang === 'ru' || lang === 'tr' ? lang : 'en';
+  const locale = localeProp ?? uiLocale;
   const [draft, setDraft] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);
-  const display = draft ?? (value === null ? '' : formatMinorAsMajor(value));
+  const display = draft ?? (value === null ? '' : formatMinorAsMajor(value, locale));
   const hasError = Boolean(error);
   const message = error ?? helperText;
 
@@ -96,7 +107,7 @@ export function MoneyInput({
           onChangeText={setDraft}
           onFocus={() => {
             setFocused(true);
-            setDraft(value === null ? '' : formatMinorAsMajor(value));
+            setDraft(value === null ? '' : formatMinorAsMajor(value, locale));
           }}
           onBlur={() => {
             setFocused(false);

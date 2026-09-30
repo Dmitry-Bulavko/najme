@@ -4,6 +4,9 @@ import { fireEvent } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useState, type ReactElement } from 'react';
 
+// MoneyInput reads the current next-intl locale; default to 'en' in unit tests.
+vi.mock('next-intl', () => ({ useLocale: () => 'en' }));
+
 import { MoneyInput } from './money-input';
 import { TimeInput } from './time-input';
 
@@ -29,16 +32,38 @@ describe('MoneyInput', () => {
     expect(screen.getByLabelText('Amount')).toHaveValue('25.50');
   });
 
-  it('parses dot and comma decimals (en locale: comma is grouping)', async () => {
+  it('rejects invalid grouping in en locale (12,5 → only 1 digit after comma)', async () => {
     const user = userEvent.setup();
     render(<MoneyHarness />);
 
     const input = screen.getByLabelText('Amount');
     await user.clear(input);
-    // In en locale, '12,5' → comma is grouping → strip comma → '125' int → 12500 minor
+    // '12,5' is not valid grouping (needs 3 digits after the thousands sep) → null
     await user.type(input, '12,5');
     await user.tab();
-    expect(screen.getByTestId('minor')).toHaveTextContent('12500');
+    expect(screen.getByTestId('minor')).toHaveTextContent('null');
+  });
+
+  it('round-trip: value=2500 me locale → focus then blur emits 2500', async () => {
+    const user = userEvent.setup();
+    render(<MoneyHarness initial={2500} locale="me" />);
+
+    const input = screen.getByLabelText('Amount');
+    // On focus, formatMinorAsMajor(2500, 'me') = '25,00'; on blur parseMajorToMinor('25,00', 'me') = 2500.
+    await user.click(input);
+    await user.tab();
+    expect(screen.getByTestId('minor')).toHaveTextContent('2500');
+  });
+
+  it('rejects 12,50 in en locale (only 2 digits after comma)', async () => {
+    const user = userEvent.setup();
+    render(<MoneyHarness locale="en" />);
+
+    const input = screen.getByLabelText('Amount');
+    await user.clear(input);
+    await user.type(input, '12,50');
+    await user.tab();
+    expect(screen.getByTestId('minor')).toHaveTextContent('null');
   });
 
   it('parses dot decimal in en locale on blur', async () => {

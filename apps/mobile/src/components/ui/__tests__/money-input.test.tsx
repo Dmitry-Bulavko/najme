@@ -127,6 +127,32 @@ describe('MoneyInput', () => {
     await fireEvent(input, 'blur');
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it('round-trip: value=2500 me locale → focus then blur emits 2500', async () => {
+    const onChange = jest.fn();
+    const { getByLabelText, getByDisplayValue } = await renderWithI18n(
+      <MoneyInput label="Amount" value={2500} onChange={onChange} locale="me" />,
+    );
+    // formatMinorAsMajor(2500, 'me') = '25,00' — displayed with comma decimal
+    expect(getByDisplayValue('25,00')).toBeTruthy();
+    const input = getByLabelText('Amount');
+    // Focus sets draft to '25,00'; blur parses it back to 2500.
+    await fireEvent(input, 'focus');
+    await fireEvent(input, 'blur');
+    expect(onChange).toHaveBeenCalledWith(2500);
+  });
+
+  it('rejects 12,50 in en locale (only 2 digits after comma — bad grouping)', async () => {
+    const onChange = jest.fn();
+    const { getByLabelText } = await renderWithI18n(
+      <MoneyInput label="Amount" value={null} onChange={onChange} locale="en" />,
+    );
+    const input = getByLabelText('Amount');
+    await fireEvent(input, 'focus');
+    await fireEvent.changeText(input, '12,50');
+    await fireEvent(input, 'blur');
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------

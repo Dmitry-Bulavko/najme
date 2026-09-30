@@ -28,6 +28,16 @@ export const MONEY_FRACTION_DIGITS = 2;
 const MINOR_FACTOR = 10 ** MONEY_FRACTION_DIGITS;
 
 /**
+ * Returns false when grouping separators appear in invalid positions.
+ * Valid: no grouping separator present, or `\d{1,3}(sep\d{3})+`.
+ */
+function hasValidGrouping(raw: string, groupingSep: ',' | '.'): boolean {
+  if (!raw.includes(groupingSep)) return true;
+  const esc = groupingSep === '.' ? '\\.' : ',';
+  return new RegExp(`^\\d{1,3}(?:${esc}\\d{3})+$`).test(raw);
+}
+
+/**
  * Parse a user-typed major-unit string into integer minor units.
  *
  * Locale rules:
@@ -74,14 +84,17 @@ export function parseMajorToMinor(raw: string, locale: ContractLocale = 'en'): n
 
   if (decimalCount === 1) {
     const idx = noSpaces.indexOf(decimalSep);
-    // Strip grouping separators from the integer portion only.
-    intPart = noSpaces.slice(0, idx).replace(new RegExp(`\\${groupingSep}`, 'g'), '');
+    const rawInt = noSpaces.slice(0, idx);
+    // Grouping separators in the integer portion must follow N,NNN,NNN pattern.
+    if (!hasValidGrouping(rawInt, groupingSep)) return null;
+    intPart = rawInt.replace(new RegExp(`\\${groupingSep}`, 'g'), '');
     fracPart = noSpaces.slice(idx + 1);
     // Grouping separator must not appear in the fraction.
     if (fracPart.includes(groupingSep)) return null;
     if (fracPart !== '' && !/^\d+$/.test(fracPart)) return null;
   } else {
     // No decimal separator — all grouping separators are thousands markers.
+    if (!hasValidGrouping(noSpaces, groupingSep)) return null;
     intPart = noSpaces.replace(new RegExp(`\\${groupingSep}`, 'g'), '');
     fracPart = '';
   }
@@ -107,11 +120,15 @@ export function parseMajorToMinor(raw: string, locale: ContractLocale = 'en'): n
   return result === 0 ? 0 : result;
 }
 
-/** Format integer minor units as a major-unit string with a `.` decimal separator. */
-export function formatMinorAsMajor(minor: number): string {
+/**
+ * Format integer minor units as a major-unit string using the locale's decimal separator.
+ * Uses `.` for `en` and `,` for `me` / `ru` / `tr`.
+ */
+export function formatMinorAsMajor(minor: number, locale: ContractLocale = 'en'): string {
   const negative = minor < 0;
   const abs = Math.abs(minor);
   const major = Math.floor(abs / MINOR_FACTOR);
   const fraction = String(abs % MINOR_FACTOR).padStart(MONEY_FRACTION_DIGITS, '0');
-  return `${negative ? '-' : ''}${major}.${fraction}`;
+  const decimalSep = locale === 'en' ? '.' : ',';
+  return `${negative ? '-' : ''}${major}${decimalSep}${fraction}`;
 }

@@ -46,8 +46,12 @@ export function TimeInput({
       onChange={(event: ChangeEvent<HTMLInputElement>) => {
         const next = event.target.value;
         if (next) {
-          const snapped = snapHhMm(next, stepMinutes);
-          onChange(snapped ?? next);
+          // Strip an optional seconds component (HH:mm:ss → HH:mm) that some browsers append.
+          const hhMm = next.length > 5 ? next.slice(0, 5) : next;
+          const snapped = snapHhMm(hhMm, stepMinutes);
+          if (snapped) {
+            onChange(snapped);
+          }
         }
       }}
       onBlur={(event) => {
