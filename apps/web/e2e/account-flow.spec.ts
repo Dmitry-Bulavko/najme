@@ -17,7 +17,7 @@ test.describe('Account flow', () => {
 
     const verifyUrl = await mailpit.waitForLink(uniqueEmail, 'verify-email');
     await page.goto(verifyUrl);
-    await expect(page.getByRole('status')).toContainText('Email verified');
+    await expect(page.getByTestId('verify-email-success')).toBeVisible({ timeout: 30_000 });
 
     await page.goto('/en/account');
     await expect(page.getByText('Verified', { exact: true })).toBeVisible();

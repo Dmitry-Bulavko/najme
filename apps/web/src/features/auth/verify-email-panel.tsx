@@ -98,7 +98,11 @@ export function VerifyEmailPanel() {
 
   if (status === 'verifying' || status === 'idle') {
     return (
-      <p role="status" className="text-center text-sm text-muted-foreground">
+      <p
+        role="status"
+        data-testid="verify-email-pending"
+        className="text-center text-sm text-muted-foreground"
+      >
         {t('emailVerification.verifying')}
       </p>
     );
@@ -107,7 +111,7 @@ export function VerifyEmailPanel() {
   if (status === 'error') {
     const signedIn = Boolean(getAccessToken());
     return (
-      <div className="grid gap-4 text-center">
+      <div className="grid gap-4 text-center" data-testid="verify-email-error">
         <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {errorMessage}
         </p>
