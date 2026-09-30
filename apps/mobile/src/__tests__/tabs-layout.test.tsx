@@ -135,8 +135,15 @@ describe('TabsLayout', () => {
     const paddingTop = Number(tabsScreenOptions.current?.tabBarStyle?.paddingTop ?? 0);
     const paddingBottom = Number(tabsScreenOptions.current?.tabBarStyle?.paddingBottom ?? 0);
     const border = 1;
+    // @react-navigation/bottom-tabs default tab item vertical padding (top + bottom).
+    const tabItemVerticalPadding = 10;
     expect(TAB_BAR_BASE_HEIGHT).toBeGreaterThanOrEqual(
-      border + paddingTop + paddingBottom + TAB_ICON_SIZE + TAB_LABEL_LINE_HEIGHT,
+      border +
+        paddingTop +
+        paddingBottom +
+        tabItemVerticalPadding +
+        TAB_ICON_SIZE +
+        TAB_LABEL_LINE_HEIGHT,
     );
   });
 });
