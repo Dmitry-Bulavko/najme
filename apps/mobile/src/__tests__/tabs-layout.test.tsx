@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, jest } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { catalogs, flattenMessages } from '@najme/i18n';
 import { tokens } from '@najme/ui-tokens';
 import { act, render } from '@testing-library/react-native';
@@ -7,19 +7,21 @@ import ICU from 'i18next-icu';
 import type { ReactNode } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
-import { TAB_BAR_BASE_HEIGHT, TAB_LABEL_LINE_HEIGHT } from '../components/ui/theme';
+import { TAB_BAR_BASE_HEIGHT, TAB_ICON_SIZE, TAB_LABEL_LINE_HEIGHT } from '../components/ui/theme';
 import TabsLayout from '../app/(tabs)/_layout';
 
-// `expo-router`'s real `Tabs`/`Tabs.Screen` render native tab-bar chrome that isn't meaningful in a
-// unit test; this test double renders each screen's `options.title` as plain text so the localized
-// tab titles are observable via Testing Library, while exercising the real `TabsLayout` component
-// (and its `useTranslation()` call) end to end.
 interface CapturedScreenOptions {
   tabBarActiveTintColor?: string;
-  tabBarStyle?: { height?: number; [key: string]: unknown };
+  tabBarStyle?: {
+    height?: number;
+    paddingTop?: number;
+    paddingBottom?: number;
+    [key: string]: unknown;
+  };
   tabBarLabelStyle?: { lineHeight?: number; [key: string]: unknown };
 }
 const tabsScreenOptions: { current?: CapturedScreenOptions } = {};
+const mockInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 
 jest.mock('expo-router', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
@@ -50,6 +52,10 @@ jest.mock('expo-router', () => {
   return { Tabs };
 });
 
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => mockInsets,
+}));
+
 beforeAll(async () => {
   await i18next
     .use(ICU)
@@ -79,6 +85,10 @@ function renderTabs() {
 }
 
 describe('TabsLayout', () => {
+  beforeEach(() => {
+    mockInsets.bottom = 0;
+  });
+
   it('gives every tab an icon and tints the active tab with the primary token', async () => {
     const { getAllByTestId } = await renderTabs();
 
@@ -108,15 +118,25 @@ describe('TabsLayout', () => {
   });
 
   it('sets tabBarStyle.height to TAB_BAR_BASE_HEIGHT plus safe-area bottom inset', async () => {
-    // jest.setup.ts mocks react-native-safe-area-context with zero insets.
+    mockInsets.bottom = 34;
     await renderTabs();
 
-    expect(tabsScreenOptions.current?.tabBarStyle?.height).toBe(TAB_BAR_BASE_HEIGHT);
+    expect(tabsScreenOptions.current?.tabBarStyle?.height).toBe(TAB_BAR_BASE_HEIGHT + 34);
   });
 
   it('sets tabBarLabelStyle.lineHeight to TAB_LABEL_LINE_HEIGHT so labels are not clipped', async () => {
     await renderTabs();
 
     expect(tabsScreenOptions.current?.tabBarLabelStyle?.lineHeight).toBe(TAB_LABEL_LINE_HEIGHT);
+  });
+
+  it('budget covers padding + icon + label line inside TAB_BAR_BASE_HEIGHT', async () => {
+    await renderTabs();
+    const paddingTop = Number(tabsScreenOptions.current?.tabBarStyle?.paddingTop ?? 0);
+    const paddingBottom = Number(tabsScreenOptions.current?.tabBarStyle?.paddingBottom ?? 0);
+    const border = 1;
+    expect(TAB_BAR_BASE_HEIGHT).toBeGreaterThanOrEqual(
+      border + paddingTop + paddingBottom + TAB_ICON_SIZE + TAB_LABEL_LINE_HEIGHT,
+    );
   });
 });

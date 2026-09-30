@@ -35,8 +35,10 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
   GoogleSignin: {
     configure: jest.fn(),
     hasPlayServices: jest.fn(async () => true),
-    signIn: jest.fn(async () => ({ data: { idToken: 'test-id-token' } })),
+    signIn: jest.fn(async () => ({ type: 'success', data: { idToken: 'test-id-token' } })),
   },
+  isCancelledResponse: (response: { type?: string }) => response.type === 'cancelled',
+  isSuccessResponse: (response: { type?: string }) => response.type === 'success',
 }));
 
 // datetimepicker is native-only; provide a lightweight stub for unit tests.

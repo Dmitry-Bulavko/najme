@@ -5,12 +5,7 @@
  * token rotation that password change performs. On a 401 (expired access token), the function
  * refreshes directly — without re-entering `withAuthMutex` — and retries once (#148).
  */
-import {
-  apiErrorResponseSchema,
-  authSessionSchema,
-  type AuthSession,
-  type ChangePasswordRequest,
-} from '@najme/contracts';
+import { authSessionSchema, type AuthSession, type ChangePasswordRequest } from '@najme/contracts';
 
 import {
   ApiError,
@@ -80,12 +75,9 @@ export async function changePasswordWithLock(body: ChangePasswordRequest): Promi
           response.status,
         );
       }
-      const parsedError = apiErrorResponseSchema.safeParse(errorBody);
-      const errorCode = parsedError.success ? parsedError.data.error.code : undefined;
-
-      if (errorCode !== 'UNAUTHENTICATED') {
-        // Business-logic 401 (e.g. INVALID_CREDENTIALS) — propagate without refreshing.
-        throw parseErrorEnvelope(errorBody, response.status);
+      const apiErr = parseErrorEnvelope(errorBody, response.status);
+      if (apiErr.code !== 'UNAUTHENTICATED') {
+        throw apiErr;
       }
 
       // Access token expired — refresh inside the held mutex (lock-free: no re-entry needed).

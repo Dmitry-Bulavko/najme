@@ -357,7 +357,10 @@ describe('changePasswordWithLock', () => {
     // 2. Fire a concurrent request that gets 401 → queues refresh behind the mutex.
     const secureRequest = apiRequest('/secure');
 
-    await new Promise((r) => setTimeout(r, 20));
+    // Let the concurrent request reach the mutex wait without advancing the password fetch.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(refreshBodies).toEqual([]);
 
     // 3. Release gate → password change completes, rotating the refresh token.
     releasePwChange(makeJsonResponse(sessionAfterPwChange));
@@ -367,6 +370,87 @@ describe('changePasswordWithLock', () => {
 
     // The refresh was sent only after the password change resolved, using the NEW refresh token.
     expect(refreshBodies).toEqual([{ refreshToken: 'refresh-pw' }]);
+  });
+
+  it('on a second 401 after refresh surfaces UNAUTHENTICATED with one refresh and two password calls', async () => {
+    setAccessToken('access-expired');
+    await setRefreshToken('refresh-initial');
+
+    let passwordCalls = 0;
+    let refreshCalls = 0;
+
+    jest.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/me/password')) {
+        passwordCalls += 1;
+        return makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401);
+      }
+      if (url.includes('/auth/refresh')) {
+        refreshCalls += 1;
+        return makeJsonResponse({
+          accessToken: 'access-refreshed',
+          accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+          refreshToken: 'refresh-refreshed',
+          user: meWithPassword,
+        });
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    await expect(
+      changePasswordWithLock({ currentPassword: 'old-password', newPassword: 'longenough1' }),
+    ).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+
+    expect(passwordCalls).toBe(2);
+    expect(refreshCalls).toBe(1);
+  });
+
+  it('clears tokens when refresh returns a definitive rejection', async () => {
+    setAccessToken('access-expired');
+    await setRefreshToken('refresh-initial');
+
+    jest.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/me/password')) {
+        return makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401);
+      }
+      if (url.includes('/auth/refresh')) {
+        return makeJsonResponse(
+          { error: { code: 'REFRESH_TOKEN_REUSED', message: 'reused' } },
+          401,
+        );
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    await expect(
+      changePasswordWithLock({ currentPassword: 'old-password', newPassword: 'longenough1' }),
+    ).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+
+    expect(getAccessToken()).toBeNull();
+    expect(await getRefreshToken()).toBeNull();
+  });
+
+  it('keeps tokens when refresh throws a TransientAuthError', async () => {
+    setAccessToken('access-expired');
+    await setRefreshToken('refresh-initial');
+
+    jest.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/me/password')) {
+        return makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401);
+      }
+      if (url.includes('/auth/refresh')) {
+        return makeJsonResponse({ error: { code: 'HTTP_ERROR', message: 'down' } }, 503);
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    await expect(
+      changePasswordWithLock({ currentPassword: 'old-password', newPassword: 'longenough1' }),
+    ).rejects.toMatchObject({ name: 'TransientAuthError' });
+
+    expect(await getRefreshToken()).toBe('refresh-initial');
   });
 
   it('persists the rotated refresh token under the auth mutex', async () => {

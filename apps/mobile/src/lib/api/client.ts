@@ -69,6 +69,9 @@ export async function persistAuthSession(session: AuthSession): Promise<void> {
 /** Tail of the auth mutex chain; other flows (#56) await this via `withAuthMutex`. */
 let mutexTail: Promise<unknown> = Promise.resolve();
 
+/** Nesting depth of `withAuthMutex` for the running operation (dev-only guard for refreshWithoutMutex). */
+let mutexHoldCount = 0;
+
 /** In-flight refresh shared by concurrent 401 retries (single-flight). */
 let inflightRefresh: Promise<string | null> | null = null;
 
@@ -77,7 +80,24 @@ let inflightRefresh: Promise<string | null> | null = null;
  * hold this lock so a concurrent refresh cannot race token rotation or resurrect a cleared session.
  */
 export function withAuthMutex<T>(operation: () => Promise<T>): Promise<T> {
-  const next = mutexTail.then(operation, operation);
+  const next = mutexTail.then(
+    async () => {
+      mutexHoldCount += 1;
+      try {
+        return await operation();
+      } finally {
+        mutexHoldCount -= 1;
+      }
+    },
+    async () => {
+      mutexHoldCount += 1;
+      try {
+        return await operation();
+      } finally {
+        mutexHoldCount -= 1;
+      }
+    },
+  );
   mutexTail = next.then(
     () => undefined,
     () => undefined,
@@ -133,6 +153,9 @@ function isDefinitiveRefreshRejection(status: number, code: string | undefined):
  * @throws {TransientAuthError} When the network / server failure is temporary (tokens kept).
  */
 export async function refreshWithoutMutex(): Promise<string | null> {
+  if (__DEV__ && mutexHoldCount === 0) {
+    throw new Error('refreshWithoutMutex must be called while holding withAuthMutex');
+  }
   return doRefresh();
 }
 

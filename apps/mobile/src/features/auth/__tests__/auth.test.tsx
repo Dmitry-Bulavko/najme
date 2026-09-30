@@ -45,6 +45,8 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
     hasPlayServices: jest.fn(async () => true),
     signIn: jest.fn(async () => ({ data: { idToken: 'google-id-token' }, type: 'success' })),
   },
+  isCancelledResponse: (response: { type?: string }) => response.type === 'cancelled',
+  isSuccessResponse: (response: { type?: string }) => response.type === 'success',
 }));
 
 jest.mock('@/i18n', () => {
@@ -321,12 +323,9 @@ describe('GoogleSignInButton visibility', () => {
 
     expect(queryByTestId('google-sign-in')).toBeNull();
   });
-});
 
-describe('GoogleSignInButton visibility', () => {
-  it('renders nothing in Expo Go even when env is configured', async () => {
+  it('renders nothing when canOfferGoogleSignIn is false even if env looks configured', async () => {
     jest.mocked(googleEnvConfigured).mockReturnValue(true);
-    // canOfferGoogleSignIn returns false when running in Expo Go (native module unavailable).
     jest.mocked(canOfferGoogleSignIn).mockReturnValue(false);
 
     const { queryByTestId } = await renderWithI18n(
@@ -435,6 +434,47 @@ describe('GoogleSignInButton navigation', () => {
     });
     expect(mockRouterReplace).not.toHaveBeenCalled();
   });
+
+  it('treats a cancelled Google prompt as a silent no-op', async () => {
+    jest.mocked(googleEnvConfigured).mockReturnValue(true);
+    jest.mocked(canOfferGoogleSignIn).mockReturnValue(true);
+    const googleModule = jest.requireMock('@react-native-google-signin/google-signin') as {
+      GoogleSignin: { signIn: { mockImplementationOnce: (fn: () => Promise<unknown>) => void; mock: { calls: unknown[] } } };
+    };
+    googleModule.GoogleSignin.signIn.mockImplementationOnce(async () => ({
+      type: 'cancelled',
+      data: null,
+    }));
+
+    jest.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/providers')) {
+        return makeJsonResponse({ google: true, password: true });
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    const screen = await renderWithI18n(
+      <Harness>
+        <GoogleSignInButton />
+      </Harness>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('google-sign-in')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText(catalogs.en.auth.google.continueWith));
+    });
+
+    await waitFor(() => {
+      expect(googleModule.GoogleSignin.signIn.mock.calls.length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+    expect(mockRouterBack).not.toHaveBeenCalled();
+  });
 });
 
 describe('SignUpForm', () => {
@@ -451,6 +491,8 @@ describe('SignUpForm', () => {
 
     const alerts = await findAllByRole('alert');
     expect(alerts.length).toBeGreaterThan(0);
+    const alertText = alerts.map((node) => String(node.props.children ?? '')).join(' ');
+    expect(alertText.length).toBeGreaterThan(0);
   });
 
   it('maps API error codes to the errors catalog', async () => {
