@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ApiError, apiRequest } from '@/lib/api/client';
+import { errorMessage } from '@/lib/i18n/error-message';
 import { useEmailLinkToken } from './use-email-link-token';
 
 type ResetFormValues = {
@@ -86,7 +87,7 @@ export function ResetPasswordForm() {
       router.replace(`/${locale}/sign-in`);
     } catch (error) {
       if (error instanceof ApiError) {
-        setApiError(tErrors(error.code as Parameters<typeof tErrors>[0]));
+        setApiError(errorMessage(tErrors, error.code));
       } else {
         setApiError(tErrors('HTTP_ERROR'));
       }

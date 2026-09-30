@@ -117,3 +117,12 @@ refresh token with the one from the response; mobile writes it to secure storage
 automatically via `Set-Cookie`. Clients must not run a refresh concurrently with the change:
 presenting the pre-change token triggers `REFRESH_TOKEN_REUSED` and revokes all sessions, including
 the new one.
+
+## Update: Google ID-token nonce (#146)
+
+GIS / `@react-native-google-signin` can bind the ID token to a client-generated `nonce` that the
+API then checks, mitigating token replay if an attacker obtains a raw credential. For alpha we
+**accept the risk and do not send or verify a nonce**: Google already verifies signature, audience,
+issuer and expiry; the credential is posted same-origin over HTTPS; and adding nonce means web
+generation, a contract field and server-side verification for a threat we have not observed.
+Revisit before production hardening or if replay becomes a concern.

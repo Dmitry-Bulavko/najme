@@ -18,6 +18,7 @@ import { registerRequestSchema, type AuthSession, type RegisterRequest } from '@
 import { isSupportedLocale } from '@/i18n/routing';
 import { LOCALE_COOKIE_MAX_AGE, LOCALE_COOKIE_NAME } from '@/i18n/routing';
 import { ApiError, apiRequest } from '@/lib/api/client';
+import { errorMessage } from '@/lib/i18n/error-message';
 import { GoogleSignInButton } from './google-sign-in-button';
 import { replaceLocaleInPath, safeNextPath } from './safe-next-path';
 import { useSession } from './session-context';
@@ -95,7 +96,7 @@ export function SignUpForm() {
       router.replace(next);
     } catch (error) {
       if (error instanceof ApiError) {
-        setApiError(tErrors(error.code as Parameters<typeof tErrors>[0]));
+        setApiError(errorMessage(tErrors, error.code));
       } else {
         setApiError(tErrors('HTTP_ERROR'));
       }
@@ -116,7 +117,7 @@ export function SignUpForm() {
           type="email"
           autoComplete="email"
           inputMode="email"
-          placeholder="you@example.com"
+          placeholder={t('emailPlaceholder')}
         />
       </FormField>
 

@@ -25,7 +25,6 @@ import {
 import { toast } from 'sonner';
 
 import {
-  ApiError,
   apiRequest,
   refreshSession,
   setAccessToken,
@@ -113,11 +112,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasMounted.current = true;
 
     void (async () => {
+      const becomeAnonymous = () => {
+        setAccessToken(null);
+        setSession({ state: 'anonymous' });
+      };
+
       try {
         // Restore access token from the httpOnly cookie via refresh.
         const newToken = await refreshSession();
         if (!newToken) {
-          setSession({ state: 'anonymous' });
+          becomeAnonymous();
           return;
         }
 
@@ -125,16 +129,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const raw = await apiRequest<unknown>('/me');
         const parsed = meSchema.safeParse(raw);
         if (!parsed.success) {
-          setSession({ state: 'anonymous' });
+          becomeAnonymous();
           return;
         }
         setSession({ state: 'authenticated', me: parsed.data });
-      } catch (error) {
-        if (error instanceof ApiError && error.code === 'REFRESH_TOKEN_REUSED') {
-          // Handler already cleared token / toasted / redirected; keep anonymous.
-          setAccessToken(null);
-        }
-        setSession({ state: 'anonymous' });
+      } catch {
+        // Reuse handler may already have cleared/toasted/redirected; always drop the token.
+        becomeAnonymous();
       }
     })();
   }, []);

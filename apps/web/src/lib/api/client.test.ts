@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
   apiRequest,
+  getAccessToken,
   refreshSession,
   setAccessToken,
   setRefreshTokenReusedHandler,
@@ -178,6 +179,32 @@ describe('401 retry with single-flight refresh', () => {
     await expect(apiRequest('/protected')).rejects.toBeInstanceOf(ApiError);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+
+  it('does not call /auth/refresh on a 401 from /auth/login even with a stale access token', async () => {
+    setAccessToken('stale-access');
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeJsonResponse({ error: { code: 'INVALID_CREDENTIALS', message: 'bad' } }, 401),
+    );
+
+    await expect(
+      apiRequest('/auth/login', { method: 'POST', body: { email: 'a@b.com', password: 'x' } }),
+    ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(String(vi.mocked(fetch).mock.calls[0]![0])).toContain('/auth/login');
+  });
+
+  it('does not refresh on 401 when the request had no bearer token', async () => {
+    setAccessToken(null);
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
+    );
+
+    await expect(apiRequest('/me')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -203,7 +230,7 @@ describe('withAuthRefreshLock', () => {
 });
 
 describe('refreshSession', () => {
-  it('returns null and clears token when refresh returns non-2xx', async () => {
+  it('returns null and clears token when refresh returns 401', async () => {
     setAccessToken('stale');
     vi.mocked(fetch).mockResolvedValueOnce(
       makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
@@ -211,6 +238,27 @@ describe('refreshSession', () => {
 
     const token = await refreshSession();
     expect(token).toBeNull();
+    expect(getAccessToken()).toBeNull();
+  });
+
+  it('returns null and keeps the access token when refresh returns 503', async () => {
+    setAccessToken('still-valid');
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeJsonResponse({ error: { code: 'INTERNAL_ERROR', message: 'down' } }, 503),
+    );
+
+    const token = await refreshSession();
+    expect(token).toBeNull();
+    expect(getAccessToken()).toBe('still-valid');
+  });
+
+  it('returns null and keeps the access token on a network error', async () => {
+    setAccessToken('still-valid');
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    const token = await refreshSession();
+    expect(token).toBeNull();
+    expect(getAccessToken()).toBe('still-valid');
   });
 
   it('invokes the reuse handler and throws ApiError on REFRESH_TOKEN_REUSED', async () => {
