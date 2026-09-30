@@ -19,5 +19,6 @@
   "GOOGLE_TOKEN_INVALID": "Prijava preko Googlea nije uspjela. Pokušajte ponovo.",
   "RATE_LIMITED": "Previše pokušaja. Sačekajte trenutak i pokušajte ponovo.",
   "SLUG_TAKEN": "Ovaj URL slug je već zauzet. Izaberite drugi.",
-  "SLUG_LOCKED": "URL slug se više ne može mijenjati nakon što je biznis odobren."
+  "SLUG_LOCKED": "URL slug se više ne može mijenjati nakon što je biznis odobren.",
+  "UPLOAD_INVALID": "Ovaj upload je nevažeći ili nepotpun. Izaberite drugu sliku i pokušajte ponovo."
 }

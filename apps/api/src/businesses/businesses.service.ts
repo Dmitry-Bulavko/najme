@@ -11,6 +11,7 @@ import { Clock } from '../common/clock.js';
 import { apiError } from '../common/errors/api-error.js';
 import { newId } from '../common/id.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { ObjectStorage } from '../storage/object-storage.js';
 import type { BusinessMembership } from './business-access.types.js';
 import {
   ensureValidBusinessSlug,
@@ -52,6 +53,7 @@ export class BusinessesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly clock: Clock,
+    private readonly storage: ObjectStorage,
   ) {}
 
   async create(userId: string, input: CreateBusinessRequest): Promise<Business> {
@@ -176,7 +178,7 @@ export class BusinessesService {
       status: row.business.status,
       role: row.role,
       staffMemberId: row.staffMemberId,
-      logoUrl: null,
+      logoUrl: this.storage.publicUrl(row.business.logoKey),
     }));
   }
 
@@ -294,8 +296,8 @@ export class BusinessesService {
       address: row.address,
       contactPhone: row.contactPhone,
       contactEmail: row.contactEmail,
-      logoUrl: null,
-      coverUrl: null,
+      logoUrl: this.storage.publicUrl(row.logoKey),
+      coverUrl: this.storage.publicUrl(row.coverKey),
       confirmationMode: row.confirmationMode,
       cancellationWindowMinutes: row.cancellationWindowMinutes,
       minBookingNoticeMinutes: row.minBookingNoticeMinutes,

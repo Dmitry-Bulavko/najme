@@ -9,6 +9,8 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { ScheduleModule } from './schedule/schedule.module.js';
 import { ServicesModule } from './services/services.module.js';
 import { StaffModule } from './staff/staff.module.js';
+import { StorageModule } from './storage/storage.module.js';
+import { UploadsModule } from './storage/uploads.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -20,10 +22,12 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     MailModule,
     AuthModule,
+    StorageModule,
     BusinessesModule,
     StaffModule,
     ServicesModule,
     ScheduleModule,
+    UploadsModule,
   ],
 })
 export class AppModule {}

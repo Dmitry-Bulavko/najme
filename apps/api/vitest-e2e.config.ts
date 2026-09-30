@@ -21,6 +21,13 @@ export default withBaseConfig({
       // Fixed: the Google e2e suite uses a fake verifier and asserts this audience list.
       GOOGLE_CLIENT_IDS: 'test-web.apps.googleusercontent.com, test-ios.apps.googleusercontent.com',
       APP_WEB_URL: process.env.APP_WEB_URL ?? 'http://localhost:3001',
+      STORAGE_ENDPOINT: process.env.STORAGE_ENDPOINT ?? 'http://localhost:9000',
+      STORAGE_REGION: process.env.STORAGE_REGION ?? 'us-east-1',
+      STORAGE_BUCKET: process.env.STORAGE_BUCKET ?? 'najme',
+      STORAGE_ACCESS_KEY_ID: process.env.STORAGE_ACCESS_KEY_ID ?? 'minioadmin',
+      STORAGE_SECRET_ACCESS_KEY: process.env.STORAGE_SECRET_ACCESS_KEY ?? 'minioadmin',
+      STORAGE_PUBLIC_BASE_URL: process.env.STORAGE_PUBLIC_BASE_URL ?? 'http://localhost:9000/najme',
+      STORAGE_FORCE_PATH_STYLE: process.env.STORAGE_FORCE_PATH_STYLE ?? 'true',
     },
     testTimeout: 20_000,
     hookTimeout: 20_000,

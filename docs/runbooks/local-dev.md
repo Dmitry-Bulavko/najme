@@ -14,7 +14,7 @@
 corepack enable pnpm
 pnpm install
 cp .env.example .env
-docker compose -f compose.dev.yml up -d   # PostgreSQL (POSTGRES_PORT, default 5434) + Mailpit
+docker compose -f compose.dev.yml up -d   # PostgreSQL, Mailpit, MinIO (+ minio-init)
 pnpm --filter @najme/api db:migrate:deploy  # first run only: create the schema
 pnpm dev                                  # builds shared packages, then API + web
 ```
@@ -27,6 +27,7 @@ pnpm dev                                  # builds shared packages, then API + w
 | Web      | http://localhost:3001/en     | API badge shows "Online" when API + DB is up       |
 | Postgres | localhost:5434               | from `compose.dev.yml`                             |
 | Mailpit  | http://localhost:8025        | inbox for every email the API sends (SMTP on 1025) |
+| MinIO    | http://localhost:9000        | S3 API; console at :9001 (user/pass from `.env`)   |
 | Metro    | http://localhost:8081        | mobile only, see below                             |
 
 Env: in development the API, web and the Prisma CLI (migrate/generate) load the root `.env` themselves (Node `--env-file-if-exists` /
@@ -52,6 +53,19 @@ delivered to real addresses. Mailpit keeps messages in memory; restart the conta
 The Mailpit-backed API e2e suite (`test/auth-mailpit.e2e-spec.ts`) runs when `MAILPIT_URL` is set
 (`MAILPIT_URL=http://localhost:8025 pnpm --filter @najme/api test`); without it the suite is skipped
 and the fake-mailer suite still covers the same flows. CI always sets it.
+
+## Object storage (MinIO)
+
+Photo uploads use S3-compatible storage (ADR-0014). Locally that is MinIO from `compose.dev.yml`
+(API `:9000`, console `:9001`). `minio-init` creates the `najme` bucket, allows anonymous read under
+`businesses/`, and sets CORS for `http://localhost:3001`.
+
+`STORAGE_*` defaults in `.env.example` match those containers. The API builds the S3 client lazily,
+so `pnpm dev` still boots if MinIO is down — uploads fail only when first used.
+
+**Physical devices:** set `STORAGE_PUBLIC_BASE_URL` (and usually `STORAGE_ENDPOINT` if the phone
+uploads via a LAN-reachable URL) to your machine’s LAN IP, e.g.
+`http://192.168.1.20:9000/najme`, not `localhost`. Same rule as `EXPO_PUBLIC_API_URL`.
 
 ### Web Playwright e2e (account flow)
 

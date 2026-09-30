@@ -31,5 +31,50 @@ services:
       timeout: 5s
       retries: 20
 
+  # S3-compatible object storage for photo uploads (ADR-0014). Console: http://localhost:9001
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_ACCESS_KEY:-minioadmin}
+    ports:
+      - '${MINIO_API_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+    volumes:
+      - najme_dev_minio:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # One-shot: create bucket, anonymous read on businesses/*, CORS for the web origin.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        set -e
+        for i in $$(seq 1 30); do
+          mc alias set local http://minio:9000 "$${STORAGE_ACCESS_KEY_ID}" "$${STORAGE_SECRET_ACCESS_KEY}" && break
+          sleep 1
+        done
+        mc mb --ignore-existing "local/$${STORAGE_BUCKET}"
+        mc anonymous set download "local/$${STORAGE_BUCKET}/businesses"
+        printf '%s' '{"CORSRules":[{"AllowedOrigins":["http://localhost:3001","http://127.0.0.1:3001"],"AllowedMethods":["GET","PUT","POST","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3000}]}' > /tmp/cors.json
+        mc cors set "local/$${STORAGE_BUCKET}" /tmp/cors.json || true
+    environment:
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-minioadmin}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-minioadmin}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-najme}
+    restart: 'no'
+
 volumes:
   najme_dev_pgdata:
+  najme_dev_minio:

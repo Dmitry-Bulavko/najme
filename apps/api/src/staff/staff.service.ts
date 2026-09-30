@@ -9,6 +9,7 @@ import { Clock } from '../common/clock.js';
 import { apiError } from '../common/errors/api-error.js';
 import { newId } from '../common/id.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { ObjectStorage } from '../storage/object-storage.js';
 
 const staffSelect = {
   id: true,
@@ -28,6 +29,7 @@ export class StaffService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly clock: Clock,
+    private readonly storage: ObjectStorage,
   ) {}
 
   async list(businessId: string): Promise<StaffMember[]> {
@@ -117,7 +119,7 @@ export class StaffService {
       id: row.id,
       businessId: row.businessId,
       displayName: row.displayName,
-      photoUrl: null,
+      photoUrl: this.storage.publicUrl(row.photoKey),
       active: row.active,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

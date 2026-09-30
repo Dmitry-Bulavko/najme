@@ -12,4 +12,5 @@ export * from './schedule.js';
 export * from './services.js';
 export * from './staff.js';
 export * from './time.js';
+export * from './uploads.js';
 export * from './users.js';

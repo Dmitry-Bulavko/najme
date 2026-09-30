@@ -20,7 +20,14 @@
         "SMTP_PASSWORD",
         "MAIL_FROM",
         "APP_WEB_URL",
-        "GOOGLE_CLIENT_IDS"
+        "GOOGLE_CLIENT_IDS",
+        "STORAGE_ENDPOINT",
+        "STORAGE_REGION",
+        "STORAGE_BUCKET",
+        "STORAGE_ACCESS_KEY_ID",
+        "STORAGE_SECRET_ACCESS_KEY",
+        "STORAGE_PUBLIC_BASE_URL",
+        "STORAGE_FORCE_PATH_STYLE"
       ]
     },
     "lint": {
@@ -47,7 +54,14 @@
         "MAIL_FROM",
         "APP_WEB_URL",
         "GOOGLE_CLIENT_IDS",
-        "MAILPIT_URL"
+        "MAILPIT_URL",
+        "STORAGE_ENDPOINT",
+        "STORAGE_REGION",
+        "STORAGE_BUCKET",
+        "STORAGE_ACCESS_KEY_ID",
+        "STORAGE_SECRET_ACCESS_KEY",
+        "STORAGE_PUBLIC_BASE_URL",
+        "STORAGE_FORCE_PATH_STYLE"
       ]
     },
     "dev": {
@@ -66,7 +80,14 @@
         "SMTP_PASSWORD",
         "MAIL_FROM",
         "APP_WEB_URL",
-        "GOOGLE_CLIENT_IDS"
+        "GOOGLE_CLIENT_IDS",
+        "STORAGE_ENDPOINT",
+        "STORAGE_REGION",
+        "STORAGE_BUCKET",
+        "STORAGE_ACCESS_KEY_ID",
+        "STORAGE_SECRET_ACCESS_KEY",
+        "STORAGE_PUBLIC_BASE_URL",
+        "STORAGE_FORCE_PATH_STYLE"
       ]
     }
   }

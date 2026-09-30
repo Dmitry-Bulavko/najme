@@ -19,5 +19,6 @@
   "GOOGLE_TOKEN_INVALID": "Google sign-in failed. Please try again.",
   "RATE_LIMITED": "Too many attempts. Please wait a moment and try again.",
   "SLUG_TAKEN": "This URL slug is already taken. Please choose another.",
-  "SLUG_LOCKED": "The URL slug can no longer be changed after the business is approved."
+  "SLUG_LOCKED": "The URL slug can no longer be changed after the business is approved.",
+  "UPLOAD_INVALID": "This upload is invalid or incomplete. Please choose another image and try again."
 }

@@ -30,6 +30,7 @@ export const ERROR_CODES = [
   // Businesses
   'SLUG_TAKEN',
   'SLUG_LOCKED',
+  'UPLOAD_INVALID',
 ] as const;
 
 /** Union of every known error code. */

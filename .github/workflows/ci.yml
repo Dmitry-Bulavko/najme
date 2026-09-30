@@ -50,6 +50,13 @@ jobs:
       MAIL_FROM: Najme <no-reply@najme.test>
       APP_WEB_URL: http://localhost:3001
       MAILPIT_URL: http://localhost:8025
+      STORAGE_ENDPOINT: http://localhost:9000
+      STORAGE_REGION: us-east-1
+      STORAGE_BUCKET: najme
+      STORAGE_ACCESS_KEY_ID: minioadmin
+      STORAGE_SECRET_ACCESS_KEY: minioadmin
+      STORAGE_PUBLIC_BASE_URL: http://localhost:9000/najme
+      STORAGE_FORCE_PATH_STYLE: 'true'
       TURBO_TELEMETRY_DISABLED: '1'
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
@@ -61,6 +68,21 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+
+      - name: Start MinIO
+        run: |
+          docker run -d --name najme-minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data
+          for _ in $(seq 30); do
+            if curl -sf http://localhost:9000/minio/health/live; then exit 0; fi
+            sleep 1
+          done
+          echo "MinIO did not become healthy"
+          docker logs najme-minio || true
+          exit 1
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -87,6 +109,13 @@ jobs:
           MAIL_FROM="Najme <no-reply@najme.test>"
           APP_WEB_URL=http://localhost:3001
           API_INTERNAL_URL=http://localhost:3000/api/v1
+          STORAGE_ENDPOINT=http://localhost:9000
+          STORAGE_REGION=us-east-1
+          STORAGE_BUCKET=najme
+          STORAGE_ACCESS_KEY_ID=minioadmin
+          STORAGE_SECRET_ACCESS_KEY=minioadmin
+          STORAGE_PUBLIC_BASE_URL=http://localhost:9000/najme
+          STORAGE_FORCE_PATH_STYLE=true
           EOF
           # Prove the root-.env-only path: DATABASE_URL must come from the file, not the job env.
           unset DATABASE_URL
@@ -193,6 +222,13 @@ jobs:
           MAIL_FROM="Najme <no-reply@najme.test>"
           APP_WEB_URL=http://localhost:3001
           API_INTERNAL_URL=http://localhost:3000/api/v1
+          STORAGE_ENDPOINT=http://localhost:9000
+          STORAGE_REGION=us-east-1
+          STORAGE_BUCKET=najme
+          STORAGE_ACCESS_KEY_ID=minioadmin
+          STORAGE_SECRET_ACCESS_KEY=minioadmin
+          STORAGE_PUBLIC_BASE_URL=http://localhost:9000/najme
+          STORAGE_FORCE_PATH_STYLE=true
           EOF
           unset DATABASE_URL
           pnpm --filter @najme/api db:migrate:deploy
