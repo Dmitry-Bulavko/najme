@@ -11,6 +11,21 @@ import { UnverifiedEmailBanner } from './unverified-email-banner';
 import { setAccessToken } from '@/lib/api/client';
 import { useEffect, type ReactElement, type ReactNode } from 'react';
 
+const toastSuccess = vi.fn();
+const toastError = vi.fn();
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: (...args: unknown[]) => toastSuccess(...args),
+    error: (...args: unknown[]) => toastError(...args),
+  },
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  useSearchParams: () => ({ get: vi.fn(() => null) }),
+}));
+
 const messages = {
   ...catalogs.en.common,
   ...catalogs.en.shell,
@@ -62,6 +77,9 @@ function renderBanner(me: Me) {
 
 beforeEach(() => {
   setAccessToken(null);
+  sessionStorage.clear();
+  toastSuccess.mockClear();
+  toastError.mockClear();
   vi.stubGlobal('fetch', vi.fn());
   vi.mocked(fetch).mockResolvedValue(
     makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
@@ -70,6 +88,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  sessionStorage.clear();
 });
 
 describe('UnverifiedEmailBanner', () => {
@@ -81,7 +100,7 @@ describe('UnverifiedEmailBanner', () => {
     });
   });
 
-  it('shows for unverified users and resends', async () => {
+  it('shows for unverified users and toasts on successful resend', async () => {
     renderBanner(unverifiedUser);
     const user = userEvent.setup();
 
@@ -96,11 +115,48 @@ describe('UnverifiedEmailBanner', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(catalogs.en.auth.unverifiedBanner.resent)).toBeInTheDocument();
+      expect(toastSuccess).toHaveBeenCalledWith(catalogs.en.auth.unverifiedBanner.resent);
     });
     expect(fetch).toHaveBeenCalledWith(
       '/api/v1/auth/verify-email/resend',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  it('toasts RATE_LIMITED on resend failure', async () => {
+    renderBanner(unverifiedUser);
+    const user = userEvent.setup();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('unverified-email-banner')).toBeInTheDocument();
+    });
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeJsonResponse({ error: { code: 'RATE_LIMITED', message: 'Slow down' } }, 429),
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: catalogs.en.auth.unverifiedBanner.resend }),
+    );
+
+    await waitFor(() => {
+      expect(toastError).toHaveBeenCalledWith(catalogs.en.errors.RATE_LIMITED);
+    });
+  });
+
+  it('hides after dismiss and persists in sessionStorage', async () => {
+    renderBanner(unverifiedUser);
+    const user = userEvent.setup();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('unverified-email-banner')).toBeInTheDocument();
+    });
+
+    await user.click(
+      screen.getByRole('button', { name: catalogs.en.auth.unverifiedBanner.dismiss }),
+    );
+
+    expect(screen.queryByTestId('unverified-email-banner')).not.toBeInTheDocument();
+    expect(sessionStorage.getItem('najme.unverified-email-banner.dismissed')).toBe('1');
   });
 });

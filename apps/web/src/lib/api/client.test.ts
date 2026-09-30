@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, apiRequest, refreshSession, setAccessToken } from './client';
+import {
+  ApiError,
+  apiRequest,
+  refreshSession,
+  setAccessToken,
+  setRefreshTokenReusedHandler,
+  withAuthRefreshLock,
+} from './client';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -19,10 +26,12 @@ function makeJsonResponse(body: unknown, status = 200) {
 
 beforeEach(() => {
   setAccessToken(null);
+  setRefreshTokenReusedHandler(null);
   vi.stubGlobal('fetch', vi.fn());
 });
 
 afterEach(() => {
+  setRefreshTokenReusedHandler(null);
   vi.restoreAllMocks();
 });
 
@@ -129,18 +138,7 @@ describe('401 retry with single-flight refresh', () => {
       },
     });
 
-    vi.mocked(fetch).mockImplementation((input) => {
-      const url = String(input);
-      if (url.includes('/auth/refresh')) {
-        refreshCount++;
-        return Promise.resolve(refreshResponse.clone());
-      }
-      // All other calls: return 401 first time, then 200
-      return Promise.resolve(makeJsonResponse({ ok: true }));
-    });
-
     // Fire two concurrent requests that both 401 on the first try.
-    // Override: first call to /api/v1/endpoint always 401, retry succeeds.
     vi.mocked(fetch).mockReset();
     let callCount = 0;
     vi.mocked(fetch).mockImplementation((input) => {
@@ -183,8 +181,26 @@ describe('401 retry with single-flight refresh', () => {
 });
 
 // ---------------------------------------------------------------------------
-// refreshSession tests
+// refreshSession / lock / reuse tests
 // ---------------------------------------------------------------------------
+
+describe('withAuthRefreshLock', () => {
+  it('uses navigator.locks.request when available', async () => {
+    const request = vi.fn(async (_name: string, fn: () => Promise<string>) => fn());
+    vi.stubGlobal('navigator', { locks: { request } });
+
+    const result = await withAuthRefreshLock(async () => 'ok');
+
+    expect(result).toBe('ok');
+    expect(request).toHaveBeenCalledWith('najme-auth-refresh', expect.any(Function));
+  });
+
+  it('runs the callback directly when locks are unavailable', async () => {
+    vi.stubGlobal('navigator', {});
+
+    await expect(withAuthRefreshLock(async () => 42)).resolves.toBe(42);
+  });
+});
 
 describe('refreshSession', () => {
   it('returns null and clears token when refresh returns non-2xx', async () => {
@@ -195,5 +211,45 @@ describe('refreshSession', () => {
 
     const token = await refreshSession();
     expect(token).toBeNull();
+  });
+
+  it('invokes the reuse handler and throws ApiError on REFRESH_TOKEN_REUSED', async () => {
+    setAccessToken('stale');
+    const onReuse = vi.fn();
+    setRefreshTokenReusedHandler(onReuse);
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeJsonResponse({ error: { code: 'REFRESH_TOKEN_REUSED', message: 'Token reused' } }, 401),
+    );
+
+    await expect(refreshSession()).rejects.toMatchObject({
+      code: 'REFRESH_TOKEN_REUSED',
+      status: 401,
+    });
+    expect(onReuse).toHaveBeenCalledOnce();
+  });
+
+  it('wraps doRefresh with the auth refresh lock', async () => {
+    const request = vi.fn(async (_name: string, fn: () => Promise<unknown>) => fn());
+    vi.stubGlobal('navigator', { locks: { request } });
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeJsonResponse({
+        accessToken: 'fresh',
+        accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+        user: {
+          id: 'u1',
+          email: 'a@b.com',
+          emailVerified: false,
+          displayName: null,
+          avatarUrl: null,
+          locale: 'en',
+          hasPassword: true,
+        },
+      }),
+    );
+
+    await expect(refreshSession()).resolves.toBe('fresh');
+    expect(request).toHaveBeenCalledWith('najme-auth-refresh', expect.any(Function));
   });
 });

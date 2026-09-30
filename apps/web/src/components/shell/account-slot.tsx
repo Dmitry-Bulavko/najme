@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -34,6 +34,7 @@ function getInitials(name: string | null, email: string): string {
  */
 export function AccountSlot() {
   const t = useTranslations('auth');
+  const locale = useLocale();
   const session = useSession();
   const router = useRouter();
 
@@ -44,7 +45,7 @@ export function AccountSlot() {
   if (session.state === 'anonymous') {
     return (
       <Link
-        href="/sign-in"
+        href={`/${locale}/sign-in`}
         className="rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
       >
         {t('header.signIn')}
@@ -76,13 +77,13 @@ export function AccountSlot() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/profile">{t('header.profile')}</Link>
+          <Link href={`/${locale}/account`}>{t('header.profile')}</Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={async () => {
             await signOut();
-            router.replace('/');
+            router.replace(`/${locale}`);
           }}
         >
           {t('header.signOut')}

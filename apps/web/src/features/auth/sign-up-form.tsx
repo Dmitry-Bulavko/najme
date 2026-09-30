@@ -6,7 +6,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
@@ -41,11 +41,20 @@ export function SignUpForm() {
   const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signIn } = useSession();
+  const session = useSession();
+  const { signIn } = session;
   const [showPassword, setShowPassword] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const passwordId = useId();
   const passwordErrorId = `${passwordId}-error`;
+
+  // Already signed in — skip the form and honour ?next= (or home).
+  useEffect(() => {
+    if (session.state === 'authenticated') {
+      const next = searchParams.get('next');
+      router.replace(next ?? `/${locale}`);
+    }
+  }, [locale, router, searchParams, session.state]);
 
   const {
     register,

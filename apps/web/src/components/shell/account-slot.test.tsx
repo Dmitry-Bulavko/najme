@@ -17,6 +17,10 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => ({ get: vi.fn(() => null) }),
 }));
 
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -73,7 +77,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('AccountSlot', () => {
-  it('renders a "Sign in" link when the user is anonymous', async () => {
+  it('renders a locale-prefixed "Sign in" link when the user is anonymous', async () => {
     vi.mocked(fetch).mockResolvedValue(
       makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
     );
@@ -85,6 +89,10 @@ describe('AccountSlot', () => {
         screen.getByRole('link', { name: catalogs.en.auth.header.signIn }),
       ).toBeInTheDocument();
     });
+    expect(screen.getByRole('link', { name: catalogs.en.auth.header.signIn })).toHaveAttribute(
+      'href',
+      '/en/sign-in',
+    );
   });
 
   it('renders the avatar button with initials when authenticated', async () => {

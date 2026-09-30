@@ -8,9 +8,15 @@ import { AuthProvider } from './session-context';
 import { GoogleSignInButton } from './google-sign-in-button';
 import { setAccessToken } from '@/lib/api/client';
 
+const replace = vi.fn();
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace }),
   useSearchParams: () => ({ get: () => null }),
+}));
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
 }));
 
 const messages = {
@@ -27,6 +33,42 @@ function makeJsonResponse(body: unknown, status = 200) {
   });
 }
 
+const fakeUser = {
+  id: 'u1',
+  email: 'alice@example.com',
+  emailVerified: true,
+  displayName: 'Alice',
+  avatarUrl: null,
+  locale: 'en' as const,
+  hasPassword: false,
+};
+
+type GisCallback = (response: { credential: string }) => void;
+
+function installGisMock() {
+  let capturedCallback: GisCallback | null = null;
+  const initialize = vi.fn((config: { callback: GisCallback }) => {
+    capturedCallback = config.callback;
+  });
+  const renderButton = vi.fn();
+
+  Object.defineProperty(window, 'google', {
+    configurable: true,
+    writable: true,
+    value: {
+      accounts: {
+        id: { initialize, renderButton },
+      },
+    },
+  });
+
+  return {
+    initialize,
+    renderButton,
+    getCallback: () => capturedCallback,
+  };
+}
+
 function renderButton() {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
@@ -39,16 +81,19 @@ function renderButton() {
 
 beforeEach(() => {
   setAccessToken(null);
+  replace.mockClear();
   vi.stubGlobal('fetch', vi.fn());
   vi.mocked(fetch).mockResolvedValue(
     makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
   );
   vi.unstubAllEnvs();
+  Reflect.deleteProperty(window, 'google');
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
+  Reflect.deleteProperty(window, 'google');
 });
 
 describe('GoogleSignInButton', () => {
@@ -77,6 +122,92 @@ describe('GoogleSignInButton', () => {
       if (host) {
         expect(host).toHaveClass('hidden');
       }
+    });
+  });
+
+  it('posts the GIS credential and redirects on success', async () => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'web-client.apps.googleusercontent.com');
+    // loadGisScript short-circuits when window.google.accounts.id already exists.
+    const gis = installGisMock();
+
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('/auth/refresh')) {
+        return Promise.resolve(
+          makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
+        );
+      }
+      if (url.includes('/auth/providers')) {
+        return Promise.resolve(makeJsonResponse({ google: true }));
+      }
+      if (url.includes('/auth/google')) {
+        return Promise.resolve(
+          makeJsonResponse({
+            accessToken: 'tok',
+            accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+            user: fakeUser,
+          }),
+        );
+      }
+      return Promise.resolve(
+        makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
+      );
+    });
+
+    renderButton();
+
+    await waitFor(() => {
+      expect(gis.initialize).toHaveBeenCalled();
+    });
+
+    const callback = gis.getCallback();
+    expect(callback).not.toBeNull();
+    callback!({ credential: 'gis-id-token' });
+
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledWith('/en');
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/auth/google',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('shows GOOGLE_TOKEN_INVALID when the API rejects the credential', async () => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'web-client.apps.googleusercontent.com');
+    const gis = installGisMock();
+
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('/auth/refresh')) {
+        return Promise.resolve(
+          makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
+        );
+      }
+      if (url.includes('/auth/providers')) {
+        return Promise.resolve(makeJsonResponse({ google: true }));
+      }
+      if (url.includes('/auth/google')) {
+        return Promise.resolve(
+          makeJsonResponse({ error: { code: 'GOOGLE_TOKEN_INVALID', message: 'bad' } }, 401),
+        );
+      }
+      return Promise.resolve(
+        makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
+      );
+    });
+
+    renderButton();
+
+    await waitFor(() => {
+      expect(gis.initialize).toHaveBeenCalled();
+    });
+
+    gis.getCallback()!({ credential: 'bad-token' });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(catalogs.en.errors.GOOGLE_TOKEN_INVALID);
     });
   });
 });

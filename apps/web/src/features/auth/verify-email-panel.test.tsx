@@ -15,6 +15,10 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => ({ get: getParam }),
 }));
 
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
 const messages = {
   ...catalogs.en.common,
   ...catalogs.en.shell,

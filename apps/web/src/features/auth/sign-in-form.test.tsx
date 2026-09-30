@@ -21,6 +21,10 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => ({ get: getParam }),
 }));
 
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -224,5 +228,24 @@ describe('SignInForm', () => {
 
     await user.click(screen.getByLabelText(catalogs.en.auth.signIn.hidePassword as string));
     expect(input).toHaveAttribute('type', 'password');
+  });
+
+  it('redirects authenticated users to home (or ?next=)', async () => {
+    getParam.mockReturnValue('/en/bookings');
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({
+          accessToken: 'tok',
+          accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+          user: fakeUser,
+        }),
+      )
+      .mockResolvedValueOnce(makeJsonResponse(fakeUser));
+
+    renderForm();
+
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledWith('/en/bookings');
+    });
   });
 });

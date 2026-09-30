@@ -7,6 +7,15 @@ import { catalogs } from '@najme/i18n';
 import { useSession, AuthProvider } from './session-context';
 import { setAccessToken } from '@/lib/api/client';
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  useSearchParams: () => ({ get: vi.fn(() => null) }),
+}));
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

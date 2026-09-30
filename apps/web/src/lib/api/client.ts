@@ -4,6 +4,7 @@
  * - Base path: `/api/v1` (same-origin; dev rewrite in next.config.ts, Caddy in prod).
  * - Attaches `Authorization: Bearer <accessToken>` from the in-memory store.
  * - On 401: performs a single-flight POST /auth/refresh then retries the original request once.
+ * - Cross-tab refresh is serialized via `navigator.locks` when available.
  * - Throws ApiError on any non-2xx response.
  */
 import { apiErrorResponseSchema, type AuthSession } from '@najme/contracts';
@@ -36,6 +37,29 @@ export function setAccessToken(token: string | null): void {
 /** Pending refresh promise for single-flight deduplication (ADR-0010). */
 let refreshingPromise: Promise<string | null> | null = null;
 
+/** Called when refresh fails with REFRESH_TOKEN_REUSED (all sessions revoked). */
+let refreshTokenReusedHandler: (() => void) | null = null;
+
+/** Registers a handler for refresh-token reuse; pass `null` to clear. */
+export function setRefreshTokenReusedHandler(handler: (() => void) | null): void {
+  refreshTokenReusedHandler = handler;
+}
+
+/**
+ * Serializes auth refresh across tabs via Web Locks when available; falls back to running
+ * `fn` directly (in-tab single-flight still applies via `refreshingPromise`).
+ */
+export async function withAuthRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks =
+    typeof navigator !== 'undefined'
+      ? (navigator as Navigator & { locks?: LockManager }).locks
+      : undefined;
+  if (locks?.request) {
+    return locks.request('najme-auth-refresh', () => fn());
+  }
+  return fn();
+}
+
 /** Executes POST /auth/refresh, returning the new access token or null on failure. */
 async function doRefresh(): Promise<string | null> {
   try {
@@ -46,12 +70,31 @@ async function doRefresh(): Promise<string | null> {
     });
     if (!res.ok) {
       accessToken = null;
+      let errorBody: unknown;
+      try {
+        errorBody = await res.json();
+      } catch {
+        return null;
+      }
+      const parsed = apiErrorResponseSchema.safeParse(errorBody);
+      if (parsed.success && parsed.data.error.code === 'REFRESH_TOKEN_REUSED') {
+        refreshTokenReusedHandler?.();
+        throw new ApiError(
+          'REFRESH_TOKEN_REUSED',
+          parsed.data.error.message,
+          res.status,
+          parsed.data.error.details,
+        );
+      }
       return null;
     }
     const data = (await res.json()) as AuthSession;
     accessToken = data.accessToken;
     return data.accessToken;
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
     accessToken = null;
     return null;
   }
@@ -59,13 +102,14 @@ async function doRefresh(): Promise<string | null> {
 
 /**
  * Single-flight refresh: concurrent 401 responses all await the same in-flight refresh rather
- * than firing multiple POST /auth/refresh requests (ADR-0010).
+ * than firing multiple POST /auth/refresh requests (ADR-0010). Cross-tab callers are serialized
+ * with `withAuthRefreshLock`.
  */
 export async function refreshSession(): Promise<string | null> {
   if (refreshingPromise) {
     return refreshingPromise;
   }
-  refreshingPromise = doRefresh().finally(() => {
+  refreshingPromise = withAuthRefreshLock(doRefresh).finally(() => {
     refreshingPromise = null;
   });
   return refreshingPromise;

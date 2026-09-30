@@ -10,6 +10,8 @@
  *   authenticated(me) — signed in
  */
 import { type Me, meSchema } from '@najme/contracts';
+import { useLocale, useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import {
   createContext,
   useCallback,
@@ -20,8 +22,15 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { toast } from 'sonner';
 
-import { ApiError, apiRequest, refreshSession, setAccessToken } from '@/lib/api/client';
+import {
+  ApiError,
+  apiRequest,
+  refreshSession,
+  setAccessToken,
+  setRefreshTokenReusedHandler,
+} from '@/lib/api/client';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,6 +72,9 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session>({ state: 'loading' });
   const hasMounted = useRef(false);
+  const locale = useLocale();
+  const router = useRouter();
+  const tErrors = useTranslations('errors');
 
   const signIn = useCallback((accessToken: string, me: Me) => {
     setAccessToken(accessToken);
@@ -82,6 +94,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateMe = useCallback((me: Me) => {
     setSession((prev) => (prev.state === 'authenticated' ? { ...prev, me } : prev));
   }, []);
+
+  // Refresh-token reuse: clear session, notify, and send the user to sign-in (ADR-0010).
+  useEffect(() => {
+    setRefreshTokenReusedHandler(() => {
+      setAccessToken(null);
+      setSession({ state: 'anonymous' });
+      toast.error(tErrors('REFRESH_TOKEN_REUSED'));
+      router.replace(`/${locale}/sign-in`);
+    });
+    return () => setRefreshTokenReusedHandler(null);
+  }, [locale, router, tErrors]);
 
   useEffect(() => {
     if (hasMounted.current) {
@@ -108,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession({ state: 'authenticated', me: parsed.data });
       } catch (error) {
         if (error instanceof ApiError && error.code === 'REFRESH_TOKEN_REUSED') {
-          // All sessions revoked — send to sign-in.
+          // Handler already cleared token / toasted / redirected; keep anonymous.
           setAccessToken(null);
         }
         setSession({ state: 'anonymous' });
