@@ -127,5 +127,5 @@ schema change, run `pnpm --filter @najme/api db:generate`, or any turbo task suc
 ## Claude Code
 
 - Cloud sessions run `.claude/hooks/session-start.sh`, which installs dependencies automatically.
-- Typical requests: "implement the next task" (`/implement`), `/manager status`,
-  `/manager plan "<goal>"`.
+- Typical requests: "ревью" / `/review`, `/manager status`, `/manager plan "<goal>"`;
+  `/implement` only as the fallback when Cursor is unavailable (ADR-0012).

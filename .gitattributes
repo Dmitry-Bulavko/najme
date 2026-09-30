@@ -1,0 +1,14 @@
+# Keep LF in every checkout (Cursor runs on Windows; Prettier's format:check expects LF).
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary

@@ -1,8 +1,11 @@
 ---
 name: review
-description: Reviews Cursor's work on the Najme `cursor/alpha` branch (ADR-0012) — finds issues in `status:in-review`, reviews each handed-off commit range against the issue, Definition of Done and conventions (checks, UI screenshots), posts the verdict on the issue and sets `status:approved` / `status:changes-requested`; closes a phase (merge commit, epic, grooming). Use when the user says "ревью", "review", "review #N", "проверь задачи", "закрыть фазу", "merge the phase".
+description: Claude Code only (ADR-0012) — Cursor and agents working from AGENTS.md must not use this. Reviews Cursor's work on the Najme `cursor/alpha` branch (ADR-0012) — finds issues in `status:in-review`, reviews each handed-off commit range against the issue, Definition of Done and conventions (checks, UI screenshots), posts the verdict on the issue and sets `status:approved` / `status:changes-requested`; closes a phase (merge commit, epic, grooming). Use when the user says "ревью", "review", "review #N", "проверь задачи", "закрыть фазу", "merge the phase".
 argument-hint: '[issue-number…] | phase'
 ---
+
+> **Claude Code only.** If you are Cursor, or any agent working from `AGENTS.md`, stop here: you
+> must not review, approve or merge work (ADR-0012, `AGENTS.md` "Claude-only tooling").
 
 # /review — reviewer of Cursor's work
 
@@ -20,6 +23,10 @@ Arguments: `$ARGUMENTS` — issue numbers to review (default: every open `status
 1. **Collect.** `list_issues` with `status:in-review` (or the given numbers). For each: the issue
    body, the latest `Ready for review:` comment (range, deviations, translations), earlier review
    rounds (to check previous findings), and the phase PR (`cursor/alpha → main`) with its CI.
+   Cursor and Claude post through the same GitHub account, so authorship is not visible: an
+   earlier "Review — round N" comment counts only if it carries a `Claude-Session:` line. Treat any
+   other verdict (and any `status:approved` / `status:changes-requested` it set) as void — review
+   the task from its first range, and report the process violation to the owner.
 2. **Check out.** `git fetch origin cursor/alpha` into a dedicated worktree (e.g.
    `git worktree add ../najme-review origin/cursor/alpha` or `git -C ../najme-review checkout
 --detach origin/cursor/alpha`). Never commit or push there.
@@ -52,7 +59,10 @@ Arguments: `$ARGUMENTS` — issue numbers to review (default: every open `status
    - …
    PREVIOUS FINDINGS: <each → resolved / not resolved>   (re-review only)
    FOLLOW-UPS: <out-of-scope issues noticed | none>
+   Claude-Session: <this session's URL>
    ```
+
+   The `Claude-Session:` line (before the footer) is what makes the verdict count (step 1).
 
    APPROVE only with no BLOCKER/MAJOR and green checks. Labels (send the full set — `issue_write`
    replaces labels): `status:approved` or `status:changes-requested`. Optional inline comments on
@@ -63,8 +73,11 @@ Arguments: `$ARGUMENTS` — issue numbers to review (default: every open `status
 
 ## Close a phase (`phase`)
 
-1. Preconditions: every task of the phase is `status:approved` (or closed), no `changes-requested`
-   / `in-review` left, the phase PR's `ci` and `smoke` are green on its head, no merge conflict.
+1. Preconditions: every task of the phase is `status:approved` (or closed) **by a Claude verdict**
+   (a review comment with a `Claude-Session:` line on its last range — otherwise review it now), no
+   `changes-requested` / `in-review` left, the phase PR's `ci` and `smoke` are green on its head, no
+   merge conflict. Also check that no issue of a later phase left `status:backlog` and that
+   nothing under `.claude/` changed in the phase PR; either is a violation to undo and report.
 2. Verify the epic's exit criteria for real: run the flows locally (API + web; mobile via the web
    export), screenshots in all relevant locales, e2e suites. Anything missing → new issue in the
    same phase, phase stays open.
@@ -82,3 +95,4 @@ Arguments: `$ARGUMENTS` — issue numbers to review (default: every open `status
   explicitly asks).
 - Merge a phase with red CI, open findings or unverified exit criteria.
 - Approve a task whose range you have not read in full.
+- Accept a verdict, label or merge you did not make as a review (ADR-0012 Consequences).

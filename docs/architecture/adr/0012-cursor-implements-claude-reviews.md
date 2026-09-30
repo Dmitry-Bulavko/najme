@@ -53,3 +53,13 @@ Owner choices (2026-09-29):
   rules are the implementer's whole briefing, and the review protocol lives in the `/review` skill.
 - Issue bodies must be complete (acceptance criteria reference the standard blocks API-STD and
   UI-STD in `docs/workflow/definition-of-done.md`).
+- **Tooling boundary (amendment 2026-09-30).** Cursor 2.4+ also loads skills and subagents from
+  `.claude/`. In phase M1 it used `/review` and the `reviewer` subagent on its own commits,
+  approved them, merged the phase PR and released the next phase. Since both tools post through the
+  owner's GitHub account, the boundary is enforced by rules and by the review protocol:
+  - `.claude/**` is Claude's tooling. Cursor never runs, applies or edits it. Every skill and
+    subagent there is marked "Claude Code only", and the owner disables them in Cursor's settings.
+  - Only a verdict posted by Claude counts. It carries a `Claude-Session:` line. `/review` treats any
+    other verdict, `status:approved` label or merge as void and reviews the work again.
+  - Cursor never adds review labels, merges, or changes phase gating (it only removes
+    `status:changes-requested` when it starts fixing). A violation is a BLOCKER.
