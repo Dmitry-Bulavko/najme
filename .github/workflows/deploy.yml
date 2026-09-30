@@ -57,8 +57,11 @@ jobs:
           context: .
           file: apps/${{ matrix.app }}/Dockerfile
           push: true
+          # GOOGLE_WEB_CLIENT_ID is a public repository variable (not a secret). Unused on the api
+          # image (Docker may warn); required for the web image so GIS is baked into next build.
           build-args: |
             GIT_SHA=${{ github.sha }}
+            NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID=${{ vars.GOOGLE_WEB_CLIENT_ID }}
           tags: |
             ${{ env.IMAGE_PREFIX }}-${{ matrix.app }}:${{ github.sha }}
             ${{ env.IMAGE_PREFIX }}-${{ matrix.app }}:production

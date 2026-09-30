@@ -5,7 +5,7 @@
  *
  * Shown only when both:
  *   - GET /auth/providers returns `{ google: true }` (API has GOOGLE_CLIENT_IDS), and
- *   - NEXT_PUBLIC_GOOGLE_CLIENT_ID is set (web GIS client).
+ *   - NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID is set (web GIS client).
  * Otherwise renders nothing so sign-in/up pages stay clean without #58 credentials.
  */
 import { isLocale } from '@najme/i18n';
@@ -91,7 +91,7 @@ export function GoogleSignInButton() {
   const buttonHostRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() ?? '';
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() ?? '';
 
   useEffect(() => {
     if (!clientId) {
