@@ -94,3 +94,31 @@ model EmailToken {
   @@index([userId])
   @@map("email_tokens")
 }
+
+// Platform-managed classification; seeded by migration (docs/architecture/data-model.md).
+// `archivedAt` lands in M6-04 — categories are archived, never hard-deleted.
+model Category {
+  id        String   @id @db.Uuid
+  slug      String   @unique
+  iconKey   String?  @map("icon_key")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  translations CategoryTranslation[]
+
+  @@map("categories")
+}
+
+// No timestamps: translation rows are replaceable configuration (data-model conventions).
+model CategoryTranslation {
+  id         String @id @db.Uuid
+  categoryId String @map("category_id") @db.Uuid
+  locale     String
+  name       String
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, locale])
+  @@map("category_translations")
+}

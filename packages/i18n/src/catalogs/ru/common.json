@@ -28,6 +28,33 @@
   "languageSwitcher": {
     "label": "Язык"
   },
+  "cities": {
+    "ANDRIJEVICA": "Андриевица",
+    "BAR": "Бар",
+    "BERANE": "Беране",
+    "BIJELO_POLJE": "Биело Поле",
+    "BUDVA": "Будва",
+    "CETINJE": "Цетине",
+    "DANILOVGRAD": "Даниловград",
+    "GUSINJE": "Гусине",
+    "HERCEG_NOVI": "Херцег-Нови",
+    "KOLASIN": "Колашин",
+    "KOTOR": "Котор",
+    "MOJKOVAC": "Мойковац",
+    "NIKSIC": "Никшич",
+    "PETNJICA": "Петница",
+    "PLAV": "Плав",
+    "PLJEVLJA": "Плевля",
+    "PLUZINE": "Плужине",
+    "PODGORICA": "Подгорица",
+    "ROZAJE": "Рожае",
+    "SAVNIK": "Шавник",
+    "TIVAT": "Тиват",
+    "TUZI": "Тузи",
+    "ULCINJ": "Улцинь",
+    "ZABLJAK": "Жабляк",
+    "ZETA": "Зета"
+  },
   "tabs": {
     "discover": "Поиск",
     "bookings": "Записи",

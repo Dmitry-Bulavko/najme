@@ -1,4 +1,6 @@
 export * from './auth.js';
+export * from './categories.js';
+export * from './cities.js';
 export * from './error.js';
 export * from './health.js';
 export * from './locale.js';
