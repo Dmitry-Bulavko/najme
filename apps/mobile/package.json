@@ -32,6 +32,7 @@
     "@najme/i18n": "workspace:*",
     "@najme/ui-tokens": "workspace:*",
     "@react-native-async-storage/async-storage": "~2.2.0",
+    "@react-native-community/datetimepicker": "^9.2.1",
     "@react-native-google-signin/google-signin": "^16.1.5",
     "@tanstack/react-query": "^5.104.0",
     "expo": "~57.0.25",

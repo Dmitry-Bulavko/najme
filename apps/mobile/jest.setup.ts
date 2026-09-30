@@ -39,4 +39,16 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
   },
 }));
 
+// datetimepicker is native-only; provide a lightweight stub for unit tests.
+jest.mock('@react-native-community/datetimepicker', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react') as typeof import('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { View } = require('react-native') as typeof import('react-native');
+  function MockDateTimePicker(): React.ReactElement {
+    return React.createElement(View, { testID: 'mock-datetimepicker' });
+  }
+  return { __esModule: true, default: MockDateTimePicker };
+});
+
 process.env.EXPO_PUBLIC_API_URL = 'http://localhost:3000/api/v1';
