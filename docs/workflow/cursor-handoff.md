@@ -15,12 +15,12 @@ briefing is `AGENTS.md` + `.cursor/rules/` + `.cursor/commands/`; Claude's proto
 4. In Cursor settings, keep the agent's terminal allow-list conservative: it must never run
    `git push --force`, `git push origin main`, or read `.env` (the rules forbid it; a deny-list is
    a second line of defence).
-5. **Hide Claude's tooling from Cursor.** Cursor also loads skills and subagents from `.claude/`
-   (`implement`, `manager`, `review`, `implementer`, `reviewer`). In phase M1 Cursor used them to
-   review, approve and merge its own work. In Cursor Settings → Rules / Skills / Subagents, disable
-   those five entries, or turn off importing third-party (Claude Code) skills and agents if your
-   Cursor version has that switch. `AGENTS.md` forbids using them either way; this removes them from
-   the agent's menu.
+5. **Hide Claude's skills from Cursor.** Cursor also loads skills from `.claude/skills`
+   (`implement`, `manager`, `review`). In phase M1 Cursor used `/review` to approve and merge its own
+   work. In Cursor Settings → Rules / Skills, disable those three skills. The subagents
+   `implementer` and `reviewer` (`.claude/agents`) stay available to Cursor as helpers, with no
+   model or effort pinned, so they run on the model you pick in Cursor. `AGENTS.md` still forbids
+   treating their output as a review verdict.
 6. **Windows.** The repository pins LF line endings (`.gitattributes`). With a clean working tree,
    refresh an existing checkout once: `git rm -r -q --cached . && git reset --hard`. Otherwise
    `format:check` fails on CRLF files. API e2e needs the native `@node-rs/argon2` binding; if
