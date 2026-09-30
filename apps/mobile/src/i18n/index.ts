@@ -10,11 +10,11 @@ import { initReactI18next } from 'react-i18next';
 export const LOCALE_STORAGE_KEY = 'najme.locale';
 
 /**
- * Catalog namespaces loaded into i18next. Excludes server-only `emails` (and later
- * `notifications`) so UI namespaces need no per-feature wiring (#55).
+ * Catalog namespaces loaded into i18next. Excludes server-only namespaces (`emails`,
+ * `notifications`) so UI namespaces need no per-feature wiring (#55, #148).
  */
-const UI_NAMESPACES = (Object.keys(catalogs.en) as (keyof Namespaces)[]).filter(
-  (ns) => ns !== 'emails',
+export const UI_NAMESPACES = (Object.keys(catalogs.en) as (keyof Namespaces)[]).filter(
+  (ns) => ns !== 'emails' && (ns as string) !== 'notifications',
 );
 
 const resources = Object.fromEntries(
@@ -81,4 +81,4 @@ export async function setLocale(locale: Locale): Promise<void> {
   await i18next.changeLanguage(locale);
 }
 
-export { i18next, UI_NAMESPACES };
+export { i18next };

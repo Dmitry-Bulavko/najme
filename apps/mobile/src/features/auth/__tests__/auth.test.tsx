@@ -8,6 +8,9 @@ import { AuthProvider, useSession } from '@/features/auth/auth-provider';
 import { canOfferGoogleSignIn, googleEnvConfigured } from '@/features/auth/google-availability';
 import { GoogleSignInButton } from '@/features/auth/google-sign-in-button';
 import { SignInForm } from '@/features/auth/sign-in-form';
+import { SignUpForm } from '@/features/auth/sign-up-form';
+import { ForgotPasswordForm } from '@/features/auth/forgot-password-form';
+import { UnverifiedEmailBanner } from '@/features/auth/unverified-email-banner';
 import { clearSessionTokens, setAccessToken } from '@/lib/api/client';
 import { getRefreshToken, setRefreshToken } from '@/lib/api/token-storage';
 import { initTestI18n, renderWithI18n } from '@/test-utils/i18n';
@@ -320,6 +323,46 @@ describe('GoogleSignInButton visibility', () => {
   });
 });
 
+describe('GoogleSignInButton visibility', () => {
+  it('renders nothing in Expo Go even when env is configured', async () => {
+    jest.mocked(googleEnvConfigured).mockReturnValue(true);
+    // canOfferGoogleSignIn returns false when running in Expo Go (native module unavailable).
+    jest.mocked(canOfferGoogleSignIn).mockReturnValue(false);
+
+    const { queryByTestId } = await renderWithI18n(
+      <Harness>
+        <GoogleSignInButton />
+      </Harness>,
+    );
+
+    expect(queryByTestId('google-sign-in')).toBeNull();
+  });
+
+  it('renders the button when env is configured and native module is available', async () => {
+    jest.mocked(googleEnvConfigured).mockReturnValue(true);
+    jest.mocked(canOfferGoogleSignIn).mockReturnValue(true);
+    mockRouterCanGoBack.mockReturnValue(false);
+
+    jest.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/providers')) {
+        return makeJsonResponse({ google: true, password: true });
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    const screen = await renderWithI18n(
+      <Harness>
+        <GoogleSignInButton />
+      </Harness>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('google-sign-in')).toBeTruthy();
+    });
+  });
+});
+
 describe('GoogleSignInButton navigation', () => {
   it('replaces to account after a successful Google sign-in when the stack is empty', async () => {
     jest.mocked(googleEnvConfigured).mockReturnValue(true);
@@ -391,5 +434,104 @@ describe('GoogleSignInButton navigation', () => {
       expect(mockRouterBack).toHaveBeenCalled();
     });
     expect(mockRouterReplace).not.toHaveBeenCalled();
+  });
+});
+
+describe('SignUpForm', () => {
+  it('shows inline validation errors on empty submit', async () => {
+    const { getByLabelText, findAllByRole } = await renderWithI18n(
+      <Harness>
+        <SignUpForm />
+      </Harness>,
+    );
+
+    await act(async () => {
+      fireEvent.press(getByLabelText(catalogs.en.auth.signUp.submit));
+    });
+
+    const alerts = await findAllByRole('alert');
+    expect(alerts.length).toBeGreaterThan(0);
+  });
+
+  it('maps API error codes to the errors catalog', async () => {
+    jest
+      .mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'EMAIL_TAKEN', message: 'exists' } }, 409),
+      );
+
+    const { getByLabelText, findByText } = await renderWithI18n(
+      <Harness>
+        <SignUpForm />
+      </Harness>,
+    );
+
+    await act(async () => {
+      fireEvent.changeText(getByLabelText(catalogs.en.auth.signUp.emailLabel), 'user@example.com');
+      fireEvent.changeText(getByLabelText(catalogs.en.auth.signUp.passwordLabel), 'password1');
+      fireEvent.press(getByLabelText(catalogs.en.auth.signUp.submit));
+    });
+
+    expect(await findByText(catalogs.en.errors.EMAIL_TAKEN)).toBeTruthy();
+  });
+});
+
+describe('ForgotPasswordForm', () => {
+  it('shows the sent-confirmation screen after a successful submit', async () => {
+    jest.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const { getByLabelText, findByText } = await renderWithI18n(<ForgotPasswordForm />);
+
+    await act(async () => {
+      fireEvent.changeText(
+        getByLabelText(catalogs.en.auth.forgotPassword.emailLabel),
+        'user@example.com',
+      );
+      fireEvent.press(getByLabelText(catalogs.en.auth.forgotPassword.submit));
+    });
+
+    expect(await findByText(catalogs.en.auth.forgotPassword.sentTitle)).toBeTruthy();
+  });
+});
+
+describe('UnverifiedEmailBanner', () => {
+  const meUnverified = {
+    ...me,
+    emailVerified: false,
+  };
+
+  it('calls resend and shows the confirmation on success', async () => {
+    jest.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/refresh')) {
+        return makeJsonResponse(sessionBody('access', 'rt-2'));
+      }
+      if (url.includes('/me')) {
+        return makeJsonResponse(meUnverified);
+      }
+      if (url.includes('/auth/verify-email/resend')) {
+        return new Response(null, { status: 204 });
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+    await setRefreshToken('rt-banner');
+
+    const screen = await renderWithI18n(
+      <Harness>
+        <UnverifiedEmailBanner />
+      </Harness>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('unverified-email-banner')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText(catalogs.en.auth.unverifiedBanner.resend));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(catalogs.en.auth.unverifiedBanner.resent)).toBeTruthy();
+    });
   });
 });

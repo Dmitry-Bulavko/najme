@@ -85,12 +85,30 @@ export function withAuthMutex<T>(operation: () => Promise<T>): Promise<T> {
   return next;
 }
 
-function apiBaseUrl(): string {
+/** Returns the API base URL, throwing if the env var is unset. */
+export function apiBaseUrl(): string {
   const base = process.env.EXPO_PUBLIC_API_URL?.trim();
   if (!base) {
     throw new ApiError('HTTP_ERROR', 'EXPO_PUBLIC_API_URL is not set', 0);
   }
   return base.replace(/\/$/, '');
+}
+
+/**
+ * Parses an API error envelope and returns a typed `ApiError`. Falls back to a generic
+ * `HTTP_ERROR` when the body does not match the error schema.
+ */
+export function parseErrorEnvelope(errorBody: unknown, status: number): ApiError {
+  const parsed = apiErrorResponseSchema.safeParse(errorBody);
+  if (parsed.success) {
+    return new ApiError(
+      parsed.data.error.code,
+      parsed.data.error.message,
+      status,
+      parsed.data.error.details,
+    );
+  }
+  return new ApiError('HTTP_ERROR', `HTTP ${status}`, status);
 }
 
 /** True when the refresh response proves the stored token must be discarded. */
@@ -105,6 +123,17 @@ function isDefinitiveRefreshRejection(status: number, code: string | undefined):
     return true;
   }
   return false;
+}
+
+/**
+ * Performs a token refresh directly, without acquiring `withAuthMutex`. For use inside an
+ * already-held mutex (e.g. `changePasswordWithLock`) where re-entering the mutex would deadlock.
+ *
+ * @returns New access token, or `null` on definitive rejection (tokens cleared).
+ * @throws {TransientAuthError} When the network / server failure is temporary (tokens kept).
+ */
+export async function refreshWithoutMutex(): Promise<string | null> {
+  return doRefresh();
 }
 
 async function doRefresh(): Promise<string | null> {
@@ -240,7 +269,17 @@ export async function apiRequest<T>(
     if (!text) {
       return undefined as T;
     }
-    return JSON.parse(text) as T;
+    // Wrap JSON.parse: a non-JSON 2xx body (e.g. a proxy HTML error page) raises a typed
+    // ApiError instead of a raw SyntaxError.
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new ApiError(
+        'HTTP_ERROR',
+        `HTTP ${response.status}: response is not JSON`,
+        response.status,
+      );
+    }
   }
 
   let errorBody: unknown;
@@ -254,15 +293,5 @@ export async function apiRequest<T>(
     );
   }
 
-  const parsed = apiErrorResponseSchema.safeParse(errorBody);
-  if (parsed.success) {
-    throw new ApiError(
-      parsed.data.error.code,
-      parsed.data.error.message,
-      response.status,
-      parsed.data.error.details,
-    );
-  }
-
-  throw new ApiError('HTTP_ERROR', `HTTP ${response.status}`, response.status);
+  throw parseErrorEnvelope(errorBody, response.status);
 }

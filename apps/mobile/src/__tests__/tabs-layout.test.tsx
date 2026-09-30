@@ -7,13 +7,19 @@ import ICU from 'i18next-icu';
 import type { ReactNode } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
+import { TAB_BAR_BASE_HEIGHT, TAB_LABEL_LINE_HEIGHT } from '../components/ui/theme';
 import TabsLayout from '../app/(tabs)/_layout';
 
 // `expo-router`'s real `Tabs`/`Tabs.Screen` render native tab-bar chrome that isn't meaningful in a
 // unit test; this test double renders each screen's `options.title` as plain text so the localized
 // tab titles are observable via Testing Library, while exercising the real `TabsLayout` component
 // (and its `useTranslation()` call) end to end.
-const tabsScreenOptions: { current?: { tabBarActiveTintColor?: string } } = {};
+interface CapturedScreenOptions {
+  tabBarActiveTintColor?: string;
+  tabBarStyle?: { height?: number; [key: string]: unknown };
+  tabBarLabelStyle?: { lineHeight?: number; [key: string]: unknown };
+}
+const tabsScreenOptions: { current?: CapturedScreenOptions } = {};
 
 jest.mock('expo-router', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
@@ -24,7 +30,7 @@ jest.mock('expo-router', () => {
     screenOptions,
   }: {
     children: ReactNode;
-    screenOptions?: { tabBarActiveTintColor?: string };
+    screenOptions?: CapturedScreenOptions;
   }) {
     tabsScreenOptions.current = screenOptions;
     return ReactActual.createElement(ReactActual.Fragment, null, children);
@@ -52,6 +58,8 @@ beforeAll(async () => {
       resources: {
         en: { common: flattenMessages(catalogs.en.common) },
         me: { common: flattenMessages(catalogs.me.common) },
+        ru: { common: flattenMessages(catalogs.ru.common) },
+        tr: { common: flattenMessages(catalogs.tr.common) },
       },
       lng: 'en',
       fallbackLng: 'en',
@@ -97,5 +105,18 @@ describe('TabsLayout', () => {
     await act(async () => {
       await i18next.changeLanguage('en');
     });
+  });
+
+  it('sets tabBarStyle.height to TAB_BAR_BASE_HEIGHT plus safe-area bottom inset', async () => {
+    // jest.setup.ts mocks react-native-safe-area-context with zero insets.
+    await renderTabs();
+
+    expect(tabsScreenOptions.current?.tabBarStyle?.height).toBe(TAB_BAR_BASE_HEIGHT);
+  });
+
+  it('sets tabBarLabelStyle.lineHeight to TAB_LABEL_LINE_HEIGHT so labels are not clipped', async () => {
+    await renderTabs();
+
+    expect(tabsScreenOptions.current?.tabBarLabelStyle?.lineHeight).toBe(TAB_LABEL_LINE_HEIGHT);
   });
 });

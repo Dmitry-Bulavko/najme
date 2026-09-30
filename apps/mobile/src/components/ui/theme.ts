@@ -42,3 +42,9 @@ export const TAB_LABEL_FONT_SIZE = 11;
 export const TAB_LABEL_LINE_HEIGHT = 14;
 /** Icon + label row before adding the bottom safe-area inset. */
 export const TAB_BAR_BASE_HEIGHT = 56;
+
+/**
+ * Letter-spacing (dp) for section headers (e.g. account settings sections). Extracted from the
+ * inline magic number so both the shared `Section` component and any StyleSheet can stay in sync.
+ */
+export const SECTION_LETTER_SPACING = 0.6;

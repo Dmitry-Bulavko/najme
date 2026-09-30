@@ -28,10 +28,13 @@ export async function getRefreshToken(): Promise<string | null> {
 }
 
 export async function setRefreshToken(token: string): Promise<void> {
-  memoryRefreshToken = token;
   if (!supportsSecureStore()) {
+    // Web fallback: keep in memory only (SecureStore unavailable — web is not a supported auth
+    // surface, but the bundle must load without crashing during `expo export --platform web`).
+    memoryRefreshToken = token;
     return;
   }
+  // Native: persist in SecureStore only; do not duplicate in module memory (ADR-0010).
   await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, token);
 }
 

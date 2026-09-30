@@ -50,6 +50,20 @@ afterEach(() => {
 });
 
 describe('apiRequest', () => {
+  it('throws ApiError HTTP_ERROR when a 2xx response body is not JSON', async () => {
+    jest.mocked(fetch).mockResolvedValueOnce(
+      new Response('<html>Bad gateway</html>', {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      }),
+    );
+
+    await expect(apiRequest('/foo')).rejects.toMatchObject({
+      code: 'HTTP_ERROR',
+      status: 200,
+    });
+  });
+
   it('sends X-Client: mobile and the Bearer access token', async () => {
     setAccessToken('tok-123');
     jest.mocked(fetch).mockResolvedValueOnce(makeJsonResponse({ ok: true }));
@@ -119,6 +133,32 @@ describe('401 retry with single-flight refresh', () => {
 
     await Promise.all([apiRequest('/a'), apiRequest('/b')]);
     expect(refreshCalls).toBe(1);
+  });
+
+  it('single-flight retries both concurrent requests with the new token', async () => {
+    setAccessToken('old');
+    await setRefreshToken('rt-1');
+
+    const retried: string[] = [];
+    jest.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/auth/refresh')) {
+        await new Promise((r) => setTimeout(r, 20));
+        return makeJsonResponse(sessionBody('new-token', 'rt-new'));
+      }
+      const auth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      if (auth === 'Bearer new-token') {
+        // Track which paths were retried with the new token.
+        retried.push(url.replace(/.*\/api\/v1/, ''));
+        return makeJsonResponse({ ok: true });
+      }
+      return makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401);
+    });
+
+    const [resA, resB] = await Promise.all([apiRequest('/a'), apiRequest('/b')]);
+    expect(resA).toEqual({ ok: true });
+    expect(resB).toEqual({ ok: true });
+    expect(retried.sort()).toEqual(['/a', '/b']);
   });
 
   it('clears the session when refresh fails definitively (401)', async () => {

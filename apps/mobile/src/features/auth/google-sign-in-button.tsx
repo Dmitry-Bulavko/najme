@@ -82,6 +82,10 @@ export function GoogleSignInButton(): ReactElement | null {
 
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const result = await GoogleSignin.signIn();
+      // User dismissed the sign-in sheet — not an error.
+      if (result.type === 'cancel') {
+        return;
+      }
       const idToken = result.data?.idToken;
       if (!idToken) {
         setApiError(t('errors:GOOGLE_TOKEN_INVALID'));

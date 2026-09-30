@@ -12,6 +12,7 @@ import { EditProfileForm } from '@/features/account/edit-profile-form';
 import { AccountLanguageSettings } from '@/features/account/language-settings';
 import { setLocale } from '@/i18n';
 import {
+  apiRequest,
   clearSessionTokens,
   getAccessToken,
   setAccessToken,
@@ -200,6 +201,22 @@ describe('AccountLanguageSettings', () => {
       expect.objectContaining({ method: 'PATCH' }),
     );
   });
+
+  it('shows saved banner even when setLocale fails after a successful PATCH', async () => {
+    const updated = { ...meWithPassword, locale: 'ru' as const };
+    jest.mocked(fetch).mockResolvedValueOnce(makeJsonResponse(updated));
+    jest.mocked(setLocale).mockRejectedValueOnce(new Error('i18n init failed'));
+
+    const { getByTestId, findByText } = await renderWithI18n(<AccountLanguageSettings />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('account-locale-ru'));
+    });
+
+    // Account locale saved server-side → report success regardless of setLocale outcome.
+    expect(await findByText(catalogs.en.account.languageSection.saved)).toBeTruthy();
+    expect(mockUpdateMe).toHaveBeenCalledWith(updated);
+  });
 });
 
 describe('ChangePasswordForm', () => {
@@ -245,6 +262,113 @@ describe('ChangePasswordForm', () => {
 });
 
 describe('changePasswordWithLock', () => {
+  it('on 401 refreshes inside the mutex without deadlock and retries with new token', async () => {
+    setAccessToken('access-expired');
+    await setRefreshToken('refresh-initial');
+
+    const sessionAfterRefresh = {
+      accessToken: 'access-refreshed',
+      accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+      refreshToken: 'refresh-refreshed',
+      user: meWithPassword,
+    };
+    const sessionAfterPwChange = {
+      accessToken: 'access-final',
+      accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+      refreshToken: 'refresh-final',
+      user: meWithPassword,
+    };
+
+    jest.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      const auth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      if (url.includes('/me/password')) {
+        if (auth === 'Bearer access-expired') {
+          return makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401);
+        }
+        if (auth === 'Bearer access-refreshed') {
+          return makeJsonResponse(sessionAfterPwChange);
+        }
+      }
+      if (url.includes('/auth/refresh')) {
+        return makeJsonResponse(sessionAfterRefresh);
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    const result = await changePasswordWithLock({
+      currentPassword: 'old-password',
+      newPassword: 'longenough1',
+    });
+
+    expect(result.accessToken).toBe('access-final');
+    expect(getAccessToken()).toBe('access-final');
+    expect(await getRefreshToken()).toBe('refresh-final');
+  });
+
+  it('race: concurrent apiRequest 401 refresh uses the new refresh token from password change', async () => {
+    setAccessToken('access-old');
+    await setRefreshToken('refresh-old');
+
+    const sessionAfterPwChange = {
+      accessToken: 'access-pw',
+      accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+      refreshToken: 'refresh-pw',
+      user: meWithPassword,
+    };
+    const sessionAfterApiRefresh = {
+      accessToken: 'access-api',
+      accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+      refreshToken: 'refresh-api',
+      user: meWithPassword,
+    };
+
+    let releasePwChange!: (r: Response) => void;
+    const pwChangeGate = new Promise<Response>((resolve) => {
+      releasePwChange = resolve;
+    });
+    const refreshBodies: unknown[] = [];
+
+    jest.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      const auth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      if (url.includes('/me/password')) {
+        return pwChangeGate;
+      }
+      if (url.includes('/auth/refresh')) {
+        refreshBodies.push(init?.body ? JSON.parse(String(init.body)) : null);
+        return makeJsonResponse(sessionAfterApiRefresh);
+      }
+      if (url.includes('/secure')) {
+        if (auth === `Bearer ${sessionAfterApiRefresh.accessToken}`) {
+          return makeJsonResponse({ ok: true });
+        }
+        return makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401);
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    // 1. Start password change (holds mutex, fetch is gated).
+    const pwChange = changePasswordWithLock({
+      currentPassword: 'old-password',
+      newPassword: 'longenough1',
+    });
+
+    // 2. Fire a concurrent request that gets 401 → queues refresh behind the mutex.
+    const secureRequest = apiRequest('/secure');
+
+    await new Promise((r) => setTimeout(r, 20));
+
+    // 3. Release gate → password change completes, rotating the refresh token.
+    releasePwChange(makeJsonResponse(sessionAfterPwChange));
+
+    await expect(pwChange).resolves.toMatchObject({ accessToken: 'access-pw' });
+    await expect(secureRequest).resolves.toEqual({ ok: true });
+
+    // The refresh was sent only after the password change resolved, using the NEW refresh token.
+    expect(refreshBodies).toEqual([{ refreshToken: 'refresh-pw' }]);
+  });
+
   it('persists the rotated refresh token under the auth mutex', async () => {
     setAccessToken('access-old');
     await setRefreshToken('refresh-old');

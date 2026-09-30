@@ -4,7 +4,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, View } from 'react-native';
 
-import { ListGroup, ListItem, Text } from '@/components/ui';
+import { ListGroup, ListItem, Section } from '@/components/ui';
 import { useSession } from '@/features/auth/auth-provider';
 import { ApiStatusBadge } from '@/features/health/api-status-badge';
 import { UnverifiedEmailBanner } from '@/features/auth/unverified-email-banner';
@@ -90,23 +90,6 @@ export function AccountHome(): ReactElement | null {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }): ReactElement {
-  return (
-    <View style={styles.section}>
-      <Text variant="caption" color="text03" accessibilityRole="header" style={styles.sectionTitle}>
-        {title}
-      </Text>
-      {children}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   root: { gap: tokens.spacing.lg },
-  section: { gap: tokens.spacing.sm },
-  sectionTitle: {
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginLeft: tokens.spacing.xs,
-  },
 });
