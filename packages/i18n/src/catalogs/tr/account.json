@@ -28,5 +28,15 @@
     "saved": "Şifre değiştirildi",
     "googleOnly": "Google ile giriş yapıyorsunuz. Bu hesapta değiştirilecek bir şifre yok."
   },
-  "signOut": "Çıkış yap"
+  "signOut": "Çıkış yap",
+  "settings": {
+    "editProfile": "Profili düzenle",
+    "language": "Dil",
+    "changePassword": "Şifre değiştir"
+  },
+  "signOutConfirm": {
+    "title": "Çıkış yapılsın mı?",
+    "body": "Rezervasyonlarınıza ve hesabınıza erişmek için tekrar giriş yapmanız gerekir.",
+    "confirm": "Çıkış yap"
+  }
 }

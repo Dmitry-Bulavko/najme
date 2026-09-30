@@ -28,5 +28,15 @@
     "saved": "Password changed",
     "googleOnly": "You sign in with Google. There is no password to change on this account."
   },
-  "signOut": "Sign out"
+  "signOut": "Sign out",
+  "settings": {
+    "editProfile": "Edit profile",
+    "language": "Language",
+    "changePassword": "Change password"
+  },
+  "signOutConfirm": {
+    "title": "Sign out?",
+    "body": "You will need to sign in again to access your bookings and account.",
+    "confirm": "Sign out"
+  }
 }

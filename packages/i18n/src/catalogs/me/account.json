@@ -28,5 +28,15 @@
     "saved": "Lozinka je promijenjena",
     "googleOnly": "Prijavljujete se putem Google-a. Na ovom nalogu nema lozinke za promjenu."
   },
-  "signOut": "Odjava"
+  "signOut": "Odjava",
+  "settings": {
+    "editProfile": "Uredi profil",
+    "language": "Jezik",
+    "changePassword": "Promjena lozinke"
+  },
+  "signOutConfirm": {
+    "title": "Odjaviti se?",
+    "body": "Morate se ponovo prijaviti da biste pristupili rezervacijama i nalogu.",
+    "confirm": "Odjava"
+  }
 }
