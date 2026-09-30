@@ -2,31 +2,21 @@
  * Business slug generation (#73 / ADR-0013).
  * Transliterates Latin/Cyrillic/Turkish characters, then kebab-cases.
  */
-
-export const RESERVED_BUSINESS_SLUGS = new Set([
-  'admin',
-  'api',
-  'auth',
-  'business',
-  'categories',
-  'cities',
-  'health',
-  'me',
-  'new',
-  'public',
-]);
+import { RESERVED_BUSINESS_SLUGS } from '@najme/contracts';
 
 const CHAR_MAP: Record<string, string> = {
+  // South-Slavic Latin
   č: 'c',
   ć: 'c',
   š: 's',
   ž: 'z',
-  đ: 'd',
+  đ: 'dj',
   Č: 'c',
   Ć: 'c',
   Š: 's',
   Ž: 'z',
-  Đ: 'd',
+  Đ: 'dj',
+  // Polish
   ą: 'a',
   ę: 'e',
   ł: 'l',
@@ -35,6 +25,7 @@ const CHAR_MAP: Record<string, string> = {
   ś: 's',
   ź: 'z',
   ż: 'z',
+  // Turkish
   ğ: 'g',
   ı: 'i',
   İ: 'i',
@@ -47,6 +38,7 @@ const CHAR_MAP: Record<string, string> = {
   Ü: 'u',
   Ö: 'o',
   Ç: 'c',
+  // Russian / shared Cyrillic
   а: 'a',
   б: 'b',
   в: 'v',
@@ -113,6 +105,19 @@ const CHAR_MAP: Record<string, string> = {
   Э: 'e',
   Ю: 'yu',
   Я: 'ya',
+  // Serbian / Montenegrin Cyrillic (map before NFKD so they are not dropped)
+  ђ: 'dj',
+  ј: 'j',
+  љ: 'lj',
+  њ: 'nj',
+  ћ: 'c',
+  џ: 'dz',
+  Ђ: 'dj',
+  Ј: 'j',
+  Љ: 'lj',
+  Њ: 'nj',
+  Ћ: 'c',
+  Џ: 'dz',
 };
 
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -120,19 +125,20 @@ const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 /** Transliterate and kebab-case a display name into a candidate slug (may be empty). */
 export function slugifyBusinessName(name: string): string {
   let out = '';
-  for (const ch of name.normalize('NFKD')) {
+  // NFC first so mapped Cyrillic (й, ђ, …) hit CHAR_MAP before diacritic decomposition.
+  for (const ch of name.normalize('NFC')) {
     if (CHAR_MAP[ch] !== undefined) {
       out += CHAR_MAP[ch];
       continue;
     }
-    if (/[A-Za-z0-9]/.test(ch)) {
-      out += ch.toLowerCase();
+    const stripped = ch.normalize('NFKD').replace(/\p{M}/gu, '');
+    if (/[A-Za-z0-9]/.test(stripped)) {
+      out += stripped.toLowerCase();
       continue;
     }
     if (/\s|_/.test(ch) || ch === '-' || ch === '/') {
       out += '-';
     }
-    // drop combining marks and other punctuation
   }
   return out.replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 60).replace(/-$/, '');
 }

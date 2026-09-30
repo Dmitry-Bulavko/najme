@@ -377,14 +377,14 @@ Later columns (see the amendment): `verifiedAt` (M6-03); `ratingAverage`, `ratin
 
 A user's role inside a business (glossary: OWNER / ADMIN / STAFF; role matrix in the amendment).
 
-| Field               | Type                | Null? | Notes                                                                                                                  |
-| ------------------- | ------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------- |
-| id                  | String (uuid v7)    | no    | PK                                                                                                                     |
-| userId              | String              | no    | FK → User                                                                                                              |
-| businessId          | String              | no    | FK → Business                                                                                                          |
-| role                | enum MembershipRole | no    | `OWNER`, `ADMIN`, `STAFF`                                                                                              |
-| staffMemberId       | String              | yes   | FK → StaffMember (unique, `SET NULL`); the bookable resource this member operates as; required for `STAFF` (app-level) |
-| createdAt/updatedAt | DateTime            | no    |                                                                                                                        |
+| Field               | Type                | Null? | Notes                                                                                                                                                                                        |
+| ------------------- | ------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                  | String (uuid v7)    | no    | PK                                                                                                                                                                                           |
+| userId              | String              | no    | FK → User                                                                                                                                                                                    |
+| businessId          | String              | no    | FK → Business                                                                                                                                                                                |
+| role                | enum MembershipRole | no    | `OWNER`, `ADMIN`, `STAFF`                                                                                                                                                                    |
+| staffMemberId       | String              | yes   | FK → StaffMember (unique, `SET NULL`); the bookable resource this member operates as; required for `STAFF` (app-level). Column added in #74 (M2-03); create-business `ownerIsStaff` sets it. |
+| createdAt/updatedAt | DateTime            | no    |                                                                                                                                                                                              |
 
 Constraints: unique `(userId, businessId)`. At least one `OWNER` per business (app-level,
 `LAST_OWNER`).

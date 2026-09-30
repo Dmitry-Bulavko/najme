@@ -16,7 +16,7 @@ e2e factories plus a route-walker that proves 404 for non-members on every `:bus
   module with slug generation, guard before body validation, and factories for later M2 tasks.
 - `staffMemberId` is omitted from `Membership` until #74 (StaffMember exists); `GET /me/businesses`
   returns `staffMemberId: null`.
-- Slug: transliterate → kebab-case → ensure length ≥ 3 and not reserved (suffix `-x` / numeric
+- Slug: transliterate → kebab-case → ensure length ≥ 3 and not reserved (suffix `-biz` / numeric
   collision suffixes) → plain unique index so soft-deleted slugs stay reserved.
 
 ## Changes
@@ -62,7 +62,10 @@ Error strings only: `errors.SLUG_TAKEN`, `errors.SLUG_LOCKED` (en/me/ru/tr).
 
 ## Implementation notes
 
-- `Membership.staffMemberId` deferred to #74; `GET /me/businesses` returns `staffMemberId: null`.
-- Create-business throttle is 5/hour keyed like other routes (client IP via `X-Forwarded-For`), not
-  a custom per-user store — same pattern as auth throttles.
-- Route-walker discovers Express routes containing `:businessId` after `configureApp`.
+- `Membership.staffMemberId` is added in #74; until then create leaves it null and
+  `GET /me/businesses` returns `staffMemberId: null`.
+- Create-business throttle is 5/hour **per authenticated user** (`UserThrottlerGuard`).
+- Slug fallback for empty/short/reserved bases is `-biz` (not `-x`); collision suffixes are
+  `-2`, `-3`, …
+- Route-walker discovers Express routes containing `:businessId` after `configureApp` and asserts
+  404 `NOT_FOUND` for non-members, random UUIDs, and malformed ids.

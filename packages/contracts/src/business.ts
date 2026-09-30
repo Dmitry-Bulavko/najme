@@ -17,12 +17,27 @@ export type BusinessStatus = z.infer<typeof businessStatusSchema>;
 export const confirmationModeSchema = z.enum(['AUTO', 'MANUAL']);
 export type ConfirmationMode = z.infer<typeof confirmationModeSchema>;
 
+/** Public URL slug reserved words (must stay in sync with API slug helpers). */
+export const RESERVED_BUSINESS_SLUGS = new Set([
+  'admin',
+  'api',
+  'auth',
+  'business',
+  'categories',
+  'cities',
+  'health',
+  'me',
+  'new',
+  'public',
+]);
+
 /** Public URL slug for a business. */
 export const businessSlugSchema = z
   .string()
   .min(3)
   .max(60)
-  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'must be a lowercase kebab-case slug');
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'must be a lowercase kebab-case slug')
+  .refine((slug) => !RESERVED_BUSINESS_SLUGS.has(slug), 'slug is reserved');
 
 export type BusinessSlug = z.infer<typeof businessSlugSchema>;
 
@@ -30,6 +45,8 @@ const businessNameSchema = z.string().trim().min(1).max(120);
 const optionalText = z.string().trim().min(1).max(2000).optional();
 const optionalAddress = z.string().trim().min(1).max(300).optional();
 const optionalPhone = z.string().trim().min(3).max(40).optional();
+/** Upper bound: one year in minutes (int4-safe; prevents DB overflow). */
+const bookingMinutesSchema = z.number().int().min(0).max(525_600);
 
 /** Body of `POST /api/v1/businesses`. */
 export const createBusinessRequestSchema = z.object({
@@ -57,8 +74,8 @@ export const updateBusinessRequestSchema = z
     contactPhone: z.string().trim().min(3).max(40).nullable().optional(),
     contactEmail: emailSchema.nullable().optional(),
     confirmationMode: confirmationModeSchema.optional(),
-    cancellationWindowMinutes: z.number().int().min(0).optional(),
-    minBookingNoticeMinutes: z.number().int().min(0).optional(),
+    cancellationWindowMinutes: bookingMinutesSchema.optional(),
+    minBookingNoticeMinutes: bookingMinutesSchema.optional(),
     bookingHorizonDays: z.number().int().min(1).max(365).optional(),
     slug: businessSlugSchema.optional(),
   })

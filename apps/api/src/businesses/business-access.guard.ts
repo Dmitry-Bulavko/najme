@@ -2,6 +2,7 @@ import { type CanActivate, type ExecutionContext, HttpStatus, Injectable } from 
 import { Reflector } from '@nestjs/core';
 import type { MembershipRole } from '@najme/contracts';
 import type { Request } from 'express';
+import { z } from 'zod';
 import { apiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { BUSINESS_ROLES_KEY } from './business-roles.decorator.js';
@@ -16,9 +17,11 @@ type AuthedRequest = Request & {
   [BUSINESS_MEMBERSHIP_KEY]?: BusinessMembership;
 };
 
+const businessIdSchema = z.string().uuid();
+
 /**
  * Resolves business membership before body validation.
- * Unknown / deleted / non-member → 404; wrong role → 403.
+ * Unknown / deleted / non-member / malformed id → 404; wrong role → 403.
  */
 @Injectable()
 export class BusinessAccessGuard implements CanActivate {
@@ -36,7 +39,7 @@ export class BusinessAccessGuard implements CanActivate {
 
     const rawBusinessId = req.params[BUSINESS_ID_PARAM];
     const businessId = typeof rawBusinessId === 'string' ? rawBusinessId : rawBusinessId?.[0];
-    if (!businessId) {
+    if (!businessId || !businessIdSchema.safeParse(businessId).success) {
       throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Business not found.');
     }
 
@@ -63,7 +66,16 @@ export class BusinessAccessGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    if (allowed && allowed.length > 0 && !allowed.includes(membership.role)) {
+    // Missing @BusinessRoles is a programming error — never fail open to any member.
+    if (allowed === undefined) {
+      throw apiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'INTERNAL_ERROR',
+        'BusinessRoles metadata is required on business-scoped handlers.',
+      );
+    }
+
+    if (allowed.length > 0 && !allowed.includes(membership.role)) {
       throw apiError(HttpStatus.FORBIDDEN, 'FORBIDDEN', 'Insufficient role for this business.');
     }
 

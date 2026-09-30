@@ -7,10 +7,28 @@ import {
 } from './slug.js';
 
 describe('business slug helpers', () => {
-  it('transliterates South-Slavic, Turkish and Cyrillic characters', () => {
+  it('transliterates Latin diacritics (South-Slavic / Polish)', () => {
     expect(slugifyBusinessName('Čarolija')).toBe('carolija');
-    expect(slugifyBusinessName('Şiş Koç')).toBe('sis-koc');
+    expect(slugifyBusinessName('Đorđe')).toBe('djordje');
+  });
+
+  it('transliterates Serbian / Montenegrin Cyrillic', () => {
+    expect(slugifyBusinessName('Ђорђе')).toBe('djordje');
+    expect(slugifyBusinessName('Јелена')).toBe('jelena');
+    expect(slugifyBusinessName('Његош')).toBe('njegosh');
+    expect(slugifyBusinessName('Љубав')).toBe('ljubav');
+    expect(slugifyBusinessName('Ћосић')).toBe('cosic');
+    expect(slugifyBusinessName('Џем')).toBe('dzem');
+  });
+
+  it('transliterates Russian Cyrillic', () => {
     expect(slugifyBusinessName('Салон Красоты')).toBe('salon-krasoty');
+    expect(slugifyBusinessName('Йога')).toBe('yoga');
+  });
+
+  it('transliterates Turkish characters', () => {
+    expect(slugifyBusinessName('Şiş Koç')).toBe('sis-koc');
+    expect(slugifyBusinessName('Iğdır')).toBe('igdir');
   });
 
   it('ensures short, empty and reserved names become valid', () => {

@@ -76,11 +76,6 @@ export async function createUser(
   return { id: user.id, email, accessToken: session.accessToken };
 }
 
-let ipCounter = 0;
-function nextIp(): string {
-  return `203.${Math.floor(ipCounter / 250) % 250}.${ipCounter++ % 250}.9`;
-}
-
 export async function createBusiness(
   app: INestApplication,
   tracker: BusinessTestTracker,
@@ -95,7 +90,6 @@ export async function createBusiness(
     .post('/api/v1/businesses')
     .set('Authorization', `Bearer ${owner.accessToken}`)
     .set('Content-Type', 'application/json')
-    .set('X-Forwarded-For', nextIp())
     .send({
       name: overrides.name ?? `Salon ${randomUUID().slice(0, 8)}`,
       categoryId: category,

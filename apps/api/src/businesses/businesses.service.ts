@@ -6,7 +6,7 @@ import type {
   MyBusiness,
   UpdateBusinessRequest,
 } from '@najme/contracts';
-import type { Prisma } from '../../generated/prisma/index.js';
+import { Prisma } from '../../generated/prisma/client.js';
 import { Clock } from '../common/clock.js';
 import { apiError } from '../common/errors/api-error.js';
 import { newId } from '../common/id.js';
@@ -39,6 +39,7 @@ const businessSelect = {
   minBookingNoticeMinutes: true,
   bookingHorizonDays: true,
   status: true,
+  approvedAt: true,
   createdAt: true,
   updatedAt: true,
   deletedAt: true,
@@ -72,8 +73,20 @@ export class BusinessesService {
     const membershipId = newId();
     const now = this.clock.now();
 
+    // Prefetch taken base / base-N so we do not walk 50 empty attempts for common names.
+    const takenRows = await this.prisma.business.findMany({
+      where: {
+        OR: [{ slug: base }, { slug: { startsWith: `${base}-` } }],
+      },
+      select: { slug: true },
+    });
+    const taken = new Set(takenRows.map((row) => row.slug));
+
     for (let attempt = 0; attempt < 50; attempt += 1) {
       const slug = nextSlugCandidate(base, attempt);
+      if (taken.has(slug)) {
+        continue;
+      }
       try {
         const row = await this.prisma.$transaction(async (tx) => {
           const created = await tx.business.create({
@@ -124,7 +137,8 @@ export class BusinessesService {
         });
         return this.toBusiness(row, 'OWNER');
       } catch (err) {
-        if (this.isUniqueViolation(err, 'businesses_slug_key')) {
+        if (this.isSlugUniqueViolation(err)) {
+          taken.add(slug);
           continue;
         }
         throw err;
@@ -182,8 +196,9 @@ export class BusinessesService {
       }
     }
 
-    if (input.slug !== undefined) {
-      if (existing.status === 'APPROVED') {
+    if (input.slug !== undefined && input.slug !== existing.slug) {
+      // Lock once the business has ever been approved (approvedAt set), not merely status.
+      if (existing.approvedAt != null) {
         throw apiError(
           HttpStatus.UNPROCESSABLE_ENTITY,
           'SLUG_LOCKED',
@@ -193,14 +208,12 @@ export class BusinessesService {
       if (!isValidBusinessSlug(input.slug)) {
         throw apiError(HttpStatus.BAD_REQUEST, 'VALIDATION_FAILED', 'Invalid slug.');
       }
-      if (input.slug !== existing.slug) {
-        const taken = await this.prisma.business.findUnique({
-          where: { slug: input.slug },
-          select: { id: true },
-        });
-        if (taken) {
-          throw apiError(HttpStatus.CONFLICT, 'SLUG_TAKEN', 'Slug is already taken.');
-        }
+      const taken = await this.prisma.business.findUnique({
+        where: { slug: input.slug },
+        select: { id: true },
+      });
+      if (taken) {
+        throw apiError(HttpStatus.CONFLICT, 'SLUG_TAKEN', 'Slug is already taken.');
       }
     }
 
@@ -226,7 +239,9 @@ export class BusinessesService {
     if (input.bookingHorizonDays !== undefined) {
       data.bookingHorizonDays = input.bookingHorizonDays;
     }
-    if (input.slug !== undefined) data.slug = input.slug;
+    if (input.slug !== undefined && input.slug !== existing.slug) {
+      data.slug = input.slug;
+    }
 
     try {
       const row = await this.prisma.business.update({
@@ -236,7 +251,7 @@ export class BusinessesService {
       });
       return this.toBusiness(row, membership.role);
     } catch (err) {
-      if (this.isUniqueViolation(err, 'businesses_slug_key')) {
+      if (this.isSlugUniqueViolation(err)) {
         throw apiError(HttpStatus.CONFLICT, 'SLUG_TAKEN', 'Slug is already taken.');
       }
       throw err;
@@ -244,9 +259,10 @@ export class BusinessesService {
   }
 
   async softDelete(membership: BusinessMembership): Promise<void> {
+    const now = this.clock.now();
     const result = await this.prisma.business.updateMany({
       where: { id: membership.businessId, deletedAt: null },
-      data: { deletedAt: this.clock.now() },
+      data: { deletedAt: now, updatedAt: now },
     });
     if (result.count === 0) {
       throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Business not found.');
@@ -289,27 +305,11 @@ export class BusinessesService {
     };
   }
 
-  private isUniqueViolation(err: unknown, constraint: string): boolean {
-    if (!err || typeof err !== 'object') {
+  private isSlugUniqueViolation(err: unknown): boolean {
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') {
       return false;
     }
-    const prismaErr = err as {
-      code?: string;
-      meta?: {
-        target?: string[] | string;
-        driverAdapterError?: { constraint?: { fields?: string[] } };
-      };
-    };
-    if (prismaErr.code !== 'P2002') {
-      return false;
-    }
-    const target = prismaErr.meta?.target;
-    if (typeof target === 'string') {
-      return target.includes('slug') || target === constraint;
-    }
-    if (Array.isArray(target)) {
-      return target.includes('slug');
-    }
-    return true;
+    const meta = JSON.stringify(err.meta ?? {});
+    return meta.includes('slug') || meta.includes('businesses_slug_key');
   }
 }

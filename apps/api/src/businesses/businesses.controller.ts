@@ -12,7 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import {
   createBusinessRequestSchema,
   updateBusinessRequestSchema,
@@ -23,6 +23,7 @@ import {
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import { RequireJsonGuard } from '../auth/require-json.guard.js';
+import { UserThrottlerGuard } from '../auth/user-throttler.guard.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { BusinessAccessGuard } from './business-access.guard.js';
 import { BusinessRoles } from './business-roles.decorator.js';
@@ -40,7 +41,7 @@ export class BusinessesController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(ThrottlerGuard, RequireJsonGuard)
+  @UseGuards(UserThrottlerGuard, RequireJsonGuard)
   @Throttle(CREATE_BUSINESS_LIMIT)
   @ApiOperation({ summary: 'Create a business; caller becomes OWNER.' })
   create(
