@@ -5,6 +5,7 @@ import {
   apiRequest,
   getAccessToken,
   refreshSession,
+  refreshSessionUnlocked,
   setAccessToken,
   setRefreshTokenReusedHandler,
   withAuthRefreshLock,
@@ -299,5 +300,33 @@ describe('refreshSession', () => {
 
     await expect(refreshSession()).resolves.toBe('fresh');
     expect(request).toHaveBeenCalledWith('najme-auth-refresh', expect.any(Function));
+  });
+});
+
+describe('refreshSessionUnlocked', () => {
+  it('refreshes without acquiring the auth refresh lock', async () => {
+    const request = vi.fn(async (_name: string, fn: () => Promise<unknown>) => fn());
+    vi.stubGlobal('navigator', { locks: { request } });
+    setAccessToken('stale');
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeJsonResponse({
+        accessToken: 'unlocked-fresh',
+        accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+        user: {
+          id: 'u1',
+          email: 'a@b.com',
+          emailVerified: false,
+          displayName: null,
+          avatarUrl: null,
+          locale: 'en',
+          hasPassword: true,
+        },
+      }),
+    );
+
+    await expect(refreshSessionUnlocked()).resolves.toBe('unlocked-fresh');
+    expect(request).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBe('unlocked-fresh');
   });
 });

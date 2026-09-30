@@ -245,12 +245,15 @@ function LanguageForm({ me }: { me: Me }) {
   const router = useRouter();
   const { updateMe } = useSession();
 
+  const formLocale = isLocale(me.locale) ? me.locale : (locale as Locale);
+
   const {
     register,
     handleSubmit,
     formState: { isSubmitting },
   } = useForm<LanguageFormValues>({
-    defaultValues: { locale: isLocale(me.locale) ? me.locale : (locale as Locale) },
+    // Keep the select in sync when session `me.locale` updates after mount (#147).
+    values: { locale: formLocale },
   });
 
   async function onSubmit(data: LanguageFormValues) {

@@ -123,6 +123,21 @@ export async function refreshSession(): Promise<string | null> {
   return refreshingPromise;
 }
 
+/**
+ * Single-flight refresh without acquiring the Web Lock. For callers that already hold
+ * `withAuthRefreshLock` (e.g. password change) so they can recover from an expired access token
+ * without deadlocking on the non-reentrant lock (#147).
+ */
+export async function refreshSessionUnlocked(): Promise<string | null> {
+  if (refreshingPromise) {
+    return refreshingPromise;
+  }
+  refreshingPromise = doRefresh().finally(() => {
+    refreshingPromise = null;
+  });
+  return refreshingPromise;
+}
+
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
 }

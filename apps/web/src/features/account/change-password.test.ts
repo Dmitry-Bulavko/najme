@@ -29,6 +29,12 @@ const authSession: AuthSession = {
   user: sessionUser,
 };
 
+const refreshSessionBody = {
+  accessToken: 'refreshed-access',
+  accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+  user: sessionUser,
+};
+
 describe('changePasswordWithLock', () => {
   beforeEach(() => {
     setAccessToken('old-access');
@@ -54,6 +60,83 @@ describe('changePasswordWithLock', () => {
     expect(request).toHaveBeenCalledWith('najme-auth-refresh', expect.any(Function));
     expect(result.accessToken).toBe('new-access');
     expect(getAccessToken()).toBe('new-access');
+  });
+
+  it('refreshes once and retries when the access token has expired', async () => {
+    const request = vi.fn(async (_name: string, fn: () => Promise<unknown>) => fn());
+    vi.stubGlobal('navigator', { locks: { request } });
+
+    const passwordSuccess: AuthSession = {
+      ...authSession,
+      accessToken: 'after-password-change',
+    };
+
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = String(input);
+      if (url.includes('/me/password')) {
+        const auth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+        if (auth === 'Bearer old-access') {
+          return Promise.resolve(
+            makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'expired' } }, 401),
+          );
+        }
+        if (auth === 'Bearer refreshed-access') {
+          return Promise.resolve(makeJsonResponse(passwordSuccess));
+        }
+        return Promise.resolve(
+          makeJsonResponse({ error: { code: 'HTTP_ERROR', message: 'unexpected token' } }, 500),
+        );
+      }
+      if (url.includes('/auth/refresh')) {
+        return Promise.resolve(makeJsonResponse(refreshSessionBody));
+      }
+      return Promise.resolve(
+        makeJsonResponse({ error: { code: 'HTTP_ERROR', message: 'x' } }, 500),
+      );
+    });
+
+    const result = await changePasswordWithLock({
+      currentPassword: 'oldpassword',
+      newPassword: 'newpassword1',
+    });
+
+    expect(result.accessToken).toBe('after-password-change');
+    expect(getAccessToken()).toBe('after-password-change');
+    const urls = vi.mocked(fetch).mock.calls.map((c) => String(c[0]));
+    expect(urls.filter((u) => u.includes('/auth/refresh'))).toHaveLength(1);
+    expect(urls.filter((u) => u.includes('/me/password'))).toHaveLength(2);
+  });
+
+  it('surfaces a second 401 after refresh without looping', async () => {
+    vi.stubGlobal('navigator', {
+      locks: { request: async (_n: string, fn: () => Promise<unknown>) => fn() },
+    });
+
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('/me/password')) {
+        return Promise.resolve(
+          makeJsonResponse({ error: { code: 'INVALID_CREDENTIALS', message: 'bad' } }, 401),
+        );
+      }
+      if (url.includes('/auth/refresh')) {
+        return Promise.resolve(makeJsonResponse(refreshSessionBody));
+      }
+      return Promise.resolve(
+        makeJsonResponse({ error: { code: 'HTTP_ERROR', message: 'x' } }, 500),
+      );
+    });
+
+    await expect(
+      changePasswordWithLock({
+        currentPassword: 'wrong',
+        newPassword: 'newpassword1',
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS', status: 401 });
+
+    const urls = vi.mocked(fetch).mock.calls.map((c) => String(c[0]));
+    expect(urls.filter((u) => u.includes('/auth/refresh'))).toHaveLength(1);
+    expect(urls.filter((u) => u.includes('/me/password'))).toHaveLength(2);
   });
 
   it('makes a concurrent refresh wait until the password change releases the lock', async () => {
