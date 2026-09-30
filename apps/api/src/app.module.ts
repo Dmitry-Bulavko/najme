@@ -6,6 +6,7 @@ import { ConfigModule } from './config/config.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { ScheduleModule } from './schedule/schedule.module.js';
 import { ServicesModule } from './services/services.module.js';
 import { StaffModule } from './staff/staff.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module.js';
     BusinessesModule,
     StaffModule,
     ServicesModule,
+    ScheduleModule,
   ],
 })
 export class AppModule {}

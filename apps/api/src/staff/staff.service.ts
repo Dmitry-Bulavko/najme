@@ -86,6 +86,11 @@ export class StaffService {
         where: { staffMemberId: staffId },
         data: { staffMemberId: null, updatedAt: now },
       });
+      // Soft-delete does not CASCADE — clear schedule config explicitly (#75).
+      await tx.workingHours.deleteMany({ where: { staffMemberId: staffId } });
+      await tx.timeOff.deleteMany({
+        where: { staffMemberId: staffId, endsAt: { gt: now } },
+      });
       const result = await tx.staffMember.updateMany({
         where: { id: staffId, businessId, deletedAt: null },
         data: { deletedAt: now, updatedAt: now },

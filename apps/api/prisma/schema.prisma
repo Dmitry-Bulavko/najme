@@ -248,9 +248,55 @@ model StaffMember {
   business    Business                 @relation(fields: [businessId], references: [id], onDelete: Restrict)
   membership  Membership?
   assignments ServiceStaffAssignment[]
+  workingHours WorkingHours[]
+  timeOff      TimeOff[]
 
   @@index([businessId])
   @@map("staff_members")
+}
+
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+
+  @@map("weekday")
+}
+
+// CHECK: raw SQL in working_hours_time_off migration.
+model WorkingHours {
+  id            String  @id @db.Uuid
+  staffMemberId String  @map("staff_member_id") @db.Uuid
+  weekday       Weekday
+  startMinute   Int     @map("start_minute")
+  endMinute     Int     @map("end_minute")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  staffMember StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+
+  @@index([staffMemberId, weekday])
+  @@map("working_hours")
+}
+
+// CHECK: raw SQL in working_hours_time_off migration.
+model TimeOff {
+  id            String   @id @db.Uuid
+  staffMemberId String   @map("staff_member_id") @db.Uuid
+  startsAt      DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt        DateTime @map("ends_at") @db.Timestamptz(3)
+  reason        String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  staffMember StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+
+  @@index([staffMemberId, startsAt])
+  @@map("time_off")
 }
 
 enum CustomFieldType {
