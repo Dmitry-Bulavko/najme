@@ -11,5 +11,13 @@ export default [
   ...baseConfig,
   nextPlugin.configs['core-web-vitals'],
   reactHooks.configs.flat['recommended-latest'],
-  { ignores: ['.next/**'] },
+  {
+    ignores: [
+      '.next/**',
+      'e2e/**',
+      'playwright-report/**',
+      'test-results/**',
+      'playwright.config.ts',
+    ],
+  },
 ];

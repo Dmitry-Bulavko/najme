@@ -55,6 +55,12 @@
     "form": "Polje forme",
     "formName": "Ime i prezime"
   },
+  "bookings": {
+    "signIn": {
+      "title": "Prijavite se da vidite rezervacije",
+      "body": "Predstojeći i prošli termini pojaviće se ovdje nakon prijave."
+    }
+  },
   "empty": {
     "discover": "Pretraga i filteri pojaviće se ovdje kada preduzeća budu objavljena.",
     "bookings": "Kada rezervišete uslugu, pojaviće se ovdje."

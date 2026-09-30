@@ -6,6 +6,8 @@ export default withBaseConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
+    // Playwright specs live under e2e/ as *.spec.ts; keep them out of Vitest.
+    exclude: ['**/node_modules/**', '**/e2e/**', '**/dist/**', '**/.next/**'],
   },
   resolve: {
     alias: {

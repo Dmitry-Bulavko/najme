@@ -17,6 +17,14 @@ export default getRequestConfig(async ({ requestLocale }) => {
 
   return {
     locale,
-    messages: { ...catalogs[locale].common, ...catalogs[locale].shell },
+    messages: {
+      // common and shell are spread at the top level; their root keys must not collide (tested).
+      ...catalogs[locale].common,
+      ...catalogs[locale].shell,
+      // Namespaced catalogs keep their namespace key so components use useTranslations('auth') etc.
+      errors: catalogs[locale].errors,
+      auth: catalogs[locale].auth,
+      account: catalogs[locale].account,
+    },
   };
 });

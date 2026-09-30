@@ -1,0 +1,42 @@
+{
+  "pageTitle": "Nalog",
+  "pageSubtitle": "Upravljajte profilom i bezbjednošću",
+  "verified": "Verifikovan",
+  "unverified": "Nije verifikovan",
+  "resend": "Pošalji verifikaciju ponovo",
+  "resent": "Verifikacioni e-mail je poslat",
+  "resending": "Šaljem…",
+  "profileSection": {
+    "title": "Profil",
+    "displayNameLabel": "Ime za prikaz",
+    "save": "Sačuvaj ime",
+    "saved": "Profil je ažuriran"
+  },
+  "languageSection": {
+    "title": "Jezik",
+    "label": "Jezik naloga",
+    "save": "Sačuvaj jezik",
+    "saved": "Jezik je ažuriran"
+  },
+  "passwordSection": {
+    "title": "Promjena lozinke",
+    "currentLabel": "Trenutna lozinka",
+    "newLabel": "Nova lozinka",
+    "confirmLabel": "Potvrdite novu lozinku",
+    "mismatch": "Lozinke se ne poklapaju",
+    "save": "Promijeni lozinku",
+    "saved": "Lozinka je promijenjena",
+    "googleOnly": "Prijavljujete se putem Google-a. Na ovom nalogu nema lozinke za promjenu."
+  },
+  "signOut": "Odjava",
+  "settings": {
+    "editProfile": "Uredi profil",
+    "language": "Jezik",
+    "changePassword": "Promjena lozinke"
+  },
+  "signOutConfirm": {
+    "title": "Odjaviti se?",
+    "body": "Morate se ponovo prijaviti da biste pristupili rezervacijama i nalogu.",
+    "confirm": "Odjava"
+  }
+}

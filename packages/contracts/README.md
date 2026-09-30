@@ -4,8 +4,8 @@ Shared zod schemas and inferred TypeScript types for API requests and responses,
 `apps/api`, `apps/web` and `apps/mobile`. See ADR-0002 and `docs/conventions/api.md`.
 
 This package holds cross-cutting contracts and the M1 auth/user contracts. Further domain schemas
-(businesses, bookings, …) live alongside the feature that introduces them,
-under `packages/contracts/src/<domain>/`.
+(businesses, bookings, …) live alongside the feature that introduces them as flat files
+`packages/contracts/src/<domain>.ts` (re-exported from `src/index.ts`).
 
 ## What's exported
 
@@ -36,10 +36,10 @@ under `packages/contracts/src/<domain>/`.
 The package has no Node- or DOM-specific dependencies, so it builds once and is consumed the same
 way by all three runtimes. `tsup` builds `src/index.ts` into:
 
-| File             | Format                   | Consumed by                                   |
-| ---------------- | ------------------------ | --------------------------------------------- |
-| `dist/index.js`  | ESM + `dist/index.d.ts`  | Next.js, Expo (native ESM/`import`)           |
-| `dist/index.cjs` | CJS + `dist/index.d.cts` | NestJS (compiles to CommonJS, uses `require`) |
+| File             | Format                   | Consumed by                                               |
+| ---------------- | ------------------------ | --------------------------------------------------------- |
+| `dist/index.js`  | ESM + `dist/index.d.ts`  | NestJS API (`"type": "module"`), Next.js, Expo (`import`) |
+| `dist/index.cjs` | CJS + `dist/index.d.cts` | Any consumer that still needs `require()`                 |
 
 `package.json#exports` picks the right pair via the `import`/`require` conditions, so every
 consumer just does:
@@ -48,13 +48,15 @@ consumer just does:
 import { healthResponseSchema } from '@najme/contracts';
 ```
 
-This avoids forcing the API onto an ESM-only Nest setup while still giving web and mobile native
-ESM. See the "Update (2026-09-28)" note in ADR-0002 for the rationale.
+The API is ESM (see the "Update (2026-09-28)" note in ADR-0002); the CJS build remains for tooling
+or bundlers that still call `require()`.
 
 `src/dual-module.test.ts` proves both entry points work: it `require()`s the built `dist/index.cjs`
 via `node:module`'s `createRequire` and `import()`s the built `dist/index.js`, asserting schemas
-from each still parse correctly. It runs against `dist/`, not the TypeScript sources, so the
-`pretest` script builds the package first.
+from each still parse correctly. It runs against `dist/`, not the TypeScript sources. Under turbo,
+this package's `test` task depends on `build` and `^build`, so `dist/` is produced before the suite
+runs. A plain `pnpm --filter @najme/contracts test` does **not** rebuild `dist` — run `build` first
+(or use `pnpm turbo run test --filter=@najme/contracts`).
 
 ## Developing this package
 
@@ -62,5 +64,5 @@ from each still parse correctly. It runs against `dist/`, not the TypeScript sou
 - `pnpm --filter @najme/contracts lint` — lints with `@najme/config`'s ESLint preset.
 - `pnpm --filter @najme/contracts typecheck` — type-checks `src/` with `@najme/config`'s Node
   preset.
-- `pnpm --filter @najme/contracts test` — builds `dist/` (via `pretest`), then runs the Vitest
-  suite.
+- `pnpm --filter @najme/contracts test` — runs the Vitest suite against existing `dist/` (does not
+  rebuild; prefer `pnpm turbo run test --filter=@najme/contracts` so `build`/`^build` run first).

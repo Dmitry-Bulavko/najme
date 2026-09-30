@@ -12,10 +12,11 @@
 
 ## Contracts
 
-- Define request and response schemas in `packages/contracts/src/<domain>/…` first; export schema +
-  inferred type. The controller validates input with the schema and returns data matching the
-  response schema.
-- OpenAPI docs are generated from the same schemas and served at `/api/v1/docs` outside production.
+- Define request and response schemas in `packages/contracts/src/<domain>.ts` first (flat files,
+  re-exported from `src/index.ts`); export schema + inferred type. The controller validates input
+  with the schema and returns data matching the response schema.
+- OpenAPI at `/api/v1/docs` (outside production) is NestJS Swagger built from controller
+  decorators (`@ApiTags`, `@ApiOperation`, …) — not generated from the zod contracts.
 
 ## Errors
 
