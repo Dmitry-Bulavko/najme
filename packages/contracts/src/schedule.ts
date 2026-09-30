@@ -5,7 +5,6 @@ import {
   hhMmEndToMinutes,
   isValidIntervalEnd,
   isValidIntervalStart,
-  minutesToHhMmEnd,
   weekdaySchemaValues,
 } from './time.js';
 
@@ -100,7 +99,19 @@ export type WorkingHoursResponse = z.infer<typeof workingHoursResponseSchema>;
 /** Business-local wall clock without offset: `YYYY-MM-DDTHH:mm`. */
 export const businessLocalDateTimeSchema = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/, 'must be YYYY-MM-DDTHH:mm');
+  .regex(/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/, 'must be YYYY-MM-DDTHH:mm')
+  .refine((value) => {
+    const datePart = value.slice(0, 10);
+    const parts = datePart.split('-').map(Number);
+    if (parts.length !== 3 || parts.some((n) => !Number.isInteger(n))) {
+      return false;
+    }
+    const [year, month, day] = parts as [number, number, number];
+    const utc = new Date(Date.UTC(year, month - 1, day));
+    return (
+      utc.getUTCFullYear() === year && utc.getUTCMonth() === month - 1 && utc.getUTCDate() === day
+    );
+  }, 'must be a real calendar date');
 
 export const createTimeOffRequestSchema = z
   .object({
@@ -132,11 +143,15 @@ export type TimeOff = z.infer<typeof timeOffSchema>;
 export const timeOffListResponseSchema = z.array(timeOffSchema);
 export type TimeOffListResponse = z.infer<typeof timeOffListResponseSchema>;
 
-export const listTimeOffQuerySchema = z.object({
-  from: z.string().datetime().optional(),
-  to: z.string().datetime().optional(),
-});
+export const listTimeOffQuerySchema = z
+  .object({
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
+  })
+  .superRefine((query, ctx) => {
+    if (query.from && query.to && query.to <= query.from) {
+      ctx.addIssue({ code: 'custom', message: 'to must be after from', path: ['to'] });
+    }
+  });
 
 export type ListTimeOffQuery = z.infer<typeof listTimeOffQuerySchema>;
-
-export { minutesToHhMmEnd };

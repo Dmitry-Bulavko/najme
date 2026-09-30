@@ -1,17 +1,24 @@
 /**
  * Business-local ↔ UTC conversion for Europe/Podgorica (#75 / ADR-0005).
- * Uses date-fns v4 + @date-fns/tz. Never depends on process TZ.
+ * Uses `@date-fns/tz` `tzOffset` only — never the TZDate component constructor, which
+ * incorrectly depends on `process.env.TZ` for ambiguous times.
  */
-import { TZDate } from '@date-fns/tz';
+import { TZDate, tzOffset } from '@date-fns/tz';
 
 export const BUSINESS_TIMEZONE = 'Europe/Podgorica';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Convert a business-local wall clock (`YYYY-MM-DDTHH:mm`) to a UTC `Date`.
  *
  * DST rules (Europe/Podgorica / Europe/Belgrade):
  * - Nonexistent local times (spring forward) resolve forward to the next valid instant.
- * - Ambiguous local times (fall back) take the earlier offset.
+ * - Ambiguous local times (fall back) take the earlier offset (the first occurrence).
+ *
+ * Algorithm (process-TZ independent): treat the wall components as a naive UTC instant, then
+ * subtract each nearby zone offset. Keep candidates that round-trip to the same wall time;
+ * if both are valid, take the earlier; if none (gap), advance using the pre-transition offset.
  */
 export function localToUtc(local: string, timeZone: string = BUSINESS_TIMEZONE): Date {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local.trim());
@@ -24,9 +31,24 @@ export function localToUtc(local: string, timeZone: string = BUSINESS_TIMEZONE):
   const hour = Number(match[4]);
   const minute = Number(match[5]);
 
-  // TZDate constructor interprets components in the given zone.
-  const zoned = new TZDate(year, month - 1, day, hour, minute, 0, 0, timeZone);
-  return new Date(zoned.getTime());
+  const naiveMs = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+  const offsetBefore = tzOffset(timeZone, new Date(naiveMs - DAY_MS));
+  const offsetAfter = tzOffset(timeZone, new Date(naiveMs + DAY_MS));
+  const offsets = [...new Set([offsetBefore, offsetAfter])];
+
+  const candidates = offsets
+    .map((offsetMinutes) => new Date(naiveMs - offsetMinutes * 60_000))
+    .filter((instant) => utcToLocal(instant, timeZone) === local)
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  if (candidates.length > 0) {
+    // Ambiguous → earlier instant; unique → that instant.
+    // candidates[0] exists: length > 0 was checked above.
+    return candidates[0]!;
+  }
+
+  // Gap: wall time does not exist — shift forward using the offset from before the change.
+  return new Date(naiveMs - offsetBefore * 60_000);
 }
 
 /** Format a UTC instant as business-local `YYYY-MM-DDTHH:mm`. */

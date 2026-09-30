@@ -79,6 +79,8 @@ export class ScheduleService {
   ): Promise<WorkingHoursResponse> {
     const now = this.clock.now();
     await this.prisma.$transaction(async (tx) => {
+      // Serialize concurrent PUTs under READ COMMITTED (#75 review).
+      await tx.$queryRaw`SELECT id FROM staff_members WHERE id = ${staffId}::uuid FOR UPDATE`;
       await tx.workingHours.deleteMany({ where: { staffMemberId: staffId } });
       if (input.intervals.length === 0) {
         return;

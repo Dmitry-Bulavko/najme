@@ -30,7 +30,6 @@
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "@prisma/client-runtime-utils": "7.10.0",
-    "date-fns": "^4.4.0",
     "dotenv": "^17.4.2",
     "google-auth-library": "^11.1.0",
     "jose": "^6.2.12",

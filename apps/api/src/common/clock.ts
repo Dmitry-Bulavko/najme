@@ -12,13 +12,20 @@ export class SystemClock extends Clock {
   }
 }
 
-/** Fixed clock for tests. */
+/** Fixed clock for tests; `set` lets e2e suites advance "now" without rebuilding the module. */
 export class FixedClock extends Clock {
-  constructor(private readonly instant: Date) {
+  private instant: Date;
+
+  constructor(instant: Date) {
     super();
+    this.instant = instant;
   }
 
   now(): Date {
     return new Date(this.instant.getTime());
+  }
+
+  set(instant: Date): void {
+    this.instant = instant;
   }
 }

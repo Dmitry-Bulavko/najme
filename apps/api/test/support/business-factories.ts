@@ -129,6 +129,7 @@ type HttpMethod = 'get' | 'post' | 'patch' | 'put' | 'delete';
 /**
  * Asserts non-member → 404 and disallowed roles → 403 for a business-scoped route.
  * `allowedRoles` lists roles that must succeed (2xx).
+ * Optional `prepare` runs after the business exists (e.g. create a staff member for nested paths).
  */
 export async function expectBusinessAuthz(
   app: INestApplication,
@@ -138,10 +139,22 @@ export async function expectBusinessAuthz(
     path: (businessId: string) => string;
     allowedRoles: MembershipRole[];
     body?: unknown;
+    prepare?: (ctx: {
+      app: INestApplication;
+      businessId: string;
+      ownerAccessToken: string;
+    }) => Promise<void>;
   },
 ): Promise<void> {
   const owner = await createUser(app, tracker, 'owner');
   const business = await createBusiness(app, tracker, owner);
+  if (opts.prepare) {
+    await opts.prepare({
+      app,
+      businessId: business.id,
+      ownerAccessToken: owner.accessToken,
+    });
+  }
   const outsider = await createUser(app, tracker, 'outsider');
 
   const outsiderRes = await request(app.getHttpServer())

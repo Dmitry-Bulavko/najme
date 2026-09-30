@@ -2,7 +2,6 @@
 export const TIME_STEP_MINUTES = 5;
 
 const HH_MM = /^([01]\d|2[0-3]):([0-5]\d)$/;
-const HH_MM_OR_24 = /^(?:([01]\d|2[0-3]):([0-5]\d)|24:00)$/;
 
 export function parseHhMm(value: string): { hours: number; minutes: number } | null {
   const match = HH_MM.exec(value.trim());
@@ -99,5 +98,3 @@ export function isValidIntervalStart(
   }
   return (parsed.hours * 60 + parsed.minutes) % stepMinutes === 0;
 }
-
-export { HH_MM_OR_24 };

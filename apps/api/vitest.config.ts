@@ -11,6 +11,8 @@ export default withBaseConfig({
   test: {
     include: ['src/**/*.spec.ts'],
     env: {
+      // Match CI / production containers so DST tests cannot pass by accident on a CET laptop.
+      TZ: 'UTC',
       JWT_ACCESS_SECRET:
         process.env.JWT_ACCESS_SECRET ?? 'test-only-access-secret-0123456789abcdef',
       // Mailpit (SMTP 1025, UI/API 8025) in dev and CI; see docs/runbooks/local-dev.md.
