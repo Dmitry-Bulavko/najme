@@ -5,8 +5,8 @@ import { passwordSchema } from '@najme/contracts';
 import { Eye, EyeOff } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useId, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useId, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -14,9 +14,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ApiError, apiRequest } from '@/lib/api/client';
+import { useEmailLinkToken } from './use-email-link-token';
 
-const resetFormSchema = z.object({ newPassword: passwordSchema });
-type ResetFormValues = z.infer<typeof resetFormSchema>;
+type ResetFormValues = {
+  newPassword: string;
+  confirmPassword: string;
+};
 
 /**
  * Reset-password form. Reads `token` from the query string (email link) and POSTs
@@ -27,12 +30,27 @@ export function ResetPasswordForm() {
   const tErrors = useTranslations('errors');
   const locale = useLocale();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const rawToken = searchParams.get('token');
+  const token = useEmailLinkToken();
   const [showPassword, setShowPassword] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const passwordId = useId();
+  const confirmId = useId();
   const passwordErrorId = `${passwordId}-error`;
+  const confirmErrorId = `${confirmId}-error`;
+
+  const resetFormSchema = useMemo(
+    () =>
+      z
+        .object({
+          newPassword: passwordSchema,
+          confirmPassword: z.string().min(1),
+        })
+        .refine((data) => data.newPassword === data.confirmPassword, {
+          path: ['confirmPassword'],
+          message: t('passwordReset.mismatch'),
+        }),
+    [t],
+  );
 
   const {
     register,
@@ -42,7 +60,7 @@ export function ResetPasswordForm() {
     resolver: zodResolver(resetFormSchema),
   });
 
-  if (!rawToken) {
+  if (!token) {
     return (
       <div className="grid gap-4 text-center">
         <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -57,8 +75,6 @@ export function ResetPasswordForm() {
       </div>
     );
   }
-
-  const token = rawToken;
 
   async function onSubmit(data: ResetFormValues) {
     setApiError(null);
@@ -115,6 +131,23 @@ export function ResetPasswordForm() {
         {errors.newPassword?.message ? (
           <p id={passwordErrorId} role="alert" className="text-xs font-medium text-destructive">
             {errors.newPassword.message}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor={confirmId}>{t('passwordReset.confirmLabel')}</Label>
+        <Input
+          {...register('confirmPassword')}
+          id={confirmId}
+          type={showPassword ? 'text' : 'password'}
+          autoComplete="new-password"
+          aria-invalid={errors.confirmPassword ? true : undefined}
+          aria-describedby={errors.confirmPassword ? confirmErrorId : undefined}
+        />
+        {errors.confirmPassword?.message ? (
+          <p id={confirmErrorId} role="alert" className="text-xs font-medium text-destructive">
+            {errors.confirmPassword.message}
           </p>
         ) : null}
       </div>

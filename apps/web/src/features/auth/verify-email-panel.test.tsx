@@ -43,6 +43,8 @@ beforeEach(() => {
   setAccessToken(null);
   getParam.mockReturnValue('verify-token');
   vi.stubGlobal('fetch', vi.fn());
+  window.history.replaceState({}, '', '/en/verify-email?token=verify-token');
+  vi.spyOn(window.history, 'replaceState');
 });
 
 afterEach(() => {
@@ -66,6 +68,25 @@ describe('VerifyEmailPanel', () => {
     });
   });
 
+  it('strips token from the URL after reading it', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(window.history.replaceState).toHaveBeenCalled();
+    });
+    const calls = vi.mocked(window.history.replaceState).mock.calls;
+    const nextUrl = calls.find(
+      (call) => typeof call[2] === 'string' && !String(call[2]).includes('token='),
+    )?.[2];
+    expect(nextUrl).toBeDefined();
+  });
+
   it('shows success after a 204 verify response', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(
@@ -82,7 +103,7 @@ describe('VerifyEmailPanel', () => {
     });
   });
 
-  it('shows TOKEN_INVALID from the API', async () => {
+  it('shows TOKEN_INVALID from the API and offers Resend via sign-in', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(
         makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
@@ -96,5 +117,8 @@ describe('VerifyEmailPanel', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(catalogs.en.errors.TOKEN_INVALID);
     });
+    expect(
+      screen.getByRole('link', { name: catalogs.en.auth.emailVerification.resend }),
+    ).toHaveAttribute('href', '/en/sign-in');
   });
 });

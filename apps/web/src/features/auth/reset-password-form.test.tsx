@@ -38,11 +38,18 @@ function renderForm() {
   );
 }
 
+async function fillPasswords(user: ReturnType<typeof userEvent.setup>, password: string) {
+  await user.type(screen.getByLabelText(catalogs.en.auth.passwordReset.passwordLabel), password);
+  await user.type(screen.getByLabelText(catalogs.en.auth.passwordReset.confirmLabel), password);
+}
+
 beforeEach(() => {
   setAccessToken(null);
   replace.mockClear();
   getParam.mockReturnValue('reset-token');
   vi.stubGlobal('fetch', vi.fn());
+  window.history.replaceState({}, '', '/en/reset-password?token=reset-token');
+  vi.spyOn(window.history, 'replaceState');
 });
 
 afterEach(() => {
@@ -58,15 +65,46 @@ describe('ResetPasswordForm', () => {
     );
   });
 
+  it('strips token from the URL after reading it', async () => {
+    renderForm();
+    await waitFor(() => {
+      expect(window.history.replaceState).toHaveBeenCalled();
+    });
+    const calls = vi.mocked(window.history.replaceState).mock.calls;
+    const nextUrl = calls.find(
+      (call) => typeof call[2] === 'string' && !String(call[2]).includes('token='),
+    )?.[2];
+    expect(nextUrl).toBeDefined();
+  });
+
   it('shows validation error for a short password', async () => {
     renderForm();
     const user = userEvent.setup();
 
-    await user.type(screen.getByLabelText(catalogs.en.auth.passwordReset.passwordLabel), 'short');
+    await fillPasswords(user, 'short');
     await user.click(screen.getByRole('button', { name: catalogs.en.auth.passwordReset.submit }));
 
     await waitFor(() => {
       expect(screen.getAllByRole('alert').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('shows mismatch when confirm differs', async () => {
+    renderForm();
+    const user = userEvent.setup();
+
+    await user.type(
+      screen.getByLabelText(catalogs.en.auth.passwordReset.passwordLabel),
+      'ValidPass1!',
+    );
+    await user.type(
+      screen.getByLabelText(catalogs.en.auth.passwordReset.confirmLabel),
+      'OtherPass1!',
+    );
+    await user.click(screen.getByRole('button', { name: catalogs.en.auth.passwordReset.submit }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(catalogs.en.auth.passwordReset.mismatch);
     });
   });
 
@@ -76,10 +114,7 @@ describe('ResetPasswordForm', () => {
     renderForm();
     const user = userEvent.setup();
 
-    await user.type(
-      screen.getByLabelText(catalogs.en.auth.passwordReset.passwordLabel),
-      'ValidPass1!',
-    );
+    await fillPasswords(user, 'ValidPass1!');
     await user.click(screen.getByRole('button', { name: catalogs.en.auth.passwordReset.submit }));
 
     await waitFor(() => {
@@ -95,10 +130,7 @@ describe('ResetPasswordForm', () => {
     renderForm();
     const user = userEvent.setup();
 
-    await user.type(
-      screen.getByLabelText(catalogs.en.auth.passwordReset.passwordLabel),
-      'ValidPass1!',
-    );
+    await fillPasswords(user, 'ValidPass1!');
     await user.click(screen.getByRole('button', { name: catalogs.en.auth.passwordReset.submit }));
 
     await waitFor(() => {

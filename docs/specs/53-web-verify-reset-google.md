@@ -66,3 +66,5 @@ Routes: `/[locale]/verify-email`, `/forgot-password`, `/reset-password`. Auth na
 - Google button requires both `GET /auth/providers.google` and `NEXT_PUBLIC_GOOGLE_CLIENT_ID`;
   without #58 credentials it stays hidden.
 - Unverified banner sits under `SiteHeader` in the locale layout so every page surfaces it.
+- Token pages set `referrer: 'no-referrer'` in metadata and strip `token` via
+  `history.replaceState` (`useEmailLinkToken`) per ADR-0011.
