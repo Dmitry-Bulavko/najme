@@ -34,6 +34,11 @@ Env: in development the API, web and the Prisma CLI (migrate/generate) load the 
 images never read an env file. Turbo runs in strict env mode, so any variable a `dev` task reads
 must be listed in that app's `turbo.json`.
 
+The API `dev` runner (`apps/api/scripts/dev.mjs`) only passes `--env-file-if-exists=../../.env` when
+that file exists. On Node 22, watch mode also watches the env-file path and would crash with
+`ENOENT` if the flag pointed at a missing file; Node 24 is more tolerant. You can still run with
+exported shell variables and no root `.env` (for example in a fresh worktree).
+
 API code changes are recompiled with `tsc --watch` and the process restarts; changes to shared
 packages need `pnpm --filter @najme/<pkg> build` (no watch mode).
 
