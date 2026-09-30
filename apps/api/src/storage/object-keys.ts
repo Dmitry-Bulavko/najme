@@ -1,5 +1,4 @@
 import type { UploadContentType, UploadKind } from '@najme/contracts';
-import { UPLOAD_MAX_BYTES } from '@najme/contracts';
 import { newId } from '../common/id.js';
 
 const EXT_BY_TYPE: Record<UploadContentType, string> = {
@@ -8,16 +7,24 @@ const EXT_BY_TYPE: Record<UploadContentType, string> = {
   'image/webp': 'webp',
 };
 
+const TYPE_BY_EXT: Record<string, UploadContentType> = {
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+};
+
 const KIND_SEGMENT: Record<UploadKind, string> = {
   LOGO: 'logo',
   COVER: 'cover',
   STAFF_PHOTO: 'staff',
 };
 
-export { UPLOAD_MAX_BYTES };
-
 export function extensionForContentType(contentType: UploadContentType): string {
   return EXT_BY_TYPE[contentType];
+}
+
+export function contentTypeForExtension(ext: string): UploadContentType | undefined {
+  return TYPE_BY_EXT[ext];
 }
 
 export function kindSegment(kind: UploadKind): string {
@@ -43,6 +50,14 @@ export function keyPrefixFor(businessId: string, kind: UploadKind): string {
   return `businesses/${businessId}/${kindSegment(kind)}/`;
 }
 
-export function isKeyUnderPrefix(key: string, prefix: string): boolean {
-  return key.startsWith(prefix) && !key.includes('..');
+/**
+ * Strict key shape for attach: prefix + uuid + allowed extension, no path tricks.
+ * UUID is the canonical 8-4-4-4-12 hex form (v7 from {@link newId}).
+ */
+export function isValidUploadKey(key: string, businessId: string, kind: UploadKind): boolean {
+  const segment = kindSegment(kind);
+  const pattern = new RegExp(
+    `^businesses/${businessId}/${segment}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(jpg|png|webp)$`,
+  );
+  return pattern.test(key);
 }

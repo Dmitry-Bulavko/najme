@@ -14,6 +14,8 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   attachUploadRequestSchema,
   createUploadRequestSchema,
+  type AttachBusinessImageResponse,
+  type AttachStaffPhotoResponse,
   type AttachUploadRequest,
   type CreateUploadRequest,
   type CreateUploadResponse,
@@ -51,7 +53,7 @@ export class UploadsController {
   attachLogo(
     @CurrentMembership() membership: BusinessMembership,
     @Body(new ZodValidationPipe(attachUploadRequestSchema)) body: AttachUploadRequest,
-  ): Promise<{ logoUrl: string | null; coverUrl: string | null }> {
+  ): Promise<AttachBusinessImageResponse> {
     return this.uploads.attachLogo(membership.businessId, body);
   }
 
@@ -69,7 +71,7 @@ export class UploadsController {
   attachCover(
     @CurrentMembership() membership: BusinessMembership,
     @Body(new ZodValidationPipe(attachUploadRequestSchema)) body: AttachUploadRequest,
-  ): Promise<{ logoUrl: string | null; coverUrl: string | null }> {
+  ): Promise<AttachBusinessImageResponse> {
     return this.uploads.attachCover(membership.businessId, body);
   }
 
@@ -88,7 +90,7 @@ export class UploadsController {
     @CurrentMembership() membership: BusinessMembership,
     @Param('staffId', ParseUUIDPipe) staffId: string,
     @Body(new ZodValidationPipe(attachUploadRequestSchema)) body: AttachUploadRequest,
-  ): Promise<{ photoUrl: string | null }> {
+  ): Promise<AttachStaffPhotoResponse> {
     return this.uploads.attachStaffPhoto(membership.businessId, staffId, body);
   }
 

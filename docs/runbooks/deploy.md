@@ -61,22 +61,32 @@ The existing $20 Lightsail instance (4 GB RAM) is reused and wiped.
 
 Create the environment as described in `github-setup.md`, then add:
 
-| Name                    | Type     | Value                                                                               |
-| ----------------------- | -------- | ----------------------------------------------------------------------------------- |
-| `DOMAIN`                | variable | `najme.dzmitry-bulauka.com`                                                         |
-| `LIGHTSAIL_HOST`        | secret   | static IP                                                                           |
-| `LIGHTSAIL_USER`        | secret   | `deploy`                                                                            |
-| `LIGHTSAIL_SSH_KEY`     | secret   | contents of `najme_deploy` (private key)                                            |
-| `LIGHTSAIL_KNOWN_HOSTS` | secret   | output of `ssh-keyscan`                                                             |
-| `GHCR_READ_TOKEN`       | secret   | PAT with `read:packages`                                                            |
-| `POSTGRES_PASSWORD`     | secret   | long random string (`openssl rand -hex 32`)                                         |
-| `JWT_ACCESS_SECRET`     | secret   | long random string (`openssl rand -base64 48`)                                      |
-| `SMTP_HOST`             | variable | provider's SMTP host (M5; nothing sends yet)                                        |
-| `SMTP_PORT`             | variable | provider's SMTP port, e.g. `587`                                                    |
-| `SMTP_USER`             | secret   | SMTP username (empty if none)                                                       |
-| `SMTP_PASSWORD`         | secret   | SMTP password, no `'` characters                                                    |
-| `MAIL_FROM`             | variable | `Najme <no-reply@<domain>>`                                                         |
-| `GOOGLE_CLIENT_IDS`     | variable | comma-separated Google OAuth client IDs (#58); must include the web client ID below |
+| Name                        | Type     | Value                                                                               |
+| --------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| `DOMAIN`                    | variable | `najme.dzmitry-bulauka.com`                                                         |
+| `LIGHTSAIL_HOST`            | secret   | static IP                                                                           |
+| `LIGHTSAIL_USER`            | secret   | `deploy`                                                                            |
+| `LIGHTSAIL_SSH_KEY`         | secret   | contents of `najme_deploy` (private key)                                            |
+| `LIGHTSAIL_KNOWN_HOSTS`     | secret   | output of `ssh-keyscan`                                                             |
+| `GHCR_READ_TOKEN`           | secret   | PAT with `read:packages`                                                            |
+| `POSTGRES_PASSWORD`         | secret   | long random string (`openssl rand -hex 32`)                                         |
+| `JWT_ACCESS_SECRET`         | secret   | long random string (`openssl rand -base64 48`)                                      |
+| `SMTP_HOST`                 | variable | provider's SMTP host (M5; nothing sends yet)                                        |
+| `SMTP_PORT`                 | variable | provider's SMTP port, e.g. `587`                                                    |
+| `SMTP_USER`                 | secret   | SMTP username (empty if none)                                                       |
+| `SMTP_PASSWORD`             | secret   | SMTP password, no `'` characters                                                    |
+| `MAIL_FROM`                 | variable | `Najme <no-reply@<domain>>`                                                         |
+| `GOOGLE_CLIENT_IDS`         | variable | comma-separated Google OAuth client IDs (#58); must include the web client ID below |
+| `STORAGE_ENDPOINT`          | variable | S3 API endpoint (Lightsail Object Storage in M7; placeholder OK until then)         |
+| `STORAGE_REGION`            | variable | S3 region string (e.g. `us-east-1`)                                                 |
+| `STORAGE_BUCKET`            | variable | bucket name                                                                         |
+| `STORAGE_ACCESS_KEY_ID`     | secret   | S3 access key id                                                                    |
+| `STORAGE_SECRET_ACCESS_KEY` | secret   | S3 secret; must not contain `'` (server `.env` is sourced by bash)                  |
+| `STORAGE_PUBLIC_BASE_URL`   | variable | public origin used to build `logoUrl` / `coverUrl` / `photoUrl`                     |
+| `STORAGE_FORCE_PATH_STYLE`  | variable | `true` for path-style MinIO/dev; typically `false` for Lightsail                    |
+
+Until the Lightsail bucket exists (M7), any syntactically valid placeholders are fine: the API
+constructs the S3 client lazily and `/health` does not touch storage.
 
 ### Build-time variables (image build)
 

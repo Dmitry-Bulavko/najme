@@ -71,21 +71,28 @@ jobs:
 
       - name: Start MinIO
         run: |
+          # Docker Hub minio/minio was removed (2026-09); Pigsty community image is MinIO-compatible.
           docker run -d --name najme-minio \
             -p 9000:9000 \
             -e MINIO_ROOT_USER=minioadmin \
             -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio:latest server /data
+            -e MINIO_API_CORS_ALLOW_ORIGIN=http://localhost:3001,http://127.0.0.1:3001 \
+            pgsty/minio:RELEASE.2026-06-18T00-00-00Z server /data
           for _ in $(seq 30); do
-            if curl -sf http://localhost:9000/minio/health/live; then exit 0; fi
+            if curl -sf http://localhost:9000/minio/health/live; then break; fi
             sleep 1
           done
-          echo "MinIO did not become healthy"
-          docker logs najme-minio || true
-          exit 1
+          if ! curl -sf http://localhost:9000/minio/health/live; then
+            echo "MinIO did not become healthy"
+            docker logs najme-minio || true
+            exit 1
+          fi
 
       - name: Install
         run: pnpm install --frozen-lockfile
+
+      - name: Init MinIO bucket
+        run: pnpm --filter @najme/api exec node scripts/storage-init.mjs
 
       - name: Format
         run: pnpm format:check

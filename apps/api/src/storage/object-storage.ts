@@ -8,7 +8,6 @@ export type PresignPostInput = {
 export type PresignPostResult = {
   url: string;
   fields: Record<string, string>;
-  expiresAt: Date;
 };
 
 export type ObjectHead = {

@@ -1,5 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import type {
+  AttachBusinessImageResponse,
+  AttachStaffPhotoResponse,
   AttachUploadRequest,
   CreateUploadRequest,
   CreateUploadResponse,
@@ -10,7 +12,7 @@ import { UPLOAD_MAX_BYTES } from '@najme/contracts';
 import { Clock } from '../common/clock.js';
 import { apiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { buildObjectKey, isKeyUnderPrefix, keyPrefixFor } from './object-keys.js';
+import { contentTypeForExtension, isValidUploadKey, buildObjectKey } from './object-keys.js';
 import { ObjectStorage } from './object-storage.js';
 
 const PRESIGN_TTL_SECONDS = 10 * 60;
@@ -35,20 +37,27 @@ export class UploadsService {
       maxBytes: UPLOAD_MAX_BYTES,
       expiresInSeconds: PRESIGN_TTL_SECONDS,
     });
+    const expiresAt = new Date(this.clock.now().getTime() + PRESIGN_TTL_SECONDS * 1000);
     return {
       key,
       url: result.url,
       fields: result.fields,
-      expiresAt: result.expiresAt.toISOString(),
+      expiresAt: expiresAt.toISOString(),
     };
   }
 
-  async attachLogo(businessId: string, input: AttachUploadRequest) {
+  async attachLogo(
+    businessId: string,
+    input: AttachUploadRequest,
+  ): Promise<AttachBusinessImageResponse> {
     await this.attachBusinessKey(businessId, 'LOGO', 'logoKey', input.key);
     return this.getBusinessUrls(businessId);
   }
 
-  async attachCover(businessId: string, input: AttachUploadRequest) {
+  async attachCover(
+    businessId: string,
+    input: AttachUploadRequest,
+  ): Promise<AttachBusinessImageResponse> {
     await this.attachBusinessKey(businessId, 'COVER', 'coverKey', input.key);
     return this.getBusinessUrls(businessId);
   }
@@ -61,29 +70,54 @@ export class UploadsService {
     await this.clearBusinessKey(businessId, 'coverKey');
   }
 
-  async attachStaffPhoto(businessId: string, staffId: string, input: AttachUploadRequest) {
-    await this.requireStaff(businessId, staffId);
-    await this.verifyUploadedObject(businessId, 'STAFF_PHOTO', input.key);
+  async attachStaffPhoto(
+    businessId: string,
+    staffId: string,
+    input: AttachUploadRequest,
+  ): Promise<AttachStaffPhotoResponse> {
     const existing = await this.prisma.staffMember.findFirst({
       where: { id: staffId, businessId, deletedAt: null },
-      select: { photoKey: true },
+      select: { id: true, photoKey: true },
     });
     if (!existing) {
       throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Staff member not found.');
     }
+
+    await this.verifyUploadedObject(businessId, 'STAFF_PHOTO', input.key);
+
+    const shared = await this.prisma.staffMember.findFirst({
+      where: {
+        businessId,
+        deletedAt: null,
+        photoKey: input.key,
+        NOT: { id: staffId },
+      },
+      select: { id: true },
+    });
+    if (shared) {
+      throw apiError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'UPLOAD_INVALID',
+        'Upload key is already attached to another staff member.',
+      );
+    }
+
+    const previous = existing.photoKey;
     const now = this.clock.now();
-    await this.prisma.staffMember.updateMany({
-      where: { id: staffId, businessId, deletedAt: null },
+    const updated = await this.prisma.staffMember.updateMany({
+      where: { id: staffId, businessId, deletedAt: null, photoKey: previous },
       data: { photoKey: input.key, updatedAt: now },
     });
-    if (existing.photoKey && existing.photoKey !== input.key) {
-      await this.storage.deleteObject(existing.photoKey);
+    if (updated.count === 0) {
+      throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Staff member not found.');
+    }
+    if (previous && previous !== input.key) {
+      await this.deleteObjectIfUnreferenced(previous);
     }
     return { photoUrl: this.storage.publicUrl(input.key) };
   }
 
   async clearStaffPhoto(businessId: string, staffId: string): Promise<void> {
-    await this.requireStaff(businessId, staffId);
     const existing = await this.prisma.staffMember.findFirst({
       where: { id: staffId, businessId, deletedAt: null },
       select: { photoKey: true },
@@ -91,18 +125,18 @@ export class UploadsService {
     if (!existing) {
       throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Staff member not found.');
     }
+    const previous = existing.photoKey;
     const now = this.clock.now();
-    await this.prisma.staffMember.updateMany({
-      where: { id: staffId, businessId, deletedAt: null },
+    const updated = await this.prisma.staffMember.updateMany({
+      where: { id: staffId, businessId, deletedAt: null, photoKey: previous },
       data: { photoKey: null, updatedAt: now },
     });
-    if (existing.photoKey) {
-      await this.storage.deleteObject(existing.photoKey);
+    if (updated.count === 0) {
+      throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Staff member not found.');
     }
-  }
-
-  urlFor(key: string | null | undefined): string | null {
-    return this.storage.publicUrl(key);
+    if (previous) {
+      await this.deleteObjectIfUnreferenced(previous);
+    }
   }
 
   private async attachBusinessKey(
@@ -121,12 +155,15 @@ export class UploadsService {
     }
     const previous = existing[column];
     const now = this.clock.now();
-    await this.prisma.business.updateMany({
-      where: { id: businessId, deletedAt: null },
+    const updated = await this.prisma.business.updateMany({
+      where: { id: businessId, deletedAt: null, [column]: previous },
       data: { [column]: key, updatedAt: now },
     });
+    if (updated.count === 0) {
+      throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Business not found.');
+    }
     if (previous && previous !== key) {
-      await this.storage.deleteObject(previous);
+      await this.deleteObjectIfUnreferenced(previous);
     }
   }
 
@@ -143,19 +180,19 @@ export class UploadsService {
     }
     const previous = existing[column];
     const now = this.clock.now();
-    await this.prisma.business.updateMany({
-      where: { id: businessId, deletedAt: null },
+    const updated = await this.prisma.business.updateMany({
+      where: { id: businessId, deletedAt: null, [column]: previous },
       data: { [column]: null, updatedAt: now },
     });
+    if (updated.count === 0) {
+      throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Business not found.');
+    }
     if (previous) {
-      await this.storage.deleteObject(previous);
+      await this.deleteObjectIfUnreferenced(previous);
     }
   }
 
-  private async getBusinessUrls(businessId: string): Promise<{
-    logoUrl: string | null;
-    coverUrl: string | null;
-  }> {
+  private async getBusinessUrls(businessId: string): Promise<AttachBusinessImageResponse> {
     const row = await this.prisma.business.findFirst({
       where: { id: businessId, deletedAt: null },
       select: { logoKey: true, coverKey: true },
@@ -174,8 +211,7 @@ export class UploadsService {
     kind: UploadKind,
     key: string,
   ): Promise<void> {
-    const prefix = keyPrefixFor(businessId, kind);
-    if (!isKeyUnderPrefix(key, prefix)) {
+    if (!isValidUploadKey(key, businessId, kind)) {
       throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, 'UPLOAD_INVALID', 'Upload key is invalid.');
     }
     const head = await this.storage.headObject(key);
@@ -189,6 +225,15 @@ export class UploadsService {
         'Upload content type is not allowed.',
       );
     }
+    const ext = key.slice(key.lastIndexOf('.') + 1);
+    const expectedType = contentTypeForExtension(ext);
+    if (!expectedType || expectedType !== head.contentType) {
+      throw apiError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'UPLOAD_INVALID',
+        'Upload content type does not match the key extension.',
+      );
+    }
     if (head.contentLength < 1 || head.contentLength > UPLOAD_MAX_BYTES) {
       throw apiError(
         HttpStatus.UNPROCESSABLE_ENTITY,
@@ -198,13 +243,22 @@ export class UploadsService {
     }
   }
 
-  private async requireStaff(businessId: string, staffId: string): Promise<void> {
-    const row = await this.prisma.staffMember.findFirst({
-      where: { id: staffId, businessId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!row) {
-      throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Staff member not found.');
+  /** Skip best-effort delete while any live row still references the key. */
+  private async deleteObjectIfUnreferenced(key: string): Promise<void> {
+    const [staffRefs, businessRefs] = await Promise.all([
+      this.prisma.staffMember.count({
+        where: { photoKey: key, deletedAt: null },
+      }),
+      this.prisma.business.count({
+        where: {
+          deletedAt: null,
+          OR: [{ logoKey: key }, { coverKey: key }],
+        },
+      }),
+    ]);
+    if (staffRefs + businessRefs > 0) {
+      return;
     }
+    await this.storage.deleteObject(key);
   }
 }

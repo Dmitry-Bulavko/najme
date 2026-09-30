@@ -1,7 +1,7 @@
 import config from '@najme/config/eslint';
 
 export default [
-  { ignores: ['generated/**'] },
+  { ignores: ['generated/**', 'scripts/storage-init.mjs'] },
   ...config,
   {
     rules: {

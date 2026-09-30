@@ -88,6 +88,13 @@ jobs:
           SMTP_HOST=localhost
           SMTP_PORT=1025
           MAIL_FROM="Najme <no-reply@localhost>"
+          STORAGE_ENDPOINT=http://127.0.0.1:9
+          STORAGE_REGION=us-east-1
+          STORAGE_BUCKET=najme-smoke
+          STORAGE_ACCESS_KEY_ID=smoke
+          STORAGE_SECRET_ACCESS_KEY=smoke-secret-not-real
+          STORAGE_PUBLIC_BASE_URL=http://127.0.0.1:9/najme-smoke
+          STORAGE_FORCE_PATH_STYLE=true
           EOF
 
       - name: Validate compose config

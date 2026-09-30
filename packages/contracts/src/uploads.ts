@@ -31,3 +31,16 @@ export const attachUploadRequestSchema = z.object({
 });
 
 export type AttachUploadRequest = z.infer<typeof attachUploadRequestSchema>;
+
+export const attachBusinessImageResponseSchema = z.object({
+  logoUrl: z.string().url().nullable(),
+  coverUrl: z.string().url().nullable(),
+});
+
+export type AttachBusinessImageResponse = z.infer<typeof attachBusinessImageResponseSchema>;
+
+export const attachStaffPhotoResponseSchema = z.object({
+  photoUrl: z.string().url().nullable(),
+});
+
+export type AttachStaffPhotoResponse = z.infer<typeof attachStaffPhotoResponseSchema>;

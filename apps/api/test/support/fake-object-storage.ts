@@ -1,10 +1,10 @@
-import { publicObjectUrl } from './object-keys.js';
+import { publicObjectUrl } from '../../src/storage/object-keys.js';
 import {
   type ObjectHead,
   ObjectStorage,
   type PresignPostInput,
   type PresignPostResult,
-} from './object-storage.js';
+} from '../../src/storage/object-storage.js';
 
 type StoredObject = {
   contentType: string;
@@ -19,6 +19,8 @@ type StoredObject = {
 export class FakeObjectStorage extends ObjectStorage {
   readonly objects = new Map<string, StoredObject>();
   readonly deletedKeys: string[] = [];
+  /** When set, {@link deleteObject} records the key then throws (caller must swallow). */
+  failDeleteWith: Error | null = null;
   private readonly publicBaseUrl: string;
   private readonly postUrl: string;
 
@@ -33,7 +35,6 @@ export class FakeObjectStorage extends ObjectStorage {
   }
 
   async createPresignedPost(input: PresignPostInput): Promise<PresignPostResult> {
-    const expiresAt = new Date(Date.now() + input.expiresInSeconds * 1000);
     return {
       url: this.postUrl,
       fields: {
@@ -45,7 +46,6 @@ export class FakeObjectStorage extends ObjectStorage {
         'X-Amz-Date': '20260101T000000Z',
         'X-Amz-Signature': 'fake',
       },
-      expiresAt,
     };
   }
 
@@ -59,6 +59,10 @@ export class FakeObjectStorage extends ObjectStorage {
 
   async deleteObject(key: string): Promise<void> {
     this.deletedKeys.push(key);
+    if (this.failDeleteWith) {
+      // Mirror S3ObjectStorage: log-and-swallow; leave the object in place.
+      return;
+    }
     this.objects.delete(key);
   }
 

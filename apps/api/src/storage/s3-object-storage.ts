@@ -31,13 +31,15 @@ export class S3ObjectStorage extends ObjectStorage {
           accessKeyId: this.env.STORAGE_ACCESS_KEY_ID,
           secretAccessKey: this.env.STORAGE_SECRET_ACCESS_KEY,
         },
+        // Newer AWS SDK default checksum headers are not implemented by MinIO/Pigsty.
+        requestChecksumCalculation: 'WHEN_REQUIRED',
+        responseChecksumValidation: 'WHEN_REQUIRED',
       });
     }
     return this.client;
   }
 
   async createPresignedPost(input: PresignPostInput): Promise<PresignPostResult> {
-    const expiresAt = new Date(Date.now() + input.expiresInSeconds * 1000);
     const { url, fields } = await createPresignedPost(this.getClient(), {
       Bucket: this.env.STORAGE_BUCKET,
       Key: input.key,
@@ -50,7 +52,7 @@ export class S3ObjectStorage extends ObjectStorage {
         'Content-Type': input.contentType,
       },
     });
-    return { url, fields, expiresAt };
+    return { url, fields };
   }
 
   async headObject(key: string): Promise<ObjectHead | null> {
