@@ -8,26 +8,16 @@
 // separate one-off build) made the watcher's initial emit rewrite `dist/` and restart the freshly
 // started API, which broke the CI dev smoke intermittently (#69).
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, resolve } from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+
+import { buildNodeServerArgs } from './dev-args.mjs';
 
 const require = createRequire(import.meta.url);
 const tsc = require.resolve('typescript/bin/tsc');
 const compileDone = /Found (\d+) errors?\. Watching for file changes\./;
 
-// Repo-root `.env` relative to this script (`apps/api/scripts` → `../../.env`).
-// Only pass `--env-file-if-exists` when the file is present: on Node 22, watch mode also
-// watches that path and crashes with ENOENT if the file is missing (#152).
-const rootEnvPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../.env');
-const nodeServerArgs = [
-  '--watch',
-  '--watch-path=dist',
-  ...(existsSync(rootEnvPath) ? ['--env-file-if-exists=../../.env'] : []),
-  'dist/main.js',
-];
+const nodeServerArgs = buildNodeServerArgs();
 
 const children = [];
 
