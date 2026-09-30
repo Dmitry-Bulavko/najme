@@ -24,11 +24,13 @@ requests directly cause double bookings and lost trust.
   ranges for the same staff member among active bookings (`PENDING`, `CONFIRMED`). The API maps the
   constraint violation to a `409 SLOT_TAKEN` error. This is created with raw SQL in a Prisma
   migration.
-- **Libraries:** use a well-maintained timezone-aware date library (e.g. `date-fns` + `date-fns-tz`
-  or `Temporal` polyfill); decide in the scheduling task and record it here.
+- **Libraries:** **`date-fns` v4** plus **`@date-fns/tz`** (chosen in #75). `BusinessTime` helpers
+  convert business-local wall clock ↔ UTC without relying on the process timezone. Prefer this
+  stack over a Temporal polyfill for MVP scheduling.
 - **Tests:** slot computation has unit tests covering DST switch days in `Europe/Podgorica`,
   overlapping time off, buffers and back-to-back bookings; the constraint has an e2e test with
-  concurrent requests.
+  concurrent requests. `BusinessTime` unit tests cover spring-forward (2026-03-29) and fall-back
+  (2026-10-25) in `Europe/Podgorica`.
 
 ## Consequences
 
