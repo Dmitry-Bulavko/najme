@@ -40,6 +40,8 @@ export const createBusinessRequestSchema = z.object({
   address: optionalAddress,
   contactPhone: optionalPhone,
   contactEmail: emailSchema.optional(),
+  /** When true, creates a StaffMember linked to the OWNER membership (#74). */
+  ownerIsStaff: z.boolean().optional(),
 });
 
 export type CreateBusinessRequest = z.infer<typeof createBusinessRequestSchema>;
