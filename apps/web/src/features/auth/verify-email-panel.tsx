@@ -136,7 +136,7 @@ export function VerifyEmailPanel() {
   }
 
   return (
-    <div className="grid gap-4 text-center">
+    <div className="grid gap-4 text-center" data-testid="verify-email-success">
       <p role="status" className="rounded-md bg-success/10 px-3 py-3 text-sm text-text01">
         <span className="block font-bold">{t('emailVerification.successTitle')}</span>
         <span className="mt-1 block text-muted-foreground">
