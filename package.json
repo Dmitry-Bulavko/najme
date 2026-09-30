@@ -13,6 +13,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:e2e": "pnpm --filter @najme/web test:e2e",
     "check": "pnpm format:check && turbo run lint typecheck test build",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

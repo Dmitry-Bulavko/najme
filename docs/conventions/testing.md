@@ -14,12 +14,30 @@
 | `packages/*` | Vitest                                                                           | Pure logic: schemas, locale resolution, formatting helpers                     |
 | API unit     | Test runner chosen at scaffold (Vitest preferred; Jest if Nest tooling requires) | Services, slot computation, policies (mock Prisma only at repository boundary) |
 | API e2e      | Supertest against the Nest app + real Postgres                                   | Endpoints: status codes, validation, authz, DB constraints                     |
-| Web          | Vitest + Testing Library; Playwright for critical flows (later)                  | Components with logic, forms, i18n rendering                                   |
+| Web          | Vitest + Testing Library; Playwright for critical flows (`apps/web/e2e`)         | Components with logic, forms, i18n rendering; browser account flows            |
 | Mobile       | Jest (jest-expo) + React Native Testing Library                                  | Screens with logic, hooks                                                      |
 
 Web note: the shared Vitest base config disables `globals`, so Testing Library's auto-cleanup
 (which relies on a global `afterEach`) does not run automatically — register `cleanup()` explicitly
 in the app's Vitest setup file (see `apps/web/vitest.setup.ts`) to avoid DOM leaking between tests.
+
+### Web Playwright e2e
+
+Critical account flows live in `apps/web/e2e/*.spec.ts` and run with Playwright (Chromium). They are
+**not** part of `pnpm test` / `pnpm check` — unit runs stay fast. CI runs them in the separate `e2e`
+job (Postgres + Mailpit + `pnpm dev`).
+
+Locally (with Postgres, Mailpit, and `pnpm dev` already up — see `docs/runbooks/local-dev.md`):
+
+```bash
+pnpm --filter @najme/web exec playwright install chromium   # once per machine
+MAILPIT_URL=http://localhost:8025 pnpm test:e2e
+```
+
+Optional env: `WEB_BASE_URL` (default `http://localhost:3001`), `API_BASE_URL` (default
+`http://localhost:3000/api/v1`), `MAILPIT_URL` (default `http://localhost:8025`). Reusable fixtures
+under `apps/web/e2e/fixtures/` cover API registration, Mailpit link polling, and UI sign-in — later
+phases add more `*.spec.ts` files only.
 
 ## Database in tests
 

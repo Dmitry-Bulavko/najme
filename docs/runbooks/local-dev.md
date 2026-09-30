@@ -48,6 +48,18 @@ The Mailpit-backed API e2e suite (`test/auth-mailpit.e2e-spec.ts`) runs when `MA
 (`MAILPIT_URL=http://localhost:8025 pnpm --filter @najme/api test`); without it the suite is skipped
 and the fake-mailer suite still covers the same flows. CI always sets it.
 
+### Web Playwright e2e (account flow)
+
+With the stack from "First run" already healthy (API `:3000`, web `:3001`, Mailpit `:8025`):
+
+```bash
+pnpm --filter @najme/web exec playwright install chromium   # once per machine
+MAILPIT_URL=http://localhost:8025 pnpm test:e2e
+```
+
+Specs are under `apps/web/e2e/`. Plain `pnpm test` / `pnpm check` do **not** run them. On failure,
+Playwright writes traces and screenshots under `apps/web/test-results/` (gitignored).
+
 ## Mobile
 
 Kept out of `pnpm dev` (Expo's interactive CLI does not fit turbo's stream UI):
@@ -104,12 +116,13 @@ schema change, run `pnpm --filter @najme/api db:generate`, or any turbo task suc
 
 ## Everyday commands
 
-| Command                                                   | What                            |
-| --------------------------------------------------------- | ------------------------------- |
-| `pnpm check`                                              | Everything CI runs              |
-| `pnpm turbo run test --filter=@najme/<pkg>`               | Tests for one package           |
-| `pnpm turbo run lint typecheck --filter=...[origin/main]` | Only what changed on the branch |
-| `pnpm format`                                             | Format the repo                 |
+| Command                                                   | What                                     |
+| --------------------------------------------------------- | ---------------------------------------- |
+| `pnpm check`                                              | Everything CI runs (not Playwright)      |
+| `pnpm test:e2e`                                           | Web Playwright account e2e (needs stack) |
+| `pnpm turbo run test --filter=@najme/<pkg>`               | Tests for one package                    |
+| `pnpm turbo run lint typecheck --filter=...[origin/main]` | Only what changed on the branch          |
+| `pnpm format`                                             | Format the repo                          |
 
 ## Claude Code
 
