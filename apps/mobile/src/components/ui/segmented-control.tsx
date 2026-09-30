@@ -49,6 +49,8 @@ export function SegmentedControl({
             accessibilityState={{ selected, disabled }}
             disabled={disabled}
             onPress={() => onChange(option.value)}
+            // Visual height is intentionally compact; hitSlop extends the touch area to 44 dp.
+            hitSlop={{ top: 4, bottom: 4 }}
             style={({ pressed }) => [
               styles.segment,
               selected && styles.segmentSelected,

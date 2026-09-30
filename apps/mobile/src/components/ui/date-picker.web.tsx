@@ -34,6 +34,8 @@ export function DatePicker({
   onChange,
   disabled = false,
   error,
+  minimumDate,
+  maximumDate,
   containerStyle,
   testID,
 }: DatePickerProps): ReactElement {
@@ -62,6 +64,14 @@ export function DatePicker({
           onBlur={() => {
             const parsed = parseIsoDate(draft ?? display);
             if (parsed) {
+              if (minimumDate && parsed < minimumDate) {
+                setDraft(null);
+                return;
+              }
+              if (maximumDate && parsed > maximumDate) {
+                setDraft(null);
+                return;
+              }
               onChange(formatIsoDate(parsed));
             }
             setDraft(null);

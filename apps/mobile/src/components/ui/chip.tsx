@@ -35,6 +35,8 @@ export function Chip({
       disabled={disabled || !pressable}
       onPress={onPress}
       testID={testID}
+      // Visual height is intentionally compact; hitSlop extends the touch area to 44 dp.
+      hitSlop={{ top: 4, bottom: 4 }}
       style={({ pressed }) => [
         styles.chip,
         selected && styles.chipSelected,

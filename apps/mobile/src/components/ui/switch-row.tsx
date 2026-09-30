@@ -53,7 +53,8 @@ export function SwitchRow({
         onValueChange={onValueChange}
         disabled={disabled}
         trackColor={{ false: colors.base04, true: colors.primary }}
-        thumbColor={colors.base01}
+        // White thumb on both states; explicitly set so RN Web doesn't bleed the track colour.
+        thumbColor={value ? colors.primaryForeground : colors.base01}
       />
     </Pressable>
   );

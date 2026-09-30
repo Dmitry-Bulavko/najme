@@ -150,7 +150,9 @@ const styles = StyleSheet.create({
   message: { marginTop: spacing.xs },
   backdrop: {
     flex: 1,
-    // text01 at 40% opacity — same overlay treatment as the web Sheet/Dialog.
+    // text01 at ~40 % opacity (0x66 / 255 ≈ 0.40) — same overlay treatment as the web Sheet/Dialog.
+    // A dedicated token (e.g. tokens.colors.overlay) was not created to avoid an unplanned
+    // ui-tokens design decision; document here so the value is traceable.
     backgroundColor: `${colors.text01}66`,
   },
   sheet: {
