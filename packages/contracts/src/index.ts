@@ -7,4 +7,5 @@ export * from './locale.js';
 export * from './money.js';
 export * from './pagination.js';
 export * from './primitives.js';
+export * from './time.js';
 export * from './users.js';

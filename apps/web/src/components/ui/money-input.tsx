@@ -1,6 +1,11 @@
 'use client';
 
-import { formatMinorAsMajor, parseMajorToMinor, type Money } from '@najme/contracts';
+import {
+  formatMinorAsMajor,
+  parseMajorToMinor,
+  type ContractLocale,
+  type Money,
+} from '@najme/contracts';
 import { useState, type ChangeEvent, type ComponentProps, type ReactElement } from 'react';
 
 import { Input } from '@/components/ui/input';
@@ -15,6 +20,8 @@ export interface MoneyInputProps extends Omit<
   onChange: (minor: number | null) => void;
   /** ISO currency shown as a trailing affix; defaults to EUR. */
   currency?: Money['currency'];
+  /** UI locale used to detect the decimal separator; defaults to `'en'`. */
+  locale?: ContractLocale;
 }
 
 /**
@@ -25,6 +32,7 @@ export function MoneyInput({
   value,
   onChange,
   currency = 'EUR',
+  locale = 'en',
   className,
   onBlur,
   onFocus,
@@ -39,7 +47,7 @@ export function MoneyInput({
       onChange(null);
       return;
     }
-    const minor = parseMajorToMinor(trimmed);
+    const minor = parseMajorToMinor(trimmed, locale);
     if (minor === null) {
       return;
     }

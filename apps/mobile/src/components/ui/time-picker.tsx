@@ -83,7 +83,7 @@ export function TimePicker({
           <DateTimePicker
             mode="time"
             value={dateValue}
-            minuteInterval={stepMinutes as 5}
+            minuteInterval={stepMinutes as 1 | 2 | 3 | 4 | 5 | 6 | 10 | 12 | 15 | 20 | 30}
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
             onChange={handleChange}
           />

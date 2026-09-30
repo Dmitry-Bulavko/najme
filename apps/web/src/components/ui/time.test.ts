@@ -24,8 +24,8 @@ describe('snapHhMm', () => {
     expect(snapHhMm('09:08')).toBe('09:10');
   });
 
-  it('formats and wraps midnight', () => {
+  it('clamps to 23:55 instead of wrapping to 00:00', () => {
     expect(formatHhMm(0, 0)).toBe('00:00');
-    expect(snapHhMm('23:58')).toBe('00:00');
+    expect(snapHhMm('23:58')).toBe('23:55');
   });
 });

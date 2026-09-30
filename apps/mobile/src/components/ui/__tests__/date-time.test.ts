@@ -9,6 +9,10 @@ describe('snapHhMm', () => {
     expect(snapHhMm('09:08')).toBe('09:10');
   });
 
+  it('clamps to 23:55 instead of wrapping to 00:00', () => {
+    expect(snapHhMm('23:58')).toBe('23:55');
+  });
+
   it('formats HH:mm', () => {
     expect(formatHhMm(9, 5)).toBe('09:05');
     expect(parseHhMm('23:59')).toEqual({ hours: 23, minutes: 59 });

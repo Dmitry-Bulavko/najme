@@ -1,4 +1,9 @@
-import { formatMinorAsMajor, parseMajorToMinor, type Money } from '@najme/contracts';
+import {
+  formatMinorAsMajor,
+  parseMajorToMinor,
+  type ContractLocale,
+  type Money,
+} from '@najme/contracts';
 import { tokens } from '@najme/ui-tokens';
 import { useState, type ReactElement } from 'react';
 import { StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
@@ -17,6 +22,8 @@ export interface MoneyInputProps {
   value: number | null;
   onChange: (minor: number | null) => void;
   currency?: Money['currency'];
+  /** UI locale used to detect the decimal separator; defaults to `'en'`. */
+  locale?: ContractLocale;
   helperText?: string;
   error?: string;
   disabled?: boolean;
@@ -35,6 +42,7 @@ export function MoneyInput({
   value,
   onChange,
   currency = 'EUR',
+  locale = 'en',
   helperText,
   error,
   disabled = false,
@@ -53,7 +61,7 @@ export function MoneyInput({
       onChange(null);
       return;
     }
-    const minor = parseMajorToMinor(trimmed);
+    const minor = parseMajorToMinor(trimmed, locale);
     if (minor === null) {
       return;
     }
