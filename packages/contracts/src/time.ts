@@ -2,6 +2,7 @@
 export const TIME_STEP_MINUTES = 5;
 
 const HH_MM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const HH_MM_OR_24 = /^(?:([01]\d|2[0-3]):([0-5]\d)|24:00)$/;
 
 export function parseHhMm(value: string): { hours: number; minutes: number } | null {
   const match = HH_MM.exec(value.trim());
@@ -9,6 +10,36 @@ export function parseHhMm(value: string): { hours: number; minutes: number } | n
     return null;
   }
   return { hours: Number(match[1]), minutes: Number(match[2]) };
+}
+
+/**
+ * Like {@link parseHhMm}, but also accepts `24:00` (end of day → 1440 minutes).
+ * Used for working-hours interval ends (#75).
+ */
+export function parseHhMmEnd(value: string): { hours: number; minutes: number } | null {
+  const trimmed = value.trim();
+  if (trimmed === '24:00') {
+    return { hours: 24, minutes: 0 };
+  }
+  return parseHhMm(trimmed);
+}
+
+/** Minutes since local midnight; `24:00` → 1440. */
+export function hhMmEndToMinutes(value: string): number | null {
+  const parsed = parseHhMmEnd(value);
+  if (!parsed) {
+    return null;
+  }
+  return parsed.hours * 60 + parsed.minutes;
+}
+
+export function minutesToHhMmEnd(totalMinutes: number): string {
+  if (totalMinutes === 1440) {
+    return '24:00';
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return formatHhMm(hours, minutes);
 }
 
 export function formatHhMm(hours: number, minutes: number): string {
@@ -34,3 +65,39 @@ export function snapHhMm(value: string, stepMinutes: number = TIME_STEP_MINUTES)
   const clamped = Math.min(snapped, maxMinutes);
   return formatHhMm(Math.floor(clamped / 60), clamped % 60);
 }
+
+export const weekdaySchemaValues = [
+  'MONDAY',
+  'TUESDAY',
+  'WEDNESDAY',
+  'THURSDAY',
+  'FRIDAY',
+  'SATURDAY',
+  'SUNDAY',
+] as const;
+
+/** HH:mm on a 5-minute step, or `24:00` for interval ends. */
+export function isValidIntervalEnd(
+  value: string,
+  stepMinutes: number = TIME_STEP_MINUTES,
+): boolean {
+  const minutes = hhMmEndToMinutes(value);
+  if (minutes === null) {
+    return false;
+  }
+  return minutes % stepMinutes === 0;
+}
+
+/** HH:mm on a 5-minute step (not `24:00`). */
+export function isValidIntervalStart(
+  value: string,
+  stepMinutes: number = TIME_STEP_MINUTES,
+): boolean {
+  const parsed = parseHhMm(value);
+  if (!parsed) {
+    return false;
+  }
+  return (parsed.hours * 60 + parsed.minutes) % stepMinutes === 0;
+}
+
+export { HH_MM_OR_24 };
