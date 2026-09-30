@@ -25,8 +25,10 @@ in the app's Vitest setup file (see `apps/web/vitest.setup.ts`) to avoid DOM lea
 
 - CI provides a PostgreSQL service (see `.github/workflows/ci.yml`); locally use
   `compose.dev.yml`.
-- e2e tests run migrations against a dedicated test database and clean up between tests
-  (truncate or transaction rollback).
+- e2e tests share the migrated database. Isolation is by unique suffixes per file (typically
+  `randomUUID()` on emails and provider account ids) so parallel suites do not collide. Each file
+  tracks the rows it created and deletes them in `afterEach` (child rows cascade from the parent
+  delete). Do not rely on truncate-all or transaction rollback across the suite.
 
 ## Time
 

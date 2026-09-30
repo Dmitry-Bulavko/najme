@@ -63,13 +63,16 @@ Account tab's language switcher persists the choice; after sign-in the account `
 
 ## Structure
 
-- `src/app` — expo-router routes: `_layout.tsx` (font/locale/auth bootstrap), `(tabs)/`, `(auth)/`.
-- `src/features` — screen-level building blocks (`auth/`, `locale/`, `health/`).
+- `src/app` — expo-router routes: `_layout.tsx` (font/locale/auth bootstrap), `(tabs)/` (explore,
+  bookings, account stack), `(auth)/`.
+- `src/features` — screen-level building blocks (`auth/`, `account/`, `locale/`, `health/`).
+- `src/components/ui` — mobile UI kit (Button, Text, TextField, FormField, Card, ListItem,
+  Banner, Avatar, Divider, Screen), re-exported from a single kit barrel `index.ts`.
 - `src/lib/api` — typed fetch client with SecureStore refresh and auth mutex.
 - `src/i18n` — i18next bootstrap and locale persistence (`initI18n`, `setLocale`).
 
 Design tokens come from `@najme/ui-tokens` (see that package's README); UI components are **not**
-shared with `apps/web` (ADR-0003) — this app uses plain React Native primitives.
+shared with `apps/web` (ADR-0003) — this app uses its own React Native kit built on those tokens.
 
 ## Testing
 
