@@ -1,10 +1,13 @@
 ---
 name: implement
-description: Orchestrates implementation of the next Najme task (or a given issue) end to end — selects the highest-priority ready GitHub issue, claims it, delegates coding to the implementer subagent and review to the reviewer subagent, opens the PR, waits for CI and squash-merges. Use when the user says "implement the next task", "take the next issue", "work on #N", "имплементируй следующую задачу", "возьми следующую задачу", "сделай задачу #N".
+description: Claude Code only (ADR-0012) — Cursor and agents working from AGENTS.md must not use this. Fallback orchestrator (ADR-0008) for when Cursor is unavailable — selects the highest-priority ready GitHub issue, claims it, delegates coding to the implementer subagent and review to the reviewer subagent, opens the PR, waits for CI and squash-merges. Use only when the owner explicitly runs `/implement` or asks Claude for the fallback mode ("запасной режим", "implement with subagents").
 argument-hint: '[issue-number] [--dry-run]'
 ---
 
-# /implement — task orchestrator
+> **Claude Code only.** If you are Cursor, or any agent working from `AGENTS.md`, stop here: this
+> is the reviewer's tooling (ADR-0012, `AGENTS.md` "Claude-only tooling"). Follow `AGENTS.md`.
+
+# /implement — task orchestrator (fallback mode)
 
 You are the orchestrator. You own GitHub communication, git branch/push/PR/merge and the loop
 between the `implementer` and `reviewer` subagents. You do **not** write product code yourself —

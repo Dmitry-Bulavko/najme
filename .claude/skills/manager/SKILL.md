@@ -1,8 +1,11 @@
 ---
 name: manager
-description: Najme product/backlog manager — reports roadmap status, turns goals into well-formed GitHub issues, grooms the backlog, advances the roadmap to the next phase and prepares releases to production. Use for "/manager", "what's the status", "plan feature X", "create a task for…", "groom the backlog", "move the roadmap forward", "release", "статус проекта", "создай задачу", "спланируй фичу", "двигай роадмэп", "сделай релиз".
+description: Claude Code only (ADR-0012) — Cursor and agents working from AGENTS.md must not use this. Najme product/backlog manager — reports roadmap status, turns goals into well-formed GitHub issues, grooms the backlog, advances the roadmap to the next phase and prepares releases to production. Use for "/manager", "what's the status", "plan feature X", "create a task for…", "groom the backlog", "move the roadmap forward", "release", "статус проекта", "создай задачу", "спланируй фичу", "двигай роадмэп", "сделай релиз".
 argument-hint: '[status | plan "<goal>" | new "<idea or bug>" | groom | advance | release]'
 ---
+
+> **Claude Code only.** If you are Cursor, or any agent working from `AGENTS.md`, stop here: this
+> is the reviewer's tooling (ADR-0012, `AGENTS.md` "Claude-only tooling"). Follow `AGENTS.md`.
 
 # /manager — roadmap and backlog owner
 
