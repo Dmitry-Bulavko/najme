@@ -27,6 +27,9 @@ export const ERROR_CODES = [
   'GOOGLE_SIGN_IN_DISABLED',
   'GOOGLE_TOKEN_INVALID',
   'RATE_LIMITED',
+  // Businesses
+  'SLUG_TAKEN',
+  'SLUG_LOCKED',
 ] as const;
 
 /** Union of every known error code. */

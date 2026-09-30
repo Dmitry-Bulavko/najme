@@ -17,5 +17,7 @@
   "PASSWORD_NOT_SET": "Bu hesabın şifresi yok. Google ile giriş yapın veya şifre sıfırlama ile bir şifre belirleyin.",
   "GOOGLE_SIGN_IN_DISABLED": "Google ile giriş şu anda kullanılamıyor.",
   "GOOGLE_TOKEN_INVALID": "Google ile giriş başarısız oldu. Lütfen tekrar deneyin.",
-  "RATE_LIMITED": "Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar deneyin."
+  "RATE_LIMITED": "Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar deneyin.",
+  "SLUG_TAKEN": "Bu URL kısa adı zaten alınmış. Lütfen başka bir tane seçin.",
+  "SLUG_LOCKED": "İşletme onaylandıktan sonra URL kısa adı değiştirilemez."
 }

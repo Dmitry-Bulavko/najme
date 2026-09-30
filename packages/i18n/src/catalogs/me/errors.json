@@ -17,5 +17,7 @@
   "PASSWORD_NOT_SET": "Ovaj nalog nema lozinku. Prijavite se preko Googlea ili postavite lozinku putem resetovanja lozinke.",
   "GOOGLE_SIGN_IN_DISABLED": "Prijava preko Googlea trenutno nije dostupna.",
   "GOOGLE_TOKEN_INVALID": "Prijava preko Googlea nije uspjela. Pokušajte ponovo.",
-  "RATE_LIMITED": "Previše pokušaja. Sačekajte trenutak i pokušajte ponovo."
+  "RATE_LIMITED": "Previše pokušaja. Sačekajte trenutak i pokušajte ponovo.",
+  "SLUG_TAKEN": "Ovaj URL slug je već zauzet. Izaberite drugi.",
+  "SLUG_LOCKED": "URL slug se više ne može mijenjati nakon što je biznis odobren."
 }

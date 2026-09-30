@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * Montenegro's 25 municipalities. Order is alphabetical by code (not display order).
- * The Prisma `City` enum lands with Business in #73; until then clients use this list.
+ * Mirrors the Prisma `City` enum on `Business.city` (#73).
  * Display names: i18n `common.cities.<CODE>` (en/me/ru/tr).
  */
 export const CITY_CODES = [
