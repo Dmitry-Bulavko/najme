@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { ApiError, apiRequest } from '@/lib/api/client';
 import { LOCALE_COOKIE_MAX_AGE, LOCALE_COOKIE_NAME } from '@/i18n/routing';
+import { replaceLocaleInPath, safeNextPath } from './safe-next-path';
 import { useSession } from './session-context';
 
 const GIS_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
@@ -125,18 +126,16 @@ export function GoogleSignInButton() {
                 });
                 signIn(session.accessToken, session.user);
 
+                const pathLocale = isLocale(locale) ? locale : 'en';
+                const next = safeNextPath(searchParams.get('next'), pathLocale);
+
                 if (isLocale(session.user.locale) && session.user.locale !== locale) {
                   setLocaleCookie(session.user.locale);
-                  const next = searchParams.get('next');
-                  const target = next ?? '/';
-                  const segments = target.split('/');
-                  segments[1] = session.user.locale;
-                  router.replace(segments.join('/') || `/${session.user.locale}`);
+                  router.replace(replaceLocaleInPath(next, session.user.locale));
                   return;
                 }
 
-                const next = searchParams.get('next');
-                router.replace(next ?? `/${locale}`);
+                router.replace(next);
               } catch (error) {
                 if (error instanceof ApiError) {
                   setApiError(tErrors(error.code as Parameters<typeof tErrors>[0]));

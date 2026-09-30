@@ -19,6 +19,7 @@ import { isSupportedLocale } from '@/i18n/routing';
 import { LOCALE_COOKIE_MAX_AGE, LOCALE_COOKIE_NAME } from '@/i18n/routing';
 import { ApiError, apiRequest } from '@/lib/api/client';
 import { GoogleSignInButton } from './google-sign-in-button';
+import { replaceLocaleInPath, safeNextPath } from './safe-next-path';
 import { useSession } from './session-context';
 
 function setLocaleCookie(localeValue: string): void {
@@ -47,14 +48,14 @@ export function SignUpForm() {
   const [apiError, setApiError] = useState<string | null>(null);
   const passwordId = useId();
   const passwordErrorId = `${passwordId}-error`;
+  const pathLocale = isLocale(locale) ? locale : 'en';
 
   // Already signed in — skip the form and honour ?next= (or home).
   useEffect(() => {
     if (session.state === 'authenticated') {
-      const next = searchParams.get('next');
-      router.replace(next ?? `/${locale}`);
+      router.replace(safeNextPath(searchParams.get('next'), pathLocale));
     }
-  }, [locale, router, searchParams, session.state]);
+  }, [pathLocale, router, searchParams, session.state]);
 
   const {
     register,
@@ -67,11 +68,11 @@ export function SignUpForm() {
 
   async function onSubmit(data: z.infer<typeof signUpFormSchema>) {
     setApiError(null);
-    const safeLocale = isSupportedLocale(locale) ? locale : undefined;
+    const registerLocale = isSupportedLocale(locale) ? locale : undefined;
     const body: RegisterRequest = {
       email: data.email,
       password: data.password,
-      locale: safeLocale,
+      locale: registerLocale,
       ...(data.displayName?.trim() ? { displayName: data.displayName.trim() } : {}),
     };
     try {
@@ -82,19 +83,16 @@ export function SignUpForm() {
 
       signIn(session.accessToken, session.user);
 
+      const next = safeNextPath(searchParams.get('next'), pathLocale);
+
       // After sign-up, if account locale differs from URL locale, navigate to the correct one.
       if (isLocale(session.user.locale) && session.user.locale !== locale) {
         setLocaleCookie(session.user.locale);
-        const next = searchParams.get('next');
-        const target = next ?? '/';
-        const segments = target.split('/');
-        segments[1] = session.user.locale;
-        router.replace(segments.join('/') || `/${session.user.locale}`);
+        router.replace(replaceLocaleInPath(next, session.user.locale));
         return;
       }
 
-      const next = searchParams.get('next');
-      router.replace(next ?? `/${locale}`);
+      router.replace(next);
     } catch (error) {
       if (error instanceof ApiError) {
         setApiError(tErrors(error.code as Parameters<typeof tErrors>[0]));

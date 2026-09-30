@@ -14,7 +14,7 @@ import { setAccessToken } from '@/lib/api/client';
 // ---------------------------------------------------------------------------
 
 const replace = vi.fn();
-const getParam = vi.fn(() => null);
+const getParam = vi.fn<() => string | null>(() => null);
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace }),
@@ -129,6 +129,40 @@ describe('SignUpForm', () => {
   });
 
   it('redirects to home on successful registration', async () => {
+    const fakeSession = {
+      accessToken: 'tok',
+      accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+      user: fakeUser,
+    };
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
+      )
+      .mockResolvedValueOnce(makeJsonResponse(fakeSession));
+
+    renderForm();
+    const user = userEvent.setup();
+
+    await user.type(
+      screen.getByLabelText(catalogs.en.auth.signUp.emailLabel as string),
+      'new@example.com',
+    );
+    await user.type(
+      screen.getByLabelText(catalogs.en.auth.signUp.passwordLabel as string),
+      'ValidPass1!',
+    );
+    await user.click(
+      screen.getByRole('button', { name: catalogs.en.auth.signUp.submit as string }),
+    );
+
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledWith('/en');
+    });
+  });
+
+  it('falls back to /en when ?next= is an external URL', async () => {
+    getParam.mockReturnValue('//evil.example/pwned');
     const fakeSession = {
       accessToken: 'tok',
       accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),

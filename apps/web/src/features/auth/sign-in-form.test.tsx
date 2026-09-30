@@ -216,6 +216,40 @@ describe('SignInForm', () => {
     });
   });
 
+  it('falls back to /en when ?next= is an external URL', async () => {
+    getParam.mockReturnValue('https://evil.example/pwned');
+    const fakeSession = {
+      accessToken: 'tok',
+      accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+      user: fakeUser,
+    };
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
+      )
+      .mockResolvedValueOnce(makeJsonResponse(fakeSession));
+
+    renderForm();
+    const user = userEvent.setup();
+
+    await user.type(
+      screen.getByLabelText(catalogs.en.auth.signIn.emailLabel as string),
+      'alice@example.com',
+    );
+    await user.type(
+      screen.getByLabelText(catalogs.en.auth.signIn.passwordLabel as string),
+      'ValidPass1!',
+    );
+    await user.click(
+      screen.getByRole('button', { name: catalogs.en.auth.signIn.submit as string }),
+    );
+
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledWith('/en');
+    });
+  });
+
   it('toggles password visibility', async () => {
     renderForm();
     const user = userEvent.setup();

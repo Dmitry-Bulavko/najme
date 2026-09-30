@@ -77,4 +77,21 @@ test.describe('Account flow', () => {
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page.getByRole('alert').filter({ hasText: INVALID_CREDENTIALS })).toBeVisible();
   });
+
+  test('rejects external ?next= after sign-in (stays on app origin)', async ({
+    page,
+    registerViaApi,
+  }) => {
+    const { email, password } = await registerViaApi();
+
+    await page.goto('/en/sign-in?next=https://example.org/');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+
+    await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible();
+    await expect(page).toHaveURL(/\/en\/?$/);
+    expect(new URL(page.url()).origin).not.toBe('https://example.org');
+    expect(page.url()).not.toContain('example.org');
+  });
 });
