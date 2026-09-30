@@ -439,7 +439,12 @@ describe('GoogleSignInButton navigation', () => {
     jest.mocked(googleEnvConfigured).mockReturnValue(true);
     jest.mocked(canOfferGoogleSignIn).mockReturnValue(true);
     const googleModule = jest.requireMock('@react-native-google-signin/google-signin') as {
-      GoogleSignin: { signIn: { mockImplementationOnce: (fn: () => Promise<unknown>) => void; mock: { calls: unknown[] } } };
+      GoogleSignin: {
+        signIn: {
+          mockImplementationOnce: (fn: () => Promise<unknown>) => void;
+          mock: { calls: unknown[] };
+        };
+      };
     };
     googleModule.GoogleSignin.signIn.mockImplementationOnce(async () => ({
       type: 'cancelled',

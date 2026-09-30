@@ -19,14 +19,14 @@ plus label line fit under the bar paddings on the Expo web export (390×844).
 
 ## Changes
 
-| Area / path | Change |
-| ----------- | ------ |
-| `apps/mobile/src/lib/api/client.ts` | Export helpers; `__DEV__` guard that `refreshWithoutMutex` runs under the mutex |
-| `apps/mobile/src/features/account/change-password.ts` | 401 → refresh once → retry; shared envelope parser |
-| `apps/mobile/src/features/auth/google-sign-in-button.tsx` | Treat library `cancelled` via `isCancelledResponse` |
-| `apps/mobile/src/components/ui/theme.ts` / `(tabs)/_layout.tsx` | Taller tab bar budget |
-| `apps/mobile/src/i18n` + `test-utils` | Shared `UI_NAMESPACES` (exclude `emails` + `notifications`) |
-| `apps/mobile/app.config.ts` | Production EAS throws without iOS Google client ID |
+| Area / path                                                     | Change                                                                          |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `apps/mobile/src/lib/api/client.ts`                             | Export helpers; `__DEV__` guard that `refreshWithoutMutex` runs under the mutex |
+| `apps/mobile/src/features/account/change-password.ts`           | 401 → refresh once → retry; shared envelope parser                              |
+| `apps/mobile/src/features/auth/google-sign-in-button.tsx`       | Treat library `cancelled` via `isCancelledResponse`                             |
+| `apps/mobile/src/components/ui/theme.ts` / `(tabs)/_layout.tsx` | Taller tab bar budget                                                           |
+| `apps/mobile/src/i18n` + `test-utils`                           | Shared `UI_NAMESPACES` (exclude `emails` + `notifications`)                     |
+| `apps/mobile/app.config.ts`                                     | Production EAS throws without iOS Google client ID                              |
 
 ## Test plan
 
