@@ -55,6 +55,12 @@
     "form": "Form field",
     "formName": "Full name"
   },
+  "bookings": {
+    "signIn": {
+      "title": "Sign in to see bookings",
+      "body": "Your upcoming and past appointments will appear here after you sign in."
+    }
+  },
   "empty": {
     "discover": "Search and filters will appear here once businesses are published.",
     "bookings": "When you book a service, it will show up here."

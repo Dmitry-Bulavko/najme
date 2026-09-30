@@ -57,14 +57,17 @@ toIntlLocale(locale); // 'sr-Latn-ME'
 ```
 
 `src/dual-module.test.ts` proves both entry points work against the built `dist/`, and that the
-catalogs are inlined into the bundle rather than shipped as separate files.
+catalogs are inlined into the bundle rather than shipped as separate files. Under turbo, this
+package's `test` task depends on `build` and `^build`, so `dist/` is produced before the suite
+runs. A plain `pnpm --filter @najme/i18n test` does **not** rebuild `dist`.
 
 ## Developing this package
 
 - `pnpm --filter @najme/i18n build` — builds `dist/` (ESM + CJS + type declarations).
 - `pnpm --filter @najme/i18n lint` — lints with `@najme/config`'s ESLint preset.
 - `pnpm --filter @najme/i18n typecheck` — type-checks `src/` with `@najme/config`'s Node preset.
-- `pnpm --filter @najme/i18n test` — builds `dist/` (via `pretest`), then runs the Vitest suite.
+- `pnpm --filter @najme/i18n test` — runs the Vitest suite against existing `dist/` (does not
+  rebuild; prefer `pnpm turbo run test --filter=@najme/i18n` so `build`/`^build` run first).
 
 ## Translations to verify
 

@@ -49,7 +49,7 @@ unitless lengths are invalid in CSS and get dropped by browsers.
 **Source of truth:** `dist/theme.css` is **generated at build time** (via a `tsup` `onSuccess`
 hook, see `tsup.config.ts`) from the same `src/colors.ts` / `radius.ts` / `spacing.ts` /
 `typography.ts` modules that back the TypeScript exports, and it is **not committed** to the repo —
-it only exists in `dist/`, produced fresh on every `build`/`pretest` run. This makes drift between
+it only exists in `dist/`, produced fresh on every `build` run. This makes drift between
 the CSS file and the TypeScript tokens structurally impossible: there is no checked-in copy to go
 stale. `src/generate-theme-css.test.ts` additionally asserts every token from `src/` is present in
 the generated CSS.
@@ -108,7 +108,10 @@ const styles = StyleSheet.create({
 });
 ```
 
-`src/dual-module.test.ts` proves both entry points work against the built `dist/`.
+`src/dual-module.test.ts` proves both entry points work against the built `dist/`. Under turbo,
+this package's `test` task depends on `build` and `^build`, so `dist/` (including `theme.css`) is
+produced before the suite runs. A plain `pnpm --filter @najme/ui-tokens test` does **not** rebuild
+`dist`.
 
 ## Developing this package
 
@@ -117,8 +120,8 @@ const styles = StyleSheet.create({
 - `pnpm --filter @najme/ui-tokens lint` — lints with `@najme/config`'s ESLint preset.
 - `pnpm --filter @najme/ui-tokens typecheck` — type-checks `src/` with `@najme/config`'s Node
   preset.
-- `pnpm --filter @najme/ui-tokens test` — builds `dist/` (via `pretest`), then runs the Vitest
-  suite.
+- `pnpm --filter @najme/ui-tokens test` — runs the Vitest suite against existing `dist/` (does not
+  rebuild; prefer `pnpm turbo run test --filter=@najme/ui-tokens` so `build`/`^build` run first).
 
 ## Out of scope (this package)
 

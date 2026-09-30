@@ -1,0 +1,42 @@
+{
+  "pageTitle": "Hesap",
+  "pageSubtitle": "Profilinizi ve güvenliğinizi yönetin",
+  "verified": "Doğrulandı",
+  "unverified": "Doğrulanmadı",
+  "resend": "Doğrulamayı yeniden gönder",
+  "resent": "Doğrulama e-postası gönderildi",
+  "resending": "Gönderiliyor…",
+  "profileSection": {
+    "title": "Profil",
+    "displayNameLabel": "Görünen ad",
+    "save": "Adı kaydet",
+    "saved": "Profil güncellendi"
+  },
+  "languageSection": {
+    "title": "Dil",
+    "label": "Hesap dili",
+    "save": "Dili kaydet",
+    "saved": "Dil güncellendi"
+  },
+  "passwordSection": {
+    "title": "Şifre değiştir",
+    "currentLabel": "Mevcut şifre",
+    "newLabel": "Yeni şifre",
+    "confirmLabel": "Yeni şifreyi onayla",
+    "mismatch": "Şifreler eşleşmiyor",
+    "save": "Şifreyi değiştir",
+    "saved": "Şifre değiştirildi",
+    "googleOnly": "Google ile giriş yapıyorsunuz. Bu hesapta değiştirilecek bir şifre yok."
+  },
+  "signOut": "Çıkış yap",
+  "settings": {
+    "editProfile": "Profili düzenle",
+    "language": "Dil",
+    "changePassword": "Şifre değiştir"
+  },
+  "signOutConfirm": {
+    "title": "Çıkış yapılsın mı?",
+    "body": "Rezervasyonlarınıza ve hesabınıza erişmek için tekrar giriş yapmanız gerekir.",
+    "confirm": "Çıkış yap"
+  }
+}

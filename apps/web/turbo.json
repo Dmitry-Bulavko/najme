@@ -3,13 +3,23 @@
   "extends": ["//"],
   "tasks": {
     "dev": {
-      "env": ["WEB_PORT", "NODE_ENV", "PUBLIC_URL", "API_INTERNAL_URL", "GIT_SHA"]
+      "env": [
+        "WEB_PORT",
+        "NODE_ENV",
+        "PUBLIC_URL",
+        "API_INTERNAL_URL",
+        "GIT_SHA",
+        "NEXT_PUBLIC_GOOGLE_CLIENT_ID"
+      ]
     },
     "build": {
-      "env": ["NODE_ENV"]
+      "env": ["NODE_ENV", "NEXT_PUBLIC_GOOGLE_CLIENT_ID"]
     },
     "start": {
       "env": ["NODE_ENV", "PORT", "HOSTNAME", "PUBLIC_URL", "API_INTERNAL_URL", "GIT_SHA"]
+    },
+    "test": {
+      "env": ["NEXT_PUBLIC_GOOGLE_CLIENT_ID"]
     }
   }
 }

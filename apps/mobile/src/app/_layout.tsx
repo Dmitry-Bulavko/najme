@@ -5,6 +5,7 @@ import {
   Manrope_800ExtraBold,
   useFonts,
 } from '@expo-google-fonts/manrope';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { tokens } from '@najme/ui-tokens';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -12,13 +13,20 @@ import { useEffect, useState } from 'react';
 import { I18nextProvider, useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { AuthProvider } from '@/features/auth/auth-provider';
 import { i18next, initI18n } from '@/i18n';
 
 void SplashScreen.preventAutoHideAsync();
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false, staleTime: 30_000 },
+  },
+});
+
 /**
  * Root layout: loads the Manrope font and resolves the initial locale (ADR-0004) before rendering
- * any route, then renders the tabs stack wrapped in `I18nextProvider` for `useTranslation()`.
+ * any route, then wraps the tree in i18n, TanStack Query and the auth session provider.
  */
 export default function RootLayout() {
   // Named "Manrope" (not the package's per-weight names) so it matches
@@ -54,16 +62,22 @@ export default function RootLayout() {
 
   return (
     <I18nextProvider i18n={i18next}>
-      <RootStack />
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <RootStack />
+        </AuthProvider>
+      </QueryClientProvider>
     </I18nextProvider>
   );
 }
 
-/** Tabs plus, in development builds only, the UI kit showcase with a native header. */
+/** Tabs, auth stack and, in development builds only, the UI kit showcase. */
 function RootStack() {
   const { t } = useTranslation('mobile');
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       {__DEV__ ? (
         <Stack.Screen
           name="ui-showcase"

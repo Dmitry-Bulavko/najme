@@ -1,9 +1,14 @@
-import { catalogs, flattenMessages } from '@najme/i18n';
+import { catalogs, flattenMessages, type Namespaces } from '@najme/i18n';
 import { render } from '@testing-library/react-native';
 import i18next from 'i18next';
 import ICU from 'i18next-icu';
 import type { ReactElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
+
+/** Same UI namespaces as the app (everything except `emails`). */
+const UI_NAMESPACES = (Object.keys(catalogs.en) as (keyof Namespaces)[]).filter(
+  (ns) => ns !== 'emails',
+);
 
 /** Initializes a test i18next instance with the real catalogs (idempotent). */
 export async function initTestI18n(lng = 'en'): Promise<void> {
@@ -13,15 +18,20 @@ export async function initTestI18n(lng = 'en'): Promise<void> {
       .use(initReactI18next)
       .init({
         resources: Object.fromEntries(
-          Object.entries(catalogs).map(([locale, { common, mobile }]) => [
+          Object.entries(catalogs).map(([locale, localeCatalogs]) => [
             locale,
-            { common: flattenMessages(common), mobile: flattenMessages(mobile) },
+            Object.fromEntries(
+              UI_NAMESPACES.map((ns) => [
+                ns,
+                flattenMessages(localeCatalogs[ns] as Parameters<typeof flattenMessages>[0]),
+              ]),
+            ),
           ]),
         ),
         lng,
         fallbackLng: 'en',
         defaultNS: 'common',
-        ns: ['common', 'mobile'],
+        ns: [...UI_NAMESPACES],
         interpolation: { escapeValue: false },
         returnNull: false,
       });

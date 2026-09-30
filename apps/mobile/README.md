@@ -1,7 +1,7 @@
 # @najme/mobile
 
 Expo (SDK 57) app for iOS and Android, built with expo-router. See ADR-0003 (clients), ADR-0004
-(i18n) and `docs/specs/15-mobile-scaffold.md`.
+(i18n), ADR-0010 (auth) and `docs/specs/55-mobile-auth.md`.
 
 ## Run
 
@@ -17,15 +17,35 @@ Then either:
 - Scan the QR code with the **Expo Go** app on a physical device (same Wi-Fi network as the dev
   machine).
 
-There is no native build/toolchain in this environment — `pnpm --filter @najme/mobile build` only
-runs `expo export --platform web`, which needs no Xcode/Android SDK, and is used to keep a
-build/CI check green. EAS builds (`eas build`) are out of scope for this task (see `eas.json`).
+There is no native build/toolchain required for CI — `pnpm --filter @najme/mobile build` only runs
+`expo export --platform web`. EAS builds (`eas build`) are out of scope until M7 (see `eas.json`).
+
+## Auth and development builds
+
+Email/password sign-in works in Expo Go. **Google Sign-In does not**: it needs a development or
+production build with the native `@react-native-google-signin/google-signin` module.
+
+```bash
+pnpm --filter @najme/mobile exec npx expo run:ios
+# or
+pnpm --filter @najme/mobile exec npx expo run:android
+```
+
+Set both `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` and `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (public; also
+list them in the API's `GOOGLE_CLIENT_IDS`, task #58). The button stays hidden when env or
+`GET /auth/providers` says Google is off, and in Expo Go / web export, so those surfaces never
+crash.
+
+The refresh token lives in `expo-secure-store`; the access token stays in memory (ADR-0010). The
+client always sends `X-Client: mobile`.
 
 ## Environment variables
 
-| Name                  | Kind   | Purpose                                                               |
-| --------------------- | ------ | --------------------------------------------------------------------- |
-| `EXPO_PUBLIC_API_URL` | public | Base URL (incl. `/api/v1`) the app calls for the API and health check |
+| Name                               | Kind   | Purpose                                                               |
+| ---------------------------------- | ------ | --------------------------------------------------------------------- |
+| `EXPO_PUBLIC_API_URL`              | public | Base URL (incl. `/api/v1`) the app calls for the API and health check |
+| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | public | iOS Google OAuth client ID; unset hides the Google button             |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | public | Web client ID used as `webClientId` for ID tokens                     |
 
 `EXPO_PUBLIC_*` vars are inlined into the JS bundle at build time (never secrets). From Expo Go on
 a physical device, use the dev machine's LAN IP instead of `localhost` (see `.env.example`).
@@ -37,20 +57,22 @@ deployment has a single environment, so there is no separate staging host yet.
 
 Locales, resolution order and catalogs come from `@najme/i18n` (ADR-0004). On launch, the app reads
 an explicit locale choice from `AsyncStorage` if present, otherwise resolves from the device's
-language preferences (`expo-localization`), otherwise falls back to `en`. The Account tab's language
-switcher persists the choice for the next launch. Message catalogs are wired into `i18next` +
-`react-i18next` via `i18next-icu`, so catalog values keep the same ICU MessageFormat syntax
-(plurals, selects) as the API and web.
+language preferences (`expo-localization`), otherwise falls back to `en`. Every catalog namespace
+except `emails` is registered in i18next (`auth`, `errors`, `common`, `mobile`, `shell`, …). The
+Account tab's language switcher persists the choice; after sign-in the account `locale` wins.
 
 ## Structure
 
-- `src/app` — expo-router routes: `_layout.tsx` (font/locale bootstrap), `(tabs)/` (Discover,
-  Bookings, Account placeholders).
-- `src/features` — screen-level building blocks (`locale/`, `health/`, `placeholder-screen.tsx`).
+- `src/app` — expo-router routes: `_layout.tsx` (font/locale/auth bootstrap), `(tabs)/` (explore,
+  bookings, account stack), `(auth)/`.
+- `src/features` — screen-level building blocks (`auth/`, `account/`, `locale/`, `health/`).
+- `src/components/ui` — mobile UI kit (Button, Text, TextField, FormField, Card, ListItem,
+  Banner, Avatar, Divider, Screen), re-exported from a single kit barrel `index.ts`.
+- `src/lib/api` — typed fetch client with SecureStore refresh and auth mutex.
 - `src/i18n` — i18next bootstrap and locale persistence (`initI18n`, `setLocale`).
 
 Design tokens come from `@najme/ui-tokens` (see that package's README); UI components are **not**
-shared with `apps/web` (ADR-0003) — this app uses plain React Native primitives.
+shared with `apps/web` (ADR-0003) — this app uses its own React Native kit built on those tokens.
 
 ## Testing
 
@@ -58,10 +80,6 @@ shared with `apps/web` (ADR-0003) — this app uses plain React Native primitive
 The per-test timeout is 20 s (`jest.testTimeout` in `package.json`): the first render in a file
 lazily loads React Native modules, which exceeded Jest's 5 s default on a loaded CI runner while
 turbo ran the other packages' tasks in parallel.
-`src/__tests__/tabs-layout.test.tsx` covers the acceptance criterion that switching the active
-locale changes the rendered tab titles; `src/i18n/index.test.ts` covers locale persistence
-(`initI18n`/`setLocale`, including the internal `me` code and a garbage stored value falling back
-to device locales).
 
 ## Metro and the pnpm workspace
 

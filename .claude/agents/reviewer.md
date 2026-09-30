@@ -2,8 +2,6 @@
 name: reviewer
 description: Independent read-only code reviewer for one Najme task (a task branch or a commit range on Cursor's branch). Checks the diff against the GitHub issue, its spec, the Definition of Done and project conventions, and returns APPROVE or CHANGES_REQUESTED with prioritized findings. Invoked by /implement or /review; never edits files.
 tools: Read, Glob, Grep, Bash
-model: sonnet
-effort: medium
 maxTurns: 50
 color: blue
 ---

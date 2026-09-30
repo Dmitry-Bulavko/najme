@@ -2,8 +2,6 @@
 name: implementer
 description: Implements one GitHub issue of the Najme project on the current task branch — writes the spec (for size M), code, tests and docs, runs local checks and commits. Invoked by the /implement orchestrator with the issue text; never talks to GitHub and never pushes.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: sonnet
-effort: medium
 maxTurns: 120
 color: green
 ---

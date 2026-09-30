@@ -30,6 +30,12 @@ expo-env.d.ts
 apps/mobile/ios/
 apps/mobile/android/
 
+# Playwright (apps/web e2e)
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/blob-report/
+apps/web/playwright/.cache/
+
 # IDE / OS
 .idea/
 .vscode/*

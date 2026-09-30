@@ -35,7 +35,10 @@ export const AVATAR_INITIALS_FONT_RATIO = 0.38;
 export const AVATAR_INITIALS_LINE_RATIO = 0.5;
 
 /**
- * Tab bar label size (dp). React Navigation scales tab labels with dynamic type itself, so no
- * `allowFontScaling` override is applied here.
+ * Tab bar metrics. Height is safe-area aware in `(tabs)/_layout`; label line-height keeps
+ * `ru`/`me` titles from clipping inside the bar (#55).
  */
 export const TAB_LABEL_FONT_SIZE = 11;
+export const TAB_LABEL_LINE_HEIGHT = 14;
+/** Icon + label row before adding the bottom safe-area inset. */
+export const TAB_BAR_BASE_HEIGHT = 56;

@@ -14,7 +14,8 @@ enforce.
 - Named exports only (except where a framework requires default exports: Next.js pages/layouts,
   expo-router routes).
 - File names: `kebab-case.ts`; React components `PascalCase` inside `kebab-case.tsx` files.
-- No barrel files inside apps; packages expose a curated `src/index.ts`.
+- No barrel files inside apps (except a single UI-kit barrel such as
+  `apps/mobile/src/components/ui/index.ts`); packages expose a curated `src/index.ts`.
 
 ## Structure
 
