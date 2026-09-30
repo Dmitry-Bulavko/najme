@@ -29,11 +29,11 @@ type AccountFixtures = {
 };
 
 export const test = base.extend<AccountFixtures>({
-  uniqueEmail: async (_args, use) => {
+  uniqueEmail: async ({}, use) => {
     await use(`e2e-${randomUUID()}@example.com`);
   },
 
-  mailpit: async (_args, use) => {
+  mailpit: async ({}, use) => {
     await use(new MailpitClient(MAILPIT_URL));
   },
 
@@ -61,7 +61,7 @@ export const test = base.extend<AccountFixtures>({
     });
   },
 
-  signInViaUi: async (_args, use) => {
+  signInViaUi: async ({}, use) => {
     await use(async (page, email, password) => {
       await page.goto('/en/sign-in');
       await page.getByLabel('Email').fill(email);
