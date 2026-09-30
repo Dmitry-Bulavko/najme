@@ -19,5 +19,19 @@
     "action": "Задать новый пароль",
     "expiry": "Ссылка действительна {hours, plural, one {# час} few {# часа} many {# часов} other {# часа}} и работает один раз.",
     "ignore": "Если вы не запрашивали сброс, проигнорируйте письмо: пароль не изменится."
+  },
+  "businessInvitation": {
+    "subject": "Вас пригласили в {businessName} на Najme",
+    "heading": "Присоединиться к {businessName}",
+    "intro": "{inviterName} приглашает вас в {businessName} как {role}.",
+    "action": "Принять приглашение",
+    "expiry": "Ссылка действительна {days, plural, one {# день} few {# дня} many {# дней} other {# дня}}.",
+    "ignore": "Если вы не ждали это приглашение, просто проигнорируйте письмо.",
+    "roles": {
+      "OWNER": "владельца",
+      "ADMIN": "администратора",
+      "STAFF": "сотрудника"
+    },
+    "inviterFallback": "Кто-то"
   }
 }

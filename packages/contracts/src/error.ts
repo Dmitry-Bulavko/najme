@@ -31,6 +31,10 @@ export const ERROR_CODES = [
   'SLUG_TAKEN',
   'SLUG_LOCKED',
   'UPLOAD_INVALID',
+  'ALREADY_MEMBER',
+  'INVITATION_EXISTS',
+  'INVITATION_EMAIL_MISMATCH',
+  'LAST_OWNER',
 ] as const;
 
 /** Union of every known error code. */

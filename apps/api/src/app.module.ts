@@ -4,6 +4,7 @@ import { BusinessesModule } from './businesses/businesses.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
 import { ConfigModule } from './config/config.module.js';
 import { HealthModule } from './health/health.module.js';
+import { InvitationsModule } from './invitations/invitations.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ScheduleModule } from './schedule/schedule.module.js';
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module.js';
     AuthModule,
     StorageModule,
     BusinessesModule,
+    InvitationsModule,
     StaffModule,
     ServicesModule,
     ScheduleModule,

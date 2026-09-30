@@ -19,5 +19,19 @@
     "action": "Choose a new password",
     "expiry": "This link is valid for {hours, plural, one {# hour} other {# hours}} and can be used once.",
     "ignore": "If you did not ask for this, ignore this email; your password will not change."
+  },
+  "businessInvitation": {
+    "subject": "You're invited to join {businessName} on Najme",
+    "heading": "Join {businessName}",
+    "intro": "{inviterName} invited you to join {businessName} as {role}.",
+    "action": "Accept invitation",
+    "expiry": "This link is valid for {days, plural, one {# day} other {# days}}.",
+    "ignore": "If you were not expecting this invitation, you can safely ignore this email.",
+    "roles": {
+      "OWNER": "an owner",
+      "ADMIN": "an admin",
+      "STAFF": "a staff member"
+    },
+    "inviterFallback": "Someone"
   }
 }

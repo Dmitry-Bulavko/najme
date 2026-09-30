@@ -42,6 +42,7 @@ model User {
   refreshTokens  RefreshToken[]
   emailTokens    EmailToken[]
   memberships    Membership[]
+  invitationsSent Invitation[] @relation("InvitationInvitedBy")
   reviewedBusinesses Business[] @relation("BusinessReviewedBy")
 
   @@map("users")
@@ -210,6 +211,7 @@ model Business {
   category     Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   reviewedBy   User?         @relation("BusinessReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
   memberships  Membership[]
+  invitations  Invitation[]
   staffMembers StaffMember[]
   services     Service[]
 
@@ -247,12 +249,45 @@ model StaffMember {
 
   business    Business                 @relation(fields: [businessId], references: [id], onDelete: Restrict)
   membership  Membership?
+  invitations Invitation[]
   assignments ServiceStaffAssignment[]
   workingHours WorkingHours[]
   timeOff      TimeOff[]
 
   @@index([businessId])
   @@map("staff_members")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+
+  @@map("invitation_status")
+}
+
+// Partial unique (business_id, email) WHERE status = 'PENDING' is raw SQL in the migration.
+model Invitation {
+  id              String           @id @db.Uuid
+  businessId      String           @map("business_id") @db.Uuid
+  email           String
+  role            MembershipRole
+  staffMemberId   String?          @map("staff_member_id") @db.Uuid
+  invitedByUserId String           @map("invited_by_user_id") @db.Uuid
+  tokenHash       String           @unique @map("token_hash")
+  status          InvitationStatus @default(PENDING)
+  expiresAt       DateTime         @map("expires_at") @db.Timestamptz(3)
+  acceptedAt      DateTime?        @map("accepted_at") @db.Timestamptz(3)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  staffMember StaffMember? @relation(fields: [staffMemberId], references: [id], onDelete: SetNull)
+  invitedBy   User         @relation("InvitationInvitedBy", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([businessId])
+  @@map("invitations")
 }
 
 enum Weekday {

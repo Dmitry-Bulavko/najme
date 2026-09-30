@@ -31,6 +31,7 @@ export class BusinessTestTracker {
   async cleanup(prisma: PrismaService): Promise<void> {
     if (this.businessIds.length > 0) {
       const ids = [...this.businessIds];
+      await prisma.invitation.deleteMany({ where: { businessId: { in: ids } } });
       await prisma.serviceStaffAssignment.deleteMany({
         where: { service: { businessId: { in: ids } } },
       });
@@ -42,11 +43,16 @@ export class BusinessTestTracker {
         where: { businessId: { in: ids } },
         data: { staffMemberId: null },
       });
+      await prisma.timeOff.deleteMany({ where: { staffMember: { businessId: { in: ids } } } });
+      await prisma.workingHours.deleteMany({
+        where: { staffMember: { businessId: { in: ids } } },
+      });
       await prisma.staffMember.deleteMany({ where: { businessId: { in: ids } } });
       await prisma.membership.deleteMany({ where: { businessId: { in: ids } } });
       await prisma.business.deleteMany({ where: { id: { in: this.businessIds.splice(0) } } });
     }
     if (this.userIds.length > 0) {
+      await prisma.invitation.deleteMany({ where: { invitedByUserId: { in: [...this.userIds] } } });
       await prisma.membership.deleteMany({ where: { userId: { in: [...this.userIds] } } });
       await prisma.user.deleteMany({ where: { id: { in: this.userIds.splice(0) } } });
     }

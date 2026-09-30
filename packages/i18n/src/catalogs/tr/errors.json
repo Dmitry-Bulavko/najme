@@ -20,5 +20,9 @@
   "RATE_LIMITED": "Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar deneyin.",
   "SLUG_TAKEN": "Bu URL kısa adı zaten alınmış. Lütfen başka bir tane seçin.",
   "SLUG_LOCKED": "İşletme onaylandıktan sonra URL kısa adı değiştirilemez.",
-  "UPLOAD_INVALID": "Bu yükleme geçersiz veya tamamlanmamış. Lütfen başka bir görsel seçip tekrar deneyin."
+  "UPLOAD_INVALID": "Bu yükleme geçersiz veya tamamlanmamış. Lütfen başka bir görsel seçip tekrar deneyin.",
+  "ALREADY_MEMBER": "Bu işletmenin zaten üyesisiniz.",
+  "INVITATION_EXISTS": "Bu e-posta için bekleyen bir davet zaten var.",
+  "INVITATION_EMAIL_MISMATCH": "Davetin gönderildiği e-posta adresiyle giriş yapın.",
+  "LAST_OWNER": "Bir işletmenin en az bir sahibi olmalıdır."
 }

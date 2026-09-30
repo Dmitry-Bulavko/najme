@@ -14,3 +14,4 @@ export * from './staff.js';
 export * from './time.js';
 export * from './uploads.js';
 export * from './users.js';
+export * from './invitations.js';

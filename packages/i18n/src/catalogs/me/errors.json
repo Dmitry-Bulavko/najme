@@ -20,5 +20,9 @@
   "RATE_LIMITED": "Previše pokušaja. Sačekajte trenutak i pokušajte ponovo.",
   "SLUG_TAKEN": "Ovaj URL slug je već zauzet. Izaberite drugi.",
   "SLUG_LOCKED": "URL slug se više ne može mijenjati nakon što je biznis odobren.",
-  "UPLOAD_INVALID": "Ovaj upload je nevažeći ili nepotpun. Izaberite drugu sliku i pokušajte ponovo."
+  "UPLOAD_INVALID": "Ovaj upload je nevažeći ili nepotpun. Izaberite drugu sliku i pokušajte ponovo.",
+  "ALREADY_MEMBER": "Već ste član ovog biznisa.",
+  "INVITATION_EXISTS": "Za ovu e-mail adresu već postoji načekajuća pozivnica.",
+  "INVITATION_EMAIL_MISMATCH": "Prijavite se sa e-mail adresom na koju je poslata pozivnica.",
+  "LAST_OWNER": "Biznis mora zadržati barem jednog vlasnika."
 }
