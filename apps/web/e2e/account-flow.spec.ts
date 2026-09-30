@@ -1,6 +1,7 @@
 import { DEFAULT_PASSWORD, expect, test } from './fixtures';
 
 const NEW_PASSWORD = 'another staple horse';
+const INVALID_CREDENTIALS = 'Incorrect email or password.';
 
 test.describe('Account flow', () => {
   test('sign up, verify email, sign in, switch language to ru', async ({
@@ -43,6 +44,8 @@ test.describe('Account flow', () => {
     signInViaUi,
   }) => {
     const { email, password } = await registerViaApi();
+    // Drain the async verify-email before requesting a reset so inbox state is stable.
+    await mailpit.waitForLink(email, 'verify-email');
     await mailpit.deleteFor(email);
 
     await page.goto('/en/forgot-password');
@@ -60,7 +63,7 @@ test.describe('Account flow', () => {
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page.getByRole('alert')).toHaveText('Incorrect email or password.');
+    await expect(page.getByRole('alert').filter({ hasText: INVALID_CREDENTIALS })).toBeVisible();
 
     await signInViaUi(page, email, NEW_PASSWORD);
   });
@@ -72,6 +75,6 @@ test.describe('Account flow', () => {
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password', { exact: true }).fill('definitely-wrong-password');
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page.getByRole('alert')).toHaveText('Incorrect email or password.');
+    await expect(page.getByRole('alert').filter({ hasText: INVALID_CREDENTIALS })).toBeVisible();
   });
 });

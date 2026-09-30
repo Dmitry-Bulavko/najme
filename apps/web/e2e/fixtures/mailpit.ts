@@ -41,19 +41,30 @@ export class MailpitClient {
   }
 
   /**
-   * Waits for a new message and returns the first http(s) link whose path contains `pathFragment`
-   * (e.g. `verify-email` or `reset-password`).
+   * Polls Mailpit until any message to `address` contains an http(s) link whose path includes
+   * `pathFragment` (e.g. `verify-email` or `reset-password`). Scans newest first so a late
+   * verification email does not steal a reset-password wait.
    */
-  async waitForLink(address: string, pathFragment: string, minCount = 1): Promise<string> {
-    const messages = await this.waitFor(address, minCount);
-    const latest = messages[messages.length - 1];
-    if (!latest) throw new Error(`no Mailpit message for ${address}`);
-    const { text, html } = await this.text(latest.ID);
-    const body = `${text}\n${html}`;
-    const match = new RegExp(`https?://[^\\s"'<>]+${pathFragment}[^\\s"'<>]*`).exec(body);
-    if (!match) {
-      throw new Error(`no ${pathFragment} link in email to ${address}`);
+  async waitForLink(address: string, pathFragment: string, timeoutMs = 20_000): Promise<string> {
+    const linkPattern = new RegExp(`https?://[^\\s"'<>]+${pathFragment}[^\\s"'<>]*`);
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const messages = await this.messagesTo(address);
+      for (let i = messages.length - 1; i >= 0; i -= 1) {
+        const message = messages[i];
+        if (!message) {
+          continue;
+        }
+        const { text, html } = await this.text(message.ID);
+        const match = linkPattern.exec(`${text}\n${html}`);
+        if (match?.[0]) {
+          return match[0].replaceAll('&amp;', '&');
+        }
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`no ${pathFragment} link in email to ${address} within ${timeoutMs}ms`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
     }
-    return match[0].replaceAll('&amp;', '&');
   }
 }
