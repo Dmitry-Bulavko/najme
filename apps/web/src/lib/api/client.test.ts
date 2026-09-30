@@ -329,4 +329,62 @@ describe('refreshSessionUnlocked', () => {
     expect(request).not.toHaveBeenCalled();
     expect(getAccessToken()).toBe('unlocked-fresh');
   });
+
+  it('does not await a lock-bound refreshingPromise while the lock is held', async () => {
+    let locked = false;
+    const waiters: Array<() => void> = [];
+    const request = vi.fn(async (_name: string, fn: () => Promise<unknown>) => {
+      if (locked) {
+        await new Promise<void>((resolve) => {
+          waiters.push(resolve);
+        });
+      }
+      locked = true;
+      try {
+        return await fn();
+      } finally {
+        locked = false;
+        waiters.shift()?.();
+      }
+    });
+    vi.stubGlobal('navigator', { locks: { request } });
+    setAccessToken('stale');
+
+    vi.mocked(fetch).mockImplementation((input) => {
+      if (String(input).includes('/auth/refresh')) {
+        return Promise.resolve(
+          makeJsonResponse({
+            accessToken: 'unlocked-while-queued',
+            accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+            user: {
+              id: 'u1',
+              email: 'a@b.com',
+              emailVerified: false,
+              displayName: null,
+              avatarUrl: null,
+              locale: 'en',
+              hasPassword: true,
+            },
+          }),
+        );
+      }
+      return Promise.resolve(
+        makeJsonResponse({ error: { code: 'HTTP_ERROR', message: 'x' } }, 500),
+      );
+    });
+
+    // Hold the lock the way password change does, then queue a lock-bound refreshSession.
+    const unlockedWhileHolding = withAuthRefreshLock(async () => {
+      const queued = refreshSession();
+      await Promise.resolve();
+      await Promise.resolve();
+      // Must not hang on the queued lock-bound promise.
+      const token = await refreshSessionUnlocked();
+      return { token, queued };
+    });
+
+    const { token, queued } = await unlockedWhileHolding;
+    expect(token).toBe('unlocked-while-queued');
+    await expect(queued).resolves.toBe('unlocked-while-queued');
+  });
 });

@@ -156,6 +156,31 @@ describe('AccountView', () => {
     expect(screen.getByRole('option', { name: LOCALE_META.ru.label })).toBeTruthy();
   });
 
+  it('updates the language select when me.locale changes after mount', async () => {
+    mockSessionRestore(passwordUser);
+    // Profile PATCH returns a different locale so LanguageForm must follow `values` (#147).
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeJsonResponse({ ...passwordUser, displayName: 'Alice Updated', locale: 'me' }),
+    );
+
+    renderAccount();
+    const user = userEvent.setup();
+
+    await screen.findByRole('heading', { name: catalogs.en.account.pageTitle });
+
+    const select = screen.getByLabelText(catalogs.en.account.languageSection.label);
+    expect(select).toHaveValue('en');
+
+    const nameInput = screen.getByLabelText(catalogs.en.account.profileSection.displayNameLabel);
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Alice Updated');
+    await user.click(screen.getByRole('button', { name: catalogs.en.account.profileSection.save }));
+
+    await waitFor(() => {
+      expect(select).toHaveValue('me');
+    });
+  });
+
   it('maps INVALID_CREDENTIALS onto the current-password field', async () => {
     mockSessionRestore(passwordUser);
     // Wrong password is also 401; changePasswordWithLock refreshes once then retries (#147).

@@ -124,18 +124,14 @@ export async function refreshSession(): Promise<string | null> {
 }
 
 /**
- * Single-flight refresh without acquiring the Web Lock. For callers that already hold
- * `withAuthRefreshLock` (e.g. password change) so they can recover from an expired access token
- * without deadlocking on the non-reentrant lock (#147).
+ * Refresh without acquiring the Web Lock and without joining `refreshingPromise`.
+ *
+ * Callers that already hold `withAuthRefreshLock` (e.g. password change) must use this: the
+ * shared single-flight promise is lock-bound, so awaiting it while holding the lock deadlocks
+ * when a concurrent `refreshSession()` is queued on the same lock (#147).
  */
 export async function refreshSessionUnlocked(): Promise<string | null> {
-  if (refreshingPromise) {
-    return refreshingPromise;
-  }
-  refreshingPromise = doRefresh().finally(() => {
-    refreshingPromise = null;
-  });
-  return refreshingPromise;
+  return doRefresh();
 }
 
 interface RequestOptions extends Omit<RequestInit, 'body'> {

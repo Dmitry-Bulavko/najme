@@ -139,6 +139,78 @@ describe('changePasswordWithLock', () => {
     expect(urls.filter((u) => u.includes('/me/password'))).toHaveLength(2);
   });
 
+  it('does not deadlock when a lock-bound refreshSession is queued during 401 retry', async () => {
+    let locked = false;
+    const waiters: Array<() => void> = [];
+    const request = vi.fn(async (_name: string, fn: () => Promise<unknown>) => {
+      if (locked) {
+        await new Promise<void>((resolve) => {
+          waiters.push(resolve);
+        });
+      }
+      locked = true;
+      try {
+        return await fn();
+      } finally {
+        locked = false;
+        waiters.shift()?.();
+      }
+    });
+    vi.stubGlobal('navigator', { locks: { request } });
+
+    let resolveFirstPassword!: (value: Response) => void;
+    const firstPasswordResponse = new Promise<Response>((resolve) => {
+      resolveFirstPassword = resolve;
+    });
+    let passwordAttempts = 0;
+
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('/me/password')) {
+        passwordAttempts += 1;
+        if (passwordAttempts === 1) {
+          return firstPasswordResponse;
+        }
+        return Promise.resolve(
+          makeJsonResponse({
+            ...authSession,
+            accessToken: 'after-password-change',
+          }),
+        );
+      }
+      if (url.includes('/auth/refresh')) {
+        return Promise.resolve(makeJsonResponse(refreshSessionBody));
+      }
+      return Promise.resolve(
+        makeJsonResponse({ error: { code: 'HTTP_ERROR', message: 'x' } }, 500),
+      );
+    });
+
+    const passwordPromise = changePasswordWithLock({
+      currentPassword: 'oldpassword',
+      newPassword: 'newpassword1',
+    });
+
+    // Let the password change acquire the lock and stall on the first POST.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Queue a lock-bound refreshSession (sets refreshingPromise to a waiter on the same lock).
+    const refreshPromise = refreshSession();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    resolveFirstPassword(
+      makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'expired' } }, 401),
+    );
+
+    // Unlocked refresh must succeed without awaiting the queued lock-bound promise.
+    await expect(passwordPromise).resolves.toMatchObject({
+      accessToken: 'after-password-change',
+    });
+    await expect(refreshPromise).resolves.toBe('refreshed-access');
+  });
+
   it('makes a concurrent refresh wait until the password change releases the lock', async () => {
     let locked = false;
     const waiters: Array<() => void> = [];
