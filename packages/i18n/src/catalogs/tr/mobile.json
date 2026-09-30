@@ -55,6 +55,12 @@
     "form": "Form alanı",
     "formName": "Ad soyad"
   },
+  "bookings": {
+    "signIn": {
+      "title": "Giriş yaparak rezervasyonları görün",
+      "body": "Yaklaşan ve geçmiş randevularınız giriş yaptıktan sonra burada görünür."
+    }
+  },
   "empty": {
     "discover": "İşletmeler yayınlandığında arama ve filtreler burada görünecek.",
     "bookings": "Bir hizmet rezerve ettiğinizde burada görünecek."

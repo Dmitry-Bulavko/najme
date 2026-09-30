@@ -3,34 +3,65 @@ import { tokens } from '@najme/ui-tokens';
 import { useRouter } from 'expo-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { ICON_BADGE_SIZE, ICON_SIZE } from '@/components/ui/theme';
 import { Button, Card, ListGroup, ListItem, Screen, Text } from '@/components/ui';
+import { SignInCta } from '@/features/auth/sign-in-cta';
+import { UnverifiedEmailBanner } from '@/features/auth/unverified-email-banner';
+import { useSession } from '@/features/auth/auth-provider';
 import { ApiStatusBadge } from '@/features/health/api-status-badge';
 import { LanguageSwitcher } from '@/features/locale/language-switcher';
 
 /**
- * Account tab: a sign-in call-to-action (placeholder until the auth task), the language switcher
- * and the API status. In development builds it also links to the UI kit showcase.
+ * Account tab: anonymous sign-in CTA, or a compact signed-in summary with unverified banner,
+ * language switcher and API status. Profile/settings land in a later task.
  */
 export default function AccountScreen(): ReactElement {
-  const { t } = useTranslation(['common', 'mobile']);
+  const { t } = useTranslation(['common', 'mobile', 'auth']);
   const router = useRouter();
+  const session = useSession();
+
+  if (session.state === 'loading') {
+    return (
+      <Screen>
+        <ActivityIndicator
+          color={tokens.colors.primary}
+          accessibilityLabel={t('common:states.loading')}
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
-      <Card style={styles.signIn}>
-        <View style={styles.iconWrap}>
-          <Ionicons name="person" size={ICON_SIZE.lg} color={tokens.colors.primary} />
-        </View>
-        <Text variant="title">{t('mobile:account.signIn.title')}</Text>
-        <Text variant="body" color="text03">
-          {t('mobile:account.signIn.body')}
-        </Text>
-        {/* Placeholder: the auth screens are a separate task. */}
-        <Button label={t('mobile:account.signIn.action')} fullWidth />
-      </Card>
+      {session.state === 'anonymous' ? (
+        <SignInCta
+          title={t('mobile:account.signIn.title')}
+          body={t('mobile:account.signIn.body')}
+        />
+      ) : (
+        <>
+          <UnverifiedEmailBanner />
+          <Card style={styles.profile}>
+            <View style={styles.iconWrap}>
+              <Ionicons name="person" size={ICON_SIZE.lg} color={tokens.colors.primary} />
+            </View>
+            <Text variant="title">{session.me.displayName?.trim() || session.me.email}</Text>
+            {session.me.displayName?.trim() ? (
+              <Text variant="body" color="text03">
+                {session.me.email}
+              </Text>
+            ) : null}
+            <Button
+              label={t('auth:header.signOut')}
+              variant="outline"
+              fullWidth
+              onPress={() => void session.signOut()}
+            />
+          </Card>
+        </>
+      )}
 
       <Section title={t('mobile:account.language')}>
         <LanguageSwitcher />
@@ -70,7 +101,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 const styles = StyleSheet.create({
-  signIn: { gap: tokens.spacing.md },
+  profile: { gap: tokens.spacing.md },
   iconWrap: {
     width: ICON_BADGE_SIZE.md,
     height: ICON_BADGE_SIZE.md,

@@ -1,6 +1,20 @@
 import type { ExpoConfig } from 'expo/config';
 
 /**
+ * Reversed iOS OAuth client ID for the Google Sign-In URL scheme
+ * (`123-abc.apps.googleusercontent.com` → `com.googleusercontent.apps.123-abc`).
+ * Placeholder keeps the config plugin valid when #58 credentials are unset.
+ */
+function iosUrlSchemeFromClientId(clientId: string | undefined): string {
+  const trimmed = clientId?.trim();
+  if (!trimmed) {
+    return 'com.googleusercontent.apps.placeholder';
+  }
+  const prefix = trimmed.replace(/\.apps\.googleusercontent\.com$/i, '');
+  return `com.googleusercontent.apps.${prefix}`;
+}
+
+/**
  * App config for the Najme Expo app (ADR-0003). Kept in TypeScript (rather than `app.json`) so it
  * can be extended with typed, environment-aware logic later without a second migration.
  */
@@ -29,12 +43,19 @@ const config: ExpoConfig = {
   },
   plugins: [
     'expo-router',
+    'expo-secure-store',
     [
       'expo-splash-screen',
       {
         image: './assets/images/splash-icon.png',
         backgroundColor: '#526ED3',
         imageWidth: 200,
+      },
+    ],
+    [
+      '@react-native-google-signin/google-signin',
+      {
+        iosUrlScheme: iosUrlSchemeFromClientId(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID),
       },
     ],
   ],

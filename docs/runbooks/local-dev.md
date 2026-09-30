@@ -61,6 +61,25 @@ pnpm --filter @najme/mobile start
 `EXPO_PUBLIC_API_URL=http://192.168.1.20:3000/api/v1` (phone on the same Wi-Fi). Restart Metro with
 `--clear` after changing it.
 
+### Development builds and Google sign-in (#55)
+
+Expo Go is fine for email/password auth. Google Sign-In needs a **development build** because
+`@react-native-google-signin/google-signin` is a native module:
+
+```bash
+# With Xcode / Android SDK installed on your machine:
+pnpm --filter @najme/mobile exec npx expo run:ios
+# or
+pnpm --filter @najme/mobile exec npx expo run:android
+```
+
+Set `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` and `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (and API
+`GOOGLE_CLIENT_IDS`, see #58). Without them — or in Expo Go — the "Continue with Google" button
+stays hidden and the app does not crash. `pnpm --filter @najme/mobile build` (`expo export
+--platform web`) must keep working without native Google.
+
+See `apps/mobile/README.md` for the full mobile auth notes.
+
 ## Other API commands
 
 ```bash

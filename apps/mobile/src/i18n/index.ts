@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { catalogs, DEFAULT_LOCALE, flattenMessages, isLocale, resolveLocale } from '@najme/i18n';
-import type { Locale } from '@najme/i18n';
+import type { Locale, Namespaces } from '@najme/i18n';
 import * as Localization from 'expo-localization';
 import i18next from 'i18next';
 import ICU from 'i18next-icu';
@@ -9,10 +9,23 @@ import { initReactI18next } from 'react-i18next';
 /** AsyncStorage key for the explicit locale choice (ADR-0004 resolution step 1). */
 export const LOCALE_STORAGE_KEY = 'najme.locale';
 
+/**
+ * Catalog namespaces loaded into i18next. Excludes server-only `emails` (and later
+ * `notifications`) so UI namespaces need no per-feature wiring (#55).
+ */
+const UI_NAMESPACES = (Object.keys(catalogs.en) as (keyof Namespaces)[]).filter(
+  (ns) => ns !== 'emails',
+);
+
 const resources = Object.fromEntries(
-  Object.entries(catalogs).map(([locale, { common, mobile }]) => [
+  Object.entries(catalogs).map(([locale, localeCatalogs]) => [
     locale,
-    { common: flattenMessages(common), mobile: flattenMessages(mobile) },
+    Object.fromEntries(
+      UI_NAMESPACES.map((ns) => [
+        ns,
+        flattenMessages(localeCatalogs[ns] as Parameters<typeof flattenMessages>[0]),
+      ]),
+    ),
   ]),
 );
 
@@ -48,7 +61,7 @@ export async function initI18n(): Promise<Locale> {
         lng: locale,
         fallbackLng: DEFAULT_LOCALE,
         defaultNS: 'common',
-        ns: ['common', 'mobile'],
+        ns: UI_NAMESPACES,
         interpolation: { escapeValue: false },
         returnNull: false,
       });
@@ -68,4 +81,4 @@ export async function setLocale(locale: Locale): Promise<void> {
   await i18next.changeLanguage(locale);
 }
 
-export { i18next };
+export { i18next, UI_NAMESPACES };

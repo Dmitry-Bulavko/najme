@@ -21,22 +21,26 @@
       "./jest.setup.ts"
     ],
     "transformIgnorePatterns": [
-      "node_modules/(?!(\\.pnpm|(jest-)?react-native[a-z-]*|@react-native[a-z-]*|expo[a-z-]*|@expo[a-z-]*|@expo-google-fonts|@najme|react-navigation|@react-navigation|@unimodules|unimodules|sentry-expo|native-base|i18next-icu|intl-messageformat|@formatjs)/)"
+      "node_modules/(?!(\\.pnpm|(jest-)?react-native[a-z-]*|@react-native(-community)?[a-z-]*|@react-native-google-signin|expo[a-z-]*|@expo[a-z-]*|@expo-google-fonts|@najme|react-navigation|@react-navigation|@unimodules|unimodules|sentry-expo|native-base|i18next-icu|intl-messageformat|@formatjs|@tanstack)/)"
     ]
   },
   "dependencies": {
     "@expo-google-fonts/manrope": "^0.4.2",
     "@expo/vector-icons": "~15.0.2",
+    "@hookform/resolvers": "^5.9.1",
     "@najme/contracts": "workspace:*",
     "@najme/i18n": "workspace:*",
     "@najme/ui-tokens": "workspace:*",
     "@react-native-async-storage/async-storage": "~2.2.0",
+    "@react-native-google-signin/google-signin": "^16.1.5",
+    "@tanstack/react-query": "^5.104.0",
     "expo": "~57.0.25",
     "expo-constants": "~57.0.19",
     "expo-font": "~57.0.4",
     "expo-linking": "~57.0.11",
     "expo-localization": "~57.0.2",
     "expo-router": "~57.0.23",
+    "expo-secure-store": "^57.0.4",
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.4",
@@ -49,7 +53,8 @@
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
-    "react-native-web": "~0.21.0"
+    "react-native-web": "~0.21.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@jest/globals": "^30.5.2",
