@@ -24,6 +24,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       // Namespaced catalogs keep their namespace key so components use useTranslations('auth') etc.
       errors: catalogs[locale].errors,
       auth: catalogs[locale].auth,
+      account: catalogs[locale].account,
     },
   };
 });

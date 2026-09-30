@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { SUPPORTED_LOCALES } from './locales.js';
 import { catalogs, flattenMessages } from './messages.js';
 
-describe.each(['auth', 'common', 'errors', 'shell', 'mobile', 'emails'] as const)(
+describe.each(['account', 'auth', 'common', 'errors', 'shell', 'mobile', 'emails'] as const)(
   '%s catalog',
   (ns) => {
     const enKeys = Object.keys(flattenMessages(catalogs.en[ns])).sort();

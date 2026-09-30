@@ -1,0 +1,32 @@
+{
+  "pageTitle": "Account",
+  "pageSubtitle": "Manage your profile and security",
+  "verified": "Verified",
+  "unverified": "Unverified",
+  "resend": "Resend verification",
+  "resent": "Verification email sent",
+  "resending": "Sending…",
+  "profileSection": {
+    "title": "Profile",
+    "displayNameLabel": "Display name",
+    "save": "Save name",
+    "saved": "Profile updated"
+  },
+  "languageSection": {
+    "title": "Language",
+    "label": "Account language",
+    "save": "Save language",
+    "saved": "Language updated"
+  },
+  "passwordSection": {
+    "title": "Change password",
+    "currentLabel": "Current password",
+    "newLabel": "New password",
+    "confirmLabel": "Confirm new password",
+    "mismatch": "Passwords do not match",
+    "save": "Change password",
+    "saved": "Password changed",
+    "googleOnly": "You sign in with Google. There is no password to change on this account."
+  },
+  "signOut": "Sign out"
+}
