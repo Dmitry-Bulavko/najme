@@ -11,6 +11,7 @@ export {
 export {
   catalogs,
   flattenMessages,
+  type AuthMessages,
   type CommonMessages,
   type EmailMessages,
   type LocaleCatalogs,

@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import { SiteFooter } from '@/components/shell/site-footer';
 import { SiteHeader } from '@/components/shell/site-header';
 import { Toaster } from '@/components/ui/sonner';
+import { AppProviders } from '@/features/auth/query-provider';
 import { isSupportedLocale } from '@/i18n/routing';
 
 import '../globals.css';
@@ -40,20 +41,22 @@ export default async function LocaleLayout({
     <html lang={toIntlLocale(locale)} className={manrope.variable}>
       <body>
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <a
-            href="#content"
-            className="sr-only rounded-md bg-primary px-4 py-2 text-sm font-bold text-primary-foreground focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50"
-          >
-            {t('skipToContent')}
-          </a>
-          <div className="flex min-h-screen flex-col">
-            <SiteHeader />
-            <main id="content" className="flex-1">
-              {children}
-            </main>
-            <SiteFooter />
-          </div>
-          <Toaster />
+          <AppProviders>
+            <a
+              href="#content"
+              className="sr-only rounded-md bg-primary px-4 py-2 text-sm font-bold text-primary-foreground focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50"
+            >
+              {t('skipToContent')}
+            </a>
+            <div className="flex min-h-screen flex-col">
+              <SiteHeader />
+              <main id="content" className="flex-1">
+                {children}
+              </main>
+              <SiteFooter />
+            </div>
+            <Toaster />
+          </AppProviders>
         </NextIntlClientProvider>
       </body>
     </html>
