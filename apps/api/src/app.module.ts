@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AdminModule } from './admin/admin.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BusinessesModule } from './businesses/businesses.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
@@ -26,6 +27,7 @@ import { UsersModule } from './users/users.module.js';
     StorageModule,
     BusinessesModule,
     InvitationsModule,
+    AdminModule,
     StaffModule,
     ServicesModule,
     ScheduleModule,

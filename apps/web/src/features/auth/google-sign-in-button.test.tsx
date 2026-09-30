@@ -42,6 +42,7 @@ const fakeUser = {
   avatarUrl: null,
   locale: 'en' as const,
   hasPassword: false,
+  isPlatformAdmin: false,
 };
 
 type GisCallback = (response: { credential: string }) => void;

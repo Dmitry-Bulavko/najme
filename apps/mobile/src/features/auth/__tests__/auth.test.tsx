@@ -65,6 +65,7 @@ const me = {
   avatarUrl: null,
   locale: 'en' as const,
   hasPassword: true,
+  isPlatformAdmin: false,
 };
 
 function sessionBody(accessToken: string, refreshToken: string) {

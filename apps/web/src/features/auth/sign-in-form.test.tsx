@@ -44,6 +44,7 @@ const fakeUser = {
   avatarUrl: null,
   locale: 'en' as const,
   hasPassword: true,
+  isPlatformAdmin: false,
 };
 
 const messages = {

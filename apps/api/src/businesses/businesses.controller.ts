@@ -87,4 +87,16 @@ export class BusinessesController {
   ): Promise<void> {
     await this.businesses.softDelete(membership);
   }
+
+  @Post(':businessId/resubmit')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(BusinessAccessGuard)
+  @BusinessRoles('OWNER', 'ADMIN')
+  @ApiOperation({ summary: 'Resubmit a rejected business for approval.' })
+  resubmit(
+    @Param('businessId', ParseUUIDPipe) _businessId: string,
+    @CurrentMembership() membership: BusinessMembership,
+  ): Promise<Business> {
+    return this.businesses.resubmit(membership);
+  }
 }

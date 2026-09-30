@@ -21,6 +21,7 @@ const sessionUser = {
   avatarUrl: null,
   locale: 'en' as const,
   hasPassword: true,
+  isPlatformAdmin: false,
 };
 
 const authSession: AuthSession = {

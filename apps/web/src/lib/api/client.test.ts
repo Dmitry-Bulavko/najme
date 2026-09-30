@@ -107,6 +107,7 @@ describe('401 retry with single-flight refresh', () => {
             avatarUrl: null,
             locale: 'en',
             hasPassword: true,
+            isPlatformAdmin: false,
           },
         }),
       )
@@ -137,6 +138,7 @@ describe('401 retry with single-flight refresh', () => {
         avatarUrl: null,
         locale: 'en',
         hasPassword: true,
+        isPlatformAdmin: false,
       },
     });
 
@@ -294,6 +296,7 @@ describe('refreshSession', () => {
           avatarUrl: null,
           locale: 'en',
           hasPassword: true,
+          isPlatformAdmin: false,
         },
       }),
     );
@@ -321,6 +324,7 @@ describe('refreshSessionUnlocked', () => {
           avatarUrl: null,
           locale: 'en',
           hasPassword: true,
+          isPlatformAdmin: false,
         },
       }),
     );
@@ -364,6 +368,7 @@ describe('refreshSessionUnlocked', () => {
               avatarUrl: null,
               locale: 'en',
               hasPassword: true,
+              isPlatformAdmin: false,
             },
           }),
         );

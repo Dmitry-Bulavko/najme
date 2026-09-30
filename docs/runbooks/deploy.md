@@ -137,3 +137,15 @@ cd /opt/najme
 docker compose -f compose.prod.yml ps
 docker compose -f compose.prod.yml logs -f --tail=200 api
 ```
+
+### Platform admin CLI
+
+Grant or revoke `User.isPlatformAdmin` against the production database (unknown email exits
+non-zero):
+
+```bash
+docker compose -f compose.prod.yml exec api \
+  node scripts/admin-flag.mjs grant someone@example.com
+docker compose -f compose.prod.yml exec api \
+  node scripts/admin-flag.mjs revoke someone@example.com
+```

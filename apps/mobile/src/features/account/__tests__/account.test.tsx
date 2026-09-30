@@ -33,12 +33,14 @@ const meWithPassword: Me = {
   avatarUrl: null,
   locale: 'en',
   hasPassword: true,
+  isPlatformAdmin: false,
 };
 
 const meGoogleOnly: Me = {
   ...meWithPassword,
   emailVerified: false,
   hasPassword: false,
+  isPlatformAdmin: false,
   displayName: null,
 };
 

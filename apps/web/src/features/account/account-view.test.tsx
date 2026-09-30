@@ -46,11 +46,13 @@ const passwordUser: Me = {
   avatarUrl: null,
   locale: 'en',
   hasPassword: true,
+  isPlatformAdmin: false,
 };
 
 const googleUser: Me = {
   ...passwordUser,
   hasPassword: false,
+  isPlatformAdmin: false,
   emailVerified: false,
   displayName: 'Gog',
 };

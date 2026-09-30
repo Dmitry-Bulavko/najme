@@ -273,6 +273,30 @@ export class BusinessesService {
     }
   }
 
+  async resubmit(membership: BusinessMembership): Promise<Business> {
+    const now = this.clock.now();
+    const result = await this.prisma.business.updateMany({
+      where: {
+        id: membership.businessId,
+        deletedAt: null,
+        status: 'REJECTED',
+      },
+      data: {
+        status: 'PENDING_APPROVAL',
+        rejectionReason: null,
+        updatedAt: now,
+      },
+    });
+    if (result.count !== 1) {
+      throw apiError(
+        HttpStatus.CONFLICT,
+        'CONFLICT',
+        'Only a rejected business can be resubmitted.',
+      );
+    }
+    return this.getForMember(membership);
+  }
+
   private async requireBusiness(businessId: string): Promise<BusinessRow> {
     const row = await this.prisma.business.findFirst({
       where: { id: businessId, deletedAt: null },

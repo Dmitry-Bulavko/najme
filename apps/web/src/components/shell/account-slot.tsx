@@ -34,6 +34,7 @@ function getInitials(name: string | null, email: string): string {
  */
 export function AccountSlot() {
   const t = useTranslations('auth');
+  const tAdmin = useTranslations('admin');
   const locale = useLocale();
   const session = useSession();
   const router = useRouter();
@@ -79,6 +80,11 @@ export function AccountSlot() {
         <DropdownMenuItem asChild>
           <Link href={`/${locale}/account`}>{t('header.profile')}</Link>
         </DropdownMenuItem>
+        {me.isPlatformAdmin ? (
+          <DropdownMenuItem asChild>
+            <Link href={`/${locale}/admin/businesses`}>{tAdmin('menuLink')}</Link>
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={async () => {

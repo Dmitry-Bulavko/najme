@@ -204,6 +204,36 @@ export function collectBusinessIdRoutes(
     if (!route?.path.includes(':businessId')) {
       continue;
     }
+    // Platform-admin routes use `:businessId` but are authz'd by PlatformAdminGuard (403), not tenancy.
+    if (route.path.includes('/admin')) {
+      continue;
+    }
+    // Platform-admin routes use `:businessId` but are authz'd by PlatformAdminGuard (403), not tenancy.
+    if (route.path.includes('/admin')) {
+      continue;
+    }
+    for (const [method, on] of Object.entries(route.methods)) {
+      if (on) {
+        routes.push({ method: method.toUpperCase(), path: route.path });
+      }
+    }
+  }
+  return routes;
+}
+
+/** Express layers under `/admin` (or `/api/v1/admin`). */
+export function collectAdminRoutes(app: INestApplication): Array<{ method: string; path: string }> {
+  const instance = app.getHttpAdapter().getInstance() as {
+    router?: { stack?: Array<{ route?: { path: string; methods: Record<string, boolean> } }> };
+    _router?: { stack?: Array<{ route?: { path: string; methods: Record<string, boolean> } }> };
+  };
+  const stack = instance.router?.stack ?? instance._router?.stack ?? [];
+  const routes: Array<{ method: string; path: string }> = [];
+  for (const layer of stack) {
+    const route = layer.route;
+    if (!route?.path.includes('/admin')) {
+      continue;
+    }
     for (const [method, on] of Object.entries(route.methods)) {
       if (on) {
         routes.push({ method: method.toUpperCase(), path: route.path });

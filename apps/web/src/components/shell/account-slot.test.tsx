@@ -40,6 +40,7 @@ const fakeUser = {
   avatarUrl: null,
   locale: 'en' as const,
   hasPassword: true,
+  isPlatformAdmin: false,
 };
 
 const messages = {
@@ -47,6 +48,7 @@ const messages = {
   ...catalogs.en.shell,
   errors: catalogs.en.errors,
   auth: catalogs.en.auth,
+  admin: catalogs.en.admin,
 };
 
 function renderSlot() {
@@ -116,18 +118,22 @@ describe('AccountSlot', () => {
     expect(screen.getByText('AB')).toBeInTheDocument();
   });
 
-  it('shows email in the dropdown when displayName is null', async () => {
-    const noNameUser = { ...fakeUser, displayName: null };
+  it('shows the admin link only for platform admins', async () => {
+    const adminUser = { ...fakeUser, isPlatformAdmin: true };
     vi.mocked(fetch)
       .mockResolvedValueOnce(
         makeJsonResponse({
           accessToken: 'tok',
           accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
-          user: noNameUser,
+          user: adminUser,
         }),
       )
-      .mockResolvedValueOnce(makeJsonResponse(noNameUser));
+      .mockResolvedValueOnce(makeJsonResponse(adminUser));
 
+    const { user } = await (async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      return { user: userEvent.setup() };
+    })();
     renderSlot();
 
     await waitFor(() => {
@@ -135,7 +141,10 @@ describe('AccountSlot', () => {
         screen.getByRole('button', { name: catalogs.en.auth.header.menuLabel }),
       ).toBeInTheDocument();
     });
-    // Initials from email: "al" → "AL"
-    expect(screen.getByText('AL')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: catalogs.en.auth.header.menuLabel }));
+    expect(screen.getByRole('menuitem', { name: catalogs.en.admin.menuLink })).toHaveAttribute(
+      'href',
+      '/en/admin/businesses',
+    );
   });
 });

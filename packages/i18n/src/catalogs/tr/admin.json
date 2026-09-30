@@ -1,0 +1,46 @@
+{
+  "pageTitle": "İşletme moderasyonu",
+  "heading": "İşletmeler",
+  "subtitle": "İnceleme bekleyen işletmeleri onaylayın veya reddedin.",
+  "menuLink": "Yönetim",
+  "tabs": {
+    "pending": "Bekleyen",
+    "rejected": "Reddedilen",
+    "approved": "Onaylanan"
+  },
+  "list": {
+    "empty": "Bu durumda işletme yok.",
+    "loadMore": "Daha fazla yükle",
+    "loading": "İşletmeler yükleniyor…",
+    "error": "İşletmeler yüklenemedi.",
+    "retry": "Yeniden dene",
+    "owner": "Sahip",
+    "verified": "doğrulanmış",
+    "unverified": "doğrulanmamış",
+    "staff": "{count, plural, one {# personel} other {# personel}}",
+    "services": "{count, plural, one {# hizmet} other {# hizmet}}",
+    "hours": "{count, plural, one {# çalışma saatli} other {# çalışma saatli}}"
+  },
+  "detail": {
+    "title": "Ayrıntılar",
+    "empty": "İncelemek için bir işletme seçin.",
+    "city": "Şehir",
+    "category": "Kategori",
+    "reason": "Red nedeni",
+    "createdAt": "Oluşturulma",
+    "reviewedAt": "İnceleme"
+  },
+  "actions": {
+    "approve": "Onayla",
+    "approving": "Onaylanıyor…",
+    "reject": "Reddet",
+    "rejectTitle": "İşletmeyi reddet",
+    "rejectHint": "Sahibin düzeltmesi gerekenleri açıklayın (10–500 karakter).",
+    "rejectReasonLabel": "Neden",
+    "rejectConfirm": "İşletmeyi reddet",
+    "rejecting": "Reddediliyor…",
+    "cancel": "İptal",
+    "approvedToast": "İşletme onaylandı.",
+    "rejectedToast": "İşletme reddedildi."
+  }
+}

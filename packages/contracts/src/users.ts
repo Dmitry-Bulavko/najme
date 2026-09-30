@@ -12,6 +12,8 @@ export const meSchema = z.object({
   avatarUrl: z.string().nullable(),
   locale: localeSchema,
   hasPassword: z.boolean(),
+  /** Platform-admin capability (flag, not a membership role). */
+  isPlatformAdmin: z.boolean(),
 });
 
 export type Me = z.infer<typeof meSchema>;
