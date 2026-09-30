@@ -39,6 +39,15 @@ crash.
 The refresh token lives in `expo-secure-store`; the access token stays in memory (ADR-0010). The
 client always sends `X-Client: mobile`.
 
+**Cold-start and transient refresh failures.** On launch the app refreshes via
+`POST /auth/refresh`. A definitive rejection (HTTP 400/401/403, or API codes `UNAUTHENTICATED` /
+`REFRESH_TOKEN_*`, or a 2xx body that fails the session schema) clears SecureStore and leaves the
+user signed out. A transient failure (network error, timeout, 5xx, 429) does **not** wipe the
+stored refresh token: the UI settles as anonymous for this launch ("signed out for now"), and the
+next app launch — or a later successful refresh — can restore the session. There is no offline
+banner or retry control yet (follow-up). Sign-out runs inside the same auth mutex as refresh so an
+in-flight rotation cannot resurrect the session after logout.
+
 ## Environment variables
 
 | Name                               | Kind   | Purpose                                                               |

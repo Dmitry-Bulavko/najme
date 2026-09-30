@@ -85,10 +85,28 @@ function Harness({ children }: { children: ReactElement }) {
 function SessionProbe() {
   const session = useSession();
   if (session.state === 'loading') {
-    return <Text testID="session-loading">loading</Text>;
+    return (
+      <>
+        <Text testID="session-loading">loading</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="sign-out-probe"
+          onPress={() => void session.signOut()}
+        />
+      </>
+    );
   }
   if (session.state === 'anonymous') {
-    return <Text testID="session-anonymous">anonymous</Text>;
+    return (
+      <>
+        <Text testID="session-anonymous">anonymous</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="sign-out-probe"
+          onPress={() => void session.signOut()}
+        />
+      </>
+    );
   }
   return (
     <>
@@ -187,9 +205,10 @@ describe('AuthProvider session restore and sign-out', () => {
     expect(screen.getByTestId('signed-in-email')).toHaveTextContent('user@example.com');
   });
 
-  it('sign-out clears SecureStore', async () => {
+  it('sign-out posts /auth/logout with the stored refresh token and clears SecureStore', async () => {
     await setRefreshToken('rt-alive');
-    jest.mocked(fetch).mockImplementation(async (input) => {
+    const logoutBodies: unknown[] = [];
+    jest.mocked(fetch).mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.includes('/auth/refresh')) {
         return makeJsonResponse(sessionBody('access', 'rt-alive'));
@@ -198,6 +217,7 @@ describe('AuthProvider session restore and sign-out', () => {
         return makeJsonResponse(me);
       }
       if (url.includes('/auth/logout')) {
+        logoutBodies.push(init?.body ? JSON.parse(String(init.body)) : null);
         return new Response(null, { status: 204 });
       }
       return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
@@ -220,6 +240,71 @@ describe('AuthProvider session restore and sign-out', () => {
     await waitFor(async () => {
       expect(await getRefreshToken()).toBeNull();
     });
+    expect(logoutBodies).toEqual([{ refreshToken: 'rt-alive' }]);
+  });
+
+  it('cold-start on transient refresh failure stays anonymous without wiping SecureStore', async () => {
+    await setRefreshToken('rt-offline');
+    jest.mocked(fetch).mockRejectedValue(new TypeError('Network request failed'));
+
+    const screen = await renderWithI18n(
+      <Harness>
+        <SessionProbe />
+      </Harness>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-anonymous')).toBeTruthy();
+    });
+    expect(await getRefreshToken()).toBe('rt-offline');
+  });
+
+  it('sign-out during an in-flight refresh revokes the rotated token', async () => {
+    await setRefreshToken('rt-old');
+
+    let releaseRefresh: ((response: Response) => void) | undefined;
+    const refreshGate = new Promise<Response>((resolve) => {
+      releaseRefresh = resolve;
+    });
+    const logoutBodies: unknown[] = [];
+
+    jest.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/auth/refresh')) {
+        return refreshGate;
+      }
+      if (url.includes('/me')) {
+        return makeJsonResponse(me);
+      }
+      if (url.includes('/auth/logout')) {
+        logoutBodies.push(init?.body ? JSON.parse(String(init.body)) : null);
+        return new Response(null, { status: 204 });
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    const screen = await renderWithI18n(
+      <Harness>
+        <SessionProbe />
+      </Harness>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-loading')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('sign-out-probe'));
+    });
+
+    await act(async () => {
+      releaseRefresh?.(makeJsonResponse(sessionBody('access-rotated', 'rt-rotated')));
+    });
+
+    await waitFor(async () => {
+      expect(await getRefreshToken()).toBeNull();
+    });
+    expect(logoutBodies).toEqual([{ refreshToken: 'rt-rotated' }]);
   });
 });
 

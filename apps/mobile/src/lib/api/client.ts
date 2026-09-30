@@ -4,8 +4,9 @@
  * - Base URL: `EXPO_PUBLIC_API_URL` (includes `/api/v1`).
  * - Always sends `X-Client: mobile` so refresh tokens travel in the JSON body.
  * - Access token stays in memory; refresh token in SecureStore (see `token-storage.ts`).
- * - On 401: single-flight refresh then one retry; refresh failure clears the session store.
- * - `withAuthMutex` serializes refresh with other session mutations (#56 password change).
+ * - On 401: single-flight refresh then one retry. Definitive refresh rejection clears the store;
+ *   transient failures (network, 5xx, 429) keep the refresh token (#144).
+ * - `withAuthMutex` serializes refresh with sign-out and other session mutations (#56).
  */
 import { apiErrorResponseSchema, authSessionSchema, type AuthSession } from '@najme/contracts';
 
@@ -22,6 +23,17 @@ export class ApiError extends Error {
     this.code = code;
     this.status = status;
     this.details = details;
+  }
+}
+
+/**
+ * Refresh could not complete, but the stored refresh token is still believed valid (offline,
+ * timeout, 5xx, 429). Callers must not wipe SecureStore.
+ */
+export class TransientAuthError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = 'TransientAuthError';
   }
 }
 
@@ -61,8 +73,8 @@ let mutexTail: Promise<unknown> = Promise.resolve();
 let inflightRefresh: Promise<string | null> | null = null;
 
 /**
- * Serializes session-mutating work with refresh. Password change (#56) must hold this lock so a
- * concurrent 401 refresh cannot present the pre-change refresh token (ADR-0010).
+ * Serializes session-mutating work with refresh. Password change (#56) and sign-out (#144) must
+ * hold this lock so a concurrent refresh cannot race token rotation or resurrect a cleared session.
  */
 export function withAuthMutex<T>(operation: () => Promise<T>): Promise<T> {
   const next = mutexTail.then(operation, operation);
@@ -81,6 +93,20 @@ function apiBaseUrl(): string {
   return base.replace(/\/$/, '');
 }
 
+/** True when the refresh response proves the stored token must be discarded. */
+function isDefinitiveRefreshRejection(status: number, code: string | undefined): boolean {
+  if (status === 400 || status === 401 || status === 403) {
+    return true;
+  }
+  if (code === 'UNAUTHENTICATED') {
+    return true;
+  }
+  if (code !== undefined && code.startsWith('REFRESH_TOKEN_')) {
+    return true;
+  }
+  return false;
+}
+
 async function doRefresh(): Promise<string | null> {
   const presented = await getRefreshToken();
   if (!presented) {
@@ -88,8 +114,9 @@ async function doRefresh(): Promise<string | null> {
     return null;
   }
 
+  let res: Response;
   try {
-    const res = await fetch(`${apiBaseUrl()}/auth/refresh`, {
+    res = await fetch(`${apiBaseUrl()}/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -98,30 +125,55 @@ async function doRefresh(): Promise<string | null> {
       },
       body: JSON.stringify({ refreshToken: presented }),
     });
+  } catch (error) {
+    throw new TransientAuthError('Refresh failed due to a network error', { cause: error });
+  }
 
-    if (!res.ok) {
+  if (!res.ok) {
+    let errorCode: string | undefined;
+    try {
+      const raw: unknown = await res.json();
+      const parsed = apiErrorResponseSchema.safeParse(raw);
+      if (parsed.success) {
+        errorCode = parsed.data.error.code;
+      }
+    } catch {
+      // Body may be empty or non-JSON; status alone can still be definitive.
+    }
+
+    if (isDefinitiveRefreshRejection(res.status, errorCode)) {
       await clearSessionTokens();
       return null;
     }
 
-    const raw: unknown = await res.json();
-    const parsed = authSessionSchema.safeParse(raw);
-    if (!parsed.success || !parsed.data.refreshToken) {
-      await clearSessionTokens();
-      return null;
-    }
+    throw new TransientAuthError(`Refresh failed transiently (HTTP ${res.status})`);
+  }
 
-    await persistAuthSession(parsed.data);
-    return parsed.data.accessToken;
+  let raw: unknown;
+  try {
+    raw = await res.json();
   } catch {
+    // 2xx without a parseable body is not a usable session — treat as definitive.
     await clearSessionTokens();
     return null;
   }
+
+  const parsed = authSessionSchema.safeParse(raw);
+  if (!parsed.success || !parsed.data.refreshToken) {
+    await clearSessionTokens();
+    return null;
+  }
+
+  await persistAuthSession(parsed.data);
+  return parsed.data.accessToken;
 }
 
 /**
  * Single-flight refresh: concurrent 401s share one POST /auth/refresh (ADR-0010). Serialized with
- * `withAuthMutex` so password-change and similar flows can hold the lock.
+ * `withAuthMutex` so password-change, sign-out and similar flows can hold the lock.
+ *
+ * @returns New access token, or `null` on definitive rejection (tokens cleared).
+ * @throws {TransientAuthError} When the network / server failure is temporary (tokens kept).
  */
 export async function refreshSession(): Promise<string | null> {
   if (inflightRefresh) {
@@ -167,9 +219,16 @@ export async function apiRequest<T>(
   let response = await doFetch(accessToken);
 
   if (response.status === 401 && !skipAuthRetry) {
-    const newToken = await refreshSession();
-    if (newToken) {
-      response = await doFetch(newToken);
+    try {
+      const newToken = await refreshSession();
+      if (newToken) {
+        response = await doFetch(newToken);
+      }
+    } catch (error) {
+      if (!(error instanceof TransientAuthError)) {
+        throw error;
+      }
+      // Keep the original 401; SecureStore still holds the refresh token.
     }
   }
 

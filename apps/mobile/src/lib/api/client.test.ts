@@ -8,6 +8,7 @@ import {
   persistAuthSession,
   refreshSession,
   setAccessToken,
+  TransientAuthError,
   withAuthMutex,
 } from './client';
 import { clearRefreshToken, getRefreshToken, setRefreshToken } from './token-storage';
@@ -120,7 +121,7 @@ describe('401 retry with single-flight refresh', () => {
     expect(refreshCalls).toBe(1);
   });
 
-  it('clears the session when refresh fails', async () => {
+  it('clears the session when refresh fails definitively (401)', async () => {
     setAccessToken('old');
     await setRefreshToken('rt-1');
 
@@ -136,6 +137,23 @@ describe('401 retry with single-flight refresh', () => {
     await expect(apiRequest('/secure')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
     expect(getAccessToken()).toBeNull();
     expect(await getRefreshToken()).toBeNull();
+  });
+
+  it('keeps the refresh token when refresh returns 503 during a 401 retry', async () => {
+    setAccessToken('old');
+    await setRefreshToken('rt-keep');
+
+    jest
+      .mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
+      )
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'INTERNAL_ERROR', message: 'down' } }, 503),
+      );
+
+    await expect(apiRequest('/secure')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    expect(await getRefreshToken()).toBe('rt-keep');
   });
 });
 
@@ -175,6 +193,40 @@ describe('withAuthMutex and session helpers', () => {
     await expect(refreshSession()).resolves.toBe('restored');
     expect(getAccessToken()).toBe('restored');
     expect(await getRefreshToken()).toBe('rt-new');
+  });
+
+  it('keeps the refresh token and throws TransientAuthError on network failure', async () => {
+    await setRefreshToken('rt-offline');
+    jest.mocked(fetch).mockRejectedValueOnce(new TypeError('Network request failed'));
+
+    await expect(refreshSession()).rejects.toBeInstanceOf(TransientAuthError);
+    expect(await getRefreshToken()).toBe('rt-offline');
+  });
+
+  it('keeps the refresh token and throws TransientAuthError on HTTP 503', async () => {
+    await setRefreshToken('rt-503');
+    jest
+      .mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'INTERNAL_ERROR', message: 'down' } }, 503),
+      );
+
+    await expect(refreshSession()).rejects.toBeInstanceOf(TransientAuthError);
+    expect(await getRefreshToken()).toBe('rt-503');
+  });
+
+  it('clears tokens on 401 REFRESH_TOKEN_REUSED', async () => {
+    await setRefreshToken('rt-reused');
+    setAccessToken('old');
+    jest
+      .mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'REFRESH_TOKEN_REUSED', message: 'reuse' } }, 401),
+      );
+
+    await expect(refreshSession()).resolves.toBeNull();
+    expect(getAccessToken()).toBeNull();
+    expect(await getRefreshToken()).toBeNull();
   });
 
   it('clearRefreshToken leaves storage empty after sign-out path', async () => {
