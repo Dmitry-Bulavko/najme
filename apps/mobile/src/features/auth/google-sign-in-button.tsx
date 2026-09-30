@@ -8,6 +8,7 @@
  */
 import { authProvidersSchema } from '@najme/contracts';
 import { tokens } from '@najme/ui-tokens';
+import { useRouter } from 'expo-router';
 import { useEffect, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
@@ -19,6 +20,7 @@ import { canOfferGoogleSignIn, googleEnvConfigured } from './google-availability
 
 export function GoogleSignInButton(): ReactElement | null {
   const { t, i18n } = useTranslation(['auth', 'errors']);
+  const router = useRouter();
   const { signInWithGoogle } = useSession();
   const [providersOk, setProvidersOk] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -93,6 +95,12 @@ export function GoogleSignInButton(): ReactElement | null {
           ? locale
           : undefined,
       );
+      // Same leave-auth-screen path as email/password sign-in and sign-up.
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)/account');
+      }
     } catch (error) {
       if (error instanceof ApiError) {
         setApiError(t(`errors:${error.code}`, { defaultValue: t('errors:HTTP_ERROR') }));

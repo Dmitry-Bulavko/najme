@@ -5,20 +5,25 @@ import type { ReactElement, ReactNode } from 'react';
 import { Pressable, Text } from 'react-native';
 
 import { AuthProvider, useSession } from '@/features/auth/auth-provider';
+import { canOfferGoogleSignIn, googleEnvConfigured } from '@/features/auth/google-availability';
 import { GoogleSignInButton } from '@/features/auth/google-sign-in-button';
 import { SignInForm } from '@/features/auth/sign-in-form';
 import { clearSessionTokens, setAccessToken } from '@/lib/api/client';
 import { getRefreshToken, setRefreshToken } from '@/lib/api/token-storage';
 import { initTestI18n, renderWithI18n } from '@/test-utils/i18n';
 
+const mockRouterReplace = jest.fn();
+const mockRouterBack = jest.fn();
+const mockRouterCanGoBack = jest.fn(() => false);
+
 jest.mock('expo-router', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
     useRouter: () => ({
       push: jest.fn(),
-      replace: jest.fn(),
-      back: jest.fn(),
-      canGoBack: () => false,
+      replace: mockRouterReplace,
+      back: mockRouterBack,
+      canGoBack: () => mockRouterCanGoBack(),
     }),
     Link: ({ children }: { children: ReactNode }) =>
       ReactActual.createElement(ReactActual.Fragment, null, children),
@@ -29,6 +34,14 @@ jest.mock('@/features/auth/google-availability', () => ({
   googleEnvConfigured: jest.fn(() => false),
   canOfferGoogleSignIn: jest.fn(() => false),
   isGoogleNativeAvailable: jest.fn(() => false),
+}));
+
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(async () => true),
+    signIn: jest.fn(async () => ({ data: { idToken: 'google-id-token' }, type: 'success' })),
+  },
 }));
 
 jest.mock('@/i18n', () => {
@@ -98,6 +111,12 @@ beforeEach(async () => {
   setAccessToken(null);
   jest.restoreAllMocks();
   jest.spyOn(globalThis, 'fetch').mockImplementation(jest.fn<typeof fetch>());
+  mockRouterReplace.mockClear();
+  mockRouterBack.mockClear();
+  mockRouterCanGoBack.mockReset();
+  mockRouterCanGoBack.mockReturnValue(false);
+  jest.mocked(googleEnvConfigured).mockReturnValue(false);
+  jest.mocked(canOfferGoogleSignIn).mockReturnValue(false);
 });
 
 describe('SignInForm', () => {
@@ -213,5 +232,79 @@ describe('GoogleSignInButton visibility', () => {
     );
 
     expect(queryByTestId('google-sign-in')).toBeNull();
+  });
+});
+
+describe('GoogleSignInButton navigation', () => {
+  it('replaces to account after a successful Google sign-in when the stack is empty', async () => {
+    jest.mocked(googleEnvConfigured).mockReturnValue(true);
+    jest.mocked(canOfferGoogleSignIn).mockReturnValue(true);
+    mockRouterCanGoBack.mockReturnValue(false);
+
+    jest.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/auth/providers')) {
+        return makeJsonResponse({ google: true, password: true });
+      }
+      if (url.includes('/auth/google') && init?.method === 'POST') {
+        return makeJsonResponse(sessionBody('access-google', 'rt-google'));
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    const screen = await renderWithI18n(
+      <Harness>
+        <GoogleSignInButton />
+      </Harness>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('google-sign-in')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText(catalogs.en.auth.google.continueWith));
+    });
+
+    await waitFor(() => {
+      expect(mockRouterReplace).toHaveBeenCalledWith('/(tabs)/account');
+    });
+    expect(mockRouterBack).not.toHaveBeenCalled();
+  });
+
+  it('goes back after a successful Google sign-in when the stack can go back', async () => {
+    jest.mocked(googleEnvConfigured).mockReturnValue(true);
+    jest.mocked(canOfferGoogleSignIn).mockReturnValue(true);
+    mockRouterCanGoBack.mockReturnValue(true);
+
+    jest.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/auth/providers')) {
+        return makeJsonResponse({ google: true, password: true });
+      }
+      if (url.includes('/auth/google') && init?.method === 'POST') {
+        return makeJsonResponse(sessionBody('access-google', 'rt-google'));
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    const screen = await renderWithI18n(
+      <Harness>
+        <GoogleSignInButton />
+      </Harness>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('google-sign-in')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText(catalogs.en.auth.google.continueWith));
+    });
+
+    await waitFor(() => {
+      expect(mockRouterBack).toHaveBeenCalled();
+    });
+    expect(mockRouterReplace).not.toHaveBeenCalled();
   });
 });
