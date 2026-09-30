@@ -93,9 +93,10 @@ so you will see them offered; they belong to the reviewer and you **never** use 
 - anything under `.claude/` — do not edit it either (not even frontmatter such as `model`).
 
 You never review, approve or merge your own work, not even through a subagent: no
-"Review — round N" / `VERDICT:` comments, no `status:approved` or `status:changes-requested`
-labels (neither adding nor removing), no merging, no closing epics, no moving issues of another
-phase out of `status:backlog`. A verdict counts only when Claude posts it from a Claude Code session
+"Review — round N" / `VERDICT:` comments, never adding `status:approved` or
+`status:changes-requested` and never removing `status:approved` (the only review-label change you
+make is removing `status:changes-requested` when you start fixing, `address-review` step 2), no
+merging, no closing epics, no moving issues of another phase out of `status:backlog`. A verdict counts only when Claude posts it from a Claude Code session
 (it carries a `Claude-Session:` link). Breaking this rule is a review BLOCKER and the affected tasks
 are reviewed again. If a task seems to need one of these actions, stop and tell the owner.
 
@@ -106,7 +107,7 @@ are reviewed again. If a task seems to need one of these actions, stop and tell 
 - change code without an issue; implement an epic, a `size:L` or a `status:needs-human` issue;
 - push to `main` or `production`; force-push (including `--force-with-lease`); rebase, squash or
   amend commits that are already pushed; merge PRs (Claude merges);
-- use or edit Claude's tooling in `.claude/`; review or approve your own work; set or remove
+- use or edit Claude's tooling in `.claude/`; review or approve your own work; add
   `status:approved` / `status:changes-requested`; change `phase:*` labels or another phase's
   `status:*` (see "Claude-only tooling");
 - read, print or commit `.env` files, keys, tokens or any secret; put secrets into `NEXT_PUBLIC_*`

@@ -61,4 +61,5 @@ Owner choices (2026-09-29):
     subagent there is marked "Claude Code only", and the owner disables them in Cursor's settings.
   - Only a verdict posted by Claude counts. It carries a `Claude-Session:` line. `/review` treats any
     other verdict, `status:approved` label or merge as void and reviews the work again.
-  - Cursor never sets review labels, merges, or changes phase gating. A violation is a BLOCKER.
+  - Cursor never adds review labels, merges, or changes phase gating (it only removes
+    `status:changes-requested` when it starts fixing). A violation is a BLOCKER.

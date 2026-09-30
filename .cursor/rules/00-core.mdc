@@ -11,8 +11,9 @@ alwaysApply: true
   comment under "Follow-ups" instead of the diff.
 - `.claude/` is Claude's reviewer tooling (ADR-0012), even when Cursor offers its skills
   (`implement`, `manager`, `review`) or subagents (`implementer`, `reviewer`): never run, apply or
-  edit them. Never review, approve or merge your own work; never set or remove `status:approved` /
-  `status:changes-requested`; never change `phase:*` labels or another phase's `status:*`. See
+  edit them. Never review, approve or merge your own work; never add `status:approved` /
+  `status:changes-requested` (removing `changes-requested` in `address-review` is the one allowed
+  change); never change `phase:*` labels or another phase's `status:*`. See
   `AGENTS.md` "Claude-only tooling". Violations are review BLOCKERs.
 - Read before writing: the issue (with comments), `docs/README.md` for the area map, the ADRs the
   issue names, and the code you touch. Reuse existing helpers instead of adding new ones.
