@@ -41,6 +41,8 @@ model User {
   authIdentities AuthIdentity[]
   refreshTokens  RefreshToken[]
   emailTokens    EmailToken[]
+  memberships    Membership[]
+  reviewedBusinesses Business[] @relation("BusinessReviewedBy")
 
   @@map("users")
 }
@@ -106,6 +108,7 @@ model Category {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   translations CategoryTranslation[]
+  businesses   Business[]
 
   @@map("categories")
 }
@@ -121,4 +124,110 @@ model CategoryTranslation {
 
   @@unique([categoryId, locale])
   @@map("category_translations")
+}
+
+enum City {
+  ANDRIJEVICA
+  BAR
+  BERANE
+  BIJELO_POLJE
+  BUDVA
+  CETINJE
+  DANILOVGRAD
+  GUSINJE
+  HERCEG_NOVI
+  KOLASIN
+  KOTOR
+  MOJKOVAC
+  NIKSIC
+  PETNJICA
+  PLAV
+  PLJEVLJA
+  PLUZINE
+  PODGORICA
+  ROZAJE
+  SAVNIK
+  TIVAT
+  TUZI
+  ULCINJ
+  ZABLJAK
+  ZETA
+
+  @@map("city")
+}
+
+enum BusinessStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUSPENDED
+
+  @@map("business_status")
+}
+
+enum ConfirmationMode {
+  AUTO
+  MANUAL
+
+  @@map("confirmation_mode")
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  STAFF
+
+  @@map("membership_role")
+}
+
+// CHECKs and composite index: raw SQL in the businesses_memberships migration.
+model Business {
+  id                        String           @id @db.Uuid
+  name                      String
+  slug                      String           @unique
+  categoryId                String           @map("category_id") @db.Uuid
+  description               String?
+  timezone                  String           @default("Europe/Podgorica")
+  city                      City
+  address                   String?
+  contactPhone              String?          @map("contact_phone")
+  contactEmail              String?          @map("contact_email")
+  logoKey                   String?          @map("logo_key")
+  coverKey                  String?          @map("cover_key")
+  confirmationMode          ConfirmationMode @default(AUTO) @map("confirmation_mode")
+  cancellationWindowMinutes Int              @default(120) @map("cancellation_window_minutes")
+  minBookingNoticeMinutes   Int              @default(60) @map("min_booking_notice_minutes")
+  bookingHorizonDays        Int              @default(60) @map("booking_horizon_days")
+  status                    BusinessStatus   @default(PENDING_APPROVAL)
+  approvedAt                DateTime?        @map("approved_at") @db.Timestamptz(3)
+  rejectionReason           String?          @map("rejection_reason")
+  reviewedAt                DateTime?        @map("reviewed_at") @db.Timestamptz(3)
+  reviewedByUserId          String?          @map("reviewed_by_user_id") @db.Uuid
+  createdAt                 DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt                 DateTime?        @map("deleted_at") @db.Timestamptz(3)
+
+  category     Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  reviewedBy   User?        @relation("BusinessReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  memberships  Membership[]
+
+  @@index([status, categoryId, city])
+  @@map("businesses")
+}
+
+// staff_member_id lands with StaffMember in #74.
+model Membership {
+  id         String         @id @db.Uuid
+  userId     String         @map("user_id") @db.Uuid
+  businessId String         @map("business_id") @db.Uuid
+  role       MembershipRole
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, businessId])
+  @@index([businessId])
+  @@map("memberships")
 }

@@ -29,6 +29,6 @@ import { RefreshTokenService } from './refresh-token.service.js';
     { provide: GoogleIdTokenVerifier, useClass: GoogleAuthLibraryVerifier },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
-  exports: [AccessTokenService],
+  exports: [AccessTokenService, AuthService, PasswordService],
 })
 export class AuthModule {}
