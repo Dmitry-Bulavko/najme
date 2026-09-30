@@ -1,11 +1,12 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import type {
   CreateServiceRequest,
+  SelectOption,
   Service,
   ServiceCustomFieldResponse,
   UpdateServiceRequest,
 } from '@najme/contracts';
-import { Prisma, type Prisma as PrismaNs } from '../../generated/prisma/index.js';
+import { Prisma } from '../../generated/prisma/client.js';
 import { Clock } from '../common/clock.js';
 import { apiError } from '../common/errors/api-error.js';
 import { newId } from '../common/id.js';
@@ -13,10 +14,11 @@ import { PrismaService } from '../prisma/prisma.service.js';
 
 const serviceInclude = {
   assignments: { select: { staffMemberId: true } },
-  customFields: { orderBy: { sortOrder: 'asc' as const } },
-} as const;
+  customFields: { orderBy: [{ sortOrder: 'asc' as const }, { key: 'asc' as const }] },
+};
 
-type ServiceRow = PrismaNs.ServiceGetPayload<{ include: typeof serviceInclude }>;
+type ServiceRow = Prisma.ServiceGetPayload<{ include: typeof serviceInclude }>;
+type Tx = Prisma.TransactionClient;
 
 @Injectable()
 export class ServicesService {
@@ -40,40 +42,46 @@ export class ServicesService {
 
   async create(businessId: string, input: CreateServiceRequest): Promise<Service> {
     const staffMemberIds = input.staffMemberIds ?? [];
-    await this.assertStaffInBusiness(businessId, staffMemberIds);
     const now = this.clock.now();
     const serviceId = newId();
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.service.create({
-        data: {
-          id: serviceId,
-          businessId,
-          name: input.name,
-          description: input.description ?? null,
-          durationMinutes: input.durationMinutes,
-          bufferBeforeMinutes: input.bufferBeforeMinutes ?? 0,
-          bufferAfterMinutes: input.bufferAfterMinutes ?? 0,
-          priceAmount: input.price.amount,
-          priceCurrency: input.price.currency,
-          minBookingNoticeMinutes: input.minBookingNoticeMinutes ?? null,
-          bookingHorizonDays: input.bookingHorizonDays ?? null,
-          active: input.active ?? true,
-          createdAt: now,
-          updatedAt: now,
-        },
-      });
-      if (staffMemberIds.length > 0) {
-        await tx.serviceStaffAssignment.createMany({
-          data: staffMemberIds.map((staffMemberId) => ({
-            id: newId(),
-            serviceId,
-            staffMemberId,
-          })),
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await this.assertStaffInBusiness(tx, businessId, staffMemberIds);
+        await tx.service.create({
+          data: {
+            id: serviceId,
+            businessId,
+            name: input.name,
+            description: input.description ?? null,
+            durationMinutes: input.durationMinutes,
+            bufferBeforeMinutes: input.bufferBeforeMinutes ?? 0,
+            bufferAfterMinutes: input.bufferAfterMinutes ?? 0,
+            priceAmount: input.price.amount,
+            priceCurrency: input.price.currency,
+            minBookingNoticeMinutes: input.minBookingNoticeMinutes ?? null,
+            bookingHorizonDays: input.bookingHorizonDays ?? null,
+            active: input.active ?? true,
+            createdAt: now,
+            updatedAt: now,
+          },
         });
-      }
-      await this.replaceCustomFields(tx, serviceId, input.customFields ?? [], now);
-    });
+        if (staffMemberIds.length > 0) {
+          await tx.serviceStaffAssignment.createMany({
+            data: staffMemberIds.map((staffMemberId) => ({
+              id: newId(),
+              serviceId,
+              staffMemberId,
+              createdAt: now,
+            })),
+          });
+        }
+        await this.replaceCustomFields(tx, serviceId, input.customFields ?? [], now);
+      });
+    } catch (err) {
+      this.rethrowConflict(err);
+      throw err;
+    }
 
     return this.get(businessId, serviceId);
   }
@@ -83,60 +91,82 @@ export class ServicesService {
     serviceId: string,
     input: UpdateServiceRequest,
   ): Promise<Service> {
-    await this.requireService(businessId, serviceId);
-    if (input.staffMemberIds) {
-      await this.assertStaffInBusiness(businessId, input.staffMemberIds);
-    }
     const now = this.clock.now();
 
-    await this.prisma.$transaction(async (tx) => {
-      const data: PrismaNs.ServiceUpdateInput = { updatedAt: now };
-      if (input.name !== undefined) data.name = input.name;
-      if (input.description !== undefined) data.description = input.description;
-      if (input.durationMinutes !== undefined) data.durationMinutes = input.durationMinutes;
-      if (input.bufferBeforeMinutes !== undefined) {
-        data.bufferBeforeMinutes = input.bufferBeforeMinutes;
-      }
-      if (input.bufferAfterMinutes !== undefined) {
-        data.bufferAfterMinutes = input.bufferAfterMinutes;
-      }
-      if (input.price !== undefined) {
-        data.priceAmount = input.price.amount;
-        data.priceCurrency = input.price.currency;
-      }
-      if (input.minBookingNoticeMinutes !== undefined) {
-        data.minBookingNoticeMinutes = input.minBookingNoticeMinutes;
-      }
-      if (input.bookingHorizonDays !== undefined) {
-        data.bookingHorizonDays = input.bookingHorizonDays;
-      }
-      if (input.active !== undefined) data.active = input.active;
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Serialize concurrent PATCHes that replace custom-field keys.
+        await tx.$queryRaw`SELECT id FROM services WHERE id = ${serviceId}::uuid AND business_id = ${businessId}::uuid AND deleted_at IS NULL FOR UPDATE`;
 
-      await tx.service.update({ where: { id: serviceId }, data });
-
-      if (input.staffMemberIds) {
-        await tx.serviceStaffAssignment.deleteMany({ where: { serviceId } });
-        if (input.staffMemberIds.length > 0) {
-          await tx.serviceStaffAssignment.createMany({
-            data: input.staffMemberIds.map((staffMemberId) => ({
-              id: newId(),
-              serviceId,
-              staffMemberId,
-            })),
-          });
+        const existing = await tx.service.findFirst({
+          where: { id: serviceId, businessId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!existing) {
+          throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Service not found.');
         }
-      }
 
-      if (input.customFields) {
-        await this.replaceCustomFields(tx, serviceId, input.customFields, now);
-      }
-    });
+        if (input.staffMemberIds) {
+          await this.assertStaffInBusiness(tx, businessId, input.staffMemberIds);
+        }
+
+        const data: Prisma.ServiceUpdateManyMutationInput = { updatedAt: now };
+        if (input.name !== undefined) data.name = input.name;
+        if (input.description !== undefined) data.description = input.description;
+        if (input.durationMinutes !== undefined) data.durationMinutes = input.durationMinutes;
+        if (input.bufferBeforeMinutes !== undefined) {
+          data.bufferBeforeMinutes = input.bufferBeforeMinutes;
+        }
+        if (input.bufferAfterMinutes !== undefined) {
+          data.bufferAfterMinutes = input.bufferAfterMinutes;
+        }
+        if (input.price !== undefined) {
+          data.priceAmount = input.price.amount;
+          data.priceCurrency = input.price.currency;
+        }
+        if (input.minBookingNoticeMinutes !== undefined) {
+          data.minBookingNoticeMinutes = input.minBookingNoticeMinutes;
+        }
+        if (input.bookingHorizonDays !== undefined) {
+          data.bookingHorizonDays = input.bookingHorizonDays;
+        }
+        if (input.active !== undefined) data.active = input.active;
+
+        const updated = await tx.service.updateMany({
+          where: { id: serviceId, businessId, deletedAt: null },
+          data,
+        });
+        if (updated.count === 0) {
+          throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Service not found.');
+        }
+
+        if (input.staffMemberIds) {
+          await tx.serviceStaffAssignment.deleteMany({ where: { serviceId } });
+          if (input.staffMemberIds.length > 0) {
+            await tx.serviceStaffAssignment.createMany({
+              data: input.staffMemberIds.map((staffMemberId) => ({
+                id: newId(),
+                serviceId,
+                staffMemberId,
+                createdAt: now,
+              })),
+            });
+          }
+        }
+
+        if (input.customFields) {
+          await this.replaceCustomFields(tx, serviceId, input.customFields, now);
+        }
+      });
+    } catch (err) {
+      this.rethrowConflict(err);
+      throw err;
+    }
 
     return this.get(businessId, serviceId);
   }
 
   async softDelete(businessId: string, serviceId: string): Promise<void> {
-    await this.requireService(businessId, serviceId);
     const now = this.clock.now();
     await this.prisma.$transaction(async (tx) => {
       await tx.serviceStaffAssignment.deleteMany({ where: { serviceId } });
@@ -150,29 +180,31 @@ export class ServicesService {
     });
   }
 
-  private async assertStaffInBusiness(businessId: string, staffMemberIds: string[]): Promise<void> {
+  private async assertStaffInBusiness(
+    tx: Tx,
+    businessId: string,
+    staffMemberIds: string[],
+  ): Promise<void> {
     if (staffMemberIds.length === 0) {
       return;
     }
     const unique = [...new Set(staffMemberIds)];
-    const found = await this.prisma.staffMember.findMany({
+    const found = await tx.staffMember.findMany({
       where: { businessId, deletedAt: null, id: { in: unique } },
       select: { id: true },
     });
     if (found.length !== unique.length) {
-      throw new HttpException(
-        {
-          code: 'VALIDATION_FAILED',
-          message: 'One or more staff members are invalid for this business.',
-          details: { staffMemberIds: unique.filter((id) => !found.some((row) => row.id === id)) },
-        },
+      throw apiError(
         HttpStatus.UNPROCESSABLE_ENTITY,
+        'VALIDATION_FAILED',
+        'One or more staff members are invalid for this business.',
+        { staffMemberIds: unique.filter((id) => !found.some((row) => row.id === id)) },
       );
     }
   }
 
   private async replaceCustomFields(
-    tx: PrismaNs.TransactionClient,
+    tx: Tx,
     serviceId: string,
     fields: NonNullable<CreateServiceRequest['customFields']>,
     now: Date,
@@ -184,10 +216,10 @@ export class ServicesService {
     const byKey = new Map(existing.map((row) => [row.key, row.id]));
     const keepKeys = new Set(fields.map((f) => f.key));
 
-    for (const field of fields) {
-      const options: PrismaNs.InputJsonValue | typeof Prisma.JsonNull =
+    for (const [index, field] of fields.entries()) {
+      const options: Prisma.InputJsonValue | typeof Prisma.JsonNull =
         field.type === 'SELECT' ? (field.options ?? []) : Prisma.JsonNull;
-      const sortOrder = field.sortOrder ?? 0;
+      const sortOrder = field.sortOrder ?? index;
       const existingId = byKey.get(field.key);
       if (existingId) {
         await tx.serviceCustomFieldDefinition.update({
@@ -243,9 +275,7 @@ export class ServicesService {
       label: field.label,
       type: field.type,
       required: field.required,
-      options: Array.isArray(field.options)
-        ? field.options.filter((o): o is string => typeof o === 'string')
-        : null,
+      options: this.parseOptions(field.options),
       sortOrder: field.sortOrder,
     }));
 
@@ -266,5 +296,30 @@ export class ServicesService {
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
+  }
+
+  private parseOptions(raw: Prisma.JsonValue | null): SelectOption[] | null {
+    if (!Array.isArray(raw)) {
+      return null;
+    }
+    const options: SelectOption[] = [];
+    for (const item of raw) {
+      if (
+        item &&
+        typeof item === 'object' &&
+        !Array.isArray(item) &&
+        typeof item.value === 'string' &&
+        typeof item.label === 'string'
+      ) {
+        options.push({ value: item.value, label: item.label });
+      }
+    }
+    return options;
+  }
+
+  private rethrowConflict(err: unknown): void {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      throw apiError(HttpStatus.CONFLICT, 'CONFLICT', 'Resource conflict.');
+    }
   }
 }

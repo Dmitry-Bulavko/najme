@@ -21,13 +21,26 @@ const bufferMinutesSchema = z
   .max(240)
   .refine(step5, { message: 'must be a multiple of 5' });
 
-const eurPriceSchema = moneySchema.refine((m) => m.currency === 'EUR' && m.amount >= 0, {
-  message: 'price must be non-negative EUR',
-});
+/** EUR service prices; amount capped to stay within PostgreSQL int4. */
+const eurPriceSchema = moneySchema
+  .refine((m) => m.currency === 'EUR' && m.amount >= 0, {
+    message: 'price must be non-negative EUR',
+  })
+  .refine((m) => m.amount <= 99_999_999, {
+    message: 'price amount must be at most 99999999',
+  });
 
 const customFieldKeySchema = z
   .string()
   .regex(/^[a-z][a-z0-9_]{0,39}$/, 'must match ^[a-z][a-z0-9_]{0,39}$');
+
+/** SELECT option: stable `value` + display `label` (data-model / AC 8). */
+export const selectOptionSchema = z.object({
+  value: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(80),
+});
+
+export type SelectOption = z.infer<typeof selectOptionSchema>;
 
 export const serviceCustomFieldSchema = z
   .object({
@@ -35,7 +48,7 @@ export const serviceCustomFieldSchema = z
     label: z.string().trim().min(1).max(80),
     type: customFieldTypeSchema,
     required: z.boolean(),
-    options: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
+    options: z.array(selectOptionSchema).max(20).optional(),
     sortOrder: z.number().int().min(0).max(99).optional(),
   })
   .superRefine((field, ctx) => {
@@ -49,11 +62,11 @@ export const serviceCustomFieldSchema = z
         });
         return;
       }
-      const unique = new Set(options);
-      if (unique.size !== options.length) {
+      const values = options.map((o) => o.value);
+      if (new Set(values).size !== values.length) {
         ctx.addIssue({
           code: 'custom',
-          message: 'SELECT options must be unique',
+          message: 'SELECT option values must be unique',
           path: ['options'],
         });
       }
@@ -72,27 +85,42 @@ const customFieldsSchema = z
   .array(serviceCustomFieldSchema)
   .max(10)
   .superRefine((fields, ctx) => {
-    const keys = fields.map((f) => f.key);
-    if (new Set(keys).size !== keys.length) {
-      ctx.addIssue({ code: 'custom', message: 'custom field keys must be unique' });
+    const seen = new Map<string, number>();
+    fields.forEach((field, index) => {
+      const prev = seen.get(field.key);
+      if (prev !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'custom field keys must be unique',
+          path: [index, 'key'],
+        });
+      } else {
+        seen.set(field.key, index);
+      }
+    });
+  });
+
+const staffMemberIdsSchema = z
+  .array(z.string().uuid())
+  .max(100)
+  .superRefine((ids, ctx) => {
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({ code: 'custom', message: 'staffMemberIds must be unique' });
     }
   });
 
-const serviceNameSchema = z.string().trim().min(1).max(80);
-const serviceDescriptionSchema = z.string().trim().min(1).max(1000);
-
 /** Shared writable fields for create/update (without replace-set lists). */
 const serviceWritableBaseSchema = z.object({
-  name: serviceNameSchema,
-  description: serviceDescriptionSchema.nullable().optional(),
+  name: z.string().trim().min(1).max(80),
+  description: z.string().trim().min(1).max(1000).nullable().optional(),
   durationMinutes: durationMinutesSchema,
   bufferBeforeMinutes: bufferMinutesSchema.optional(),
   bufferAfterMinutes: bufferMinutesSchema.optional(),
   price: eurPriceSchema,
-  minBookingNoticeMinutes: z.number().int().min(0).nullable().optional(),
+  minBookingNoticeMinutes: z.number().int().min(0).max(525_600).nullable().optional(),
   bookingHorizonDays: z.number().int().min(1).max(365).nullable().optional(),
   active: z.boolean().optional(),
-  staffMemberIds: z.array(z.string().uuid()).optional(),
+  staffMemberIds: staffMemberIdsSchema.optional(),
   customFields: customFieldsSchema.optional(),
 });
 
@@ -112,7 +140,7 @@ export const serviceCustomFieldResponseSchema = z.object({
   label: z.string().min(1),
   type: customFieldTypeSchema,
   required: z.boolean(),
-  options: z.array(z.string()).nullable(),
+  options: z.array(selectOptionSchema).nullable(),
   sortOrder: z.number().int(),
 });
 

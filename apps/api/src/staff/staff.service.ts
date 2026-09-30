@@ -4,7 +4,7 @@ import type {
   StaffMember,
   UpdateStaffMemberRequest,
 } from '@najme/contracts';
-import type { Prisma } from '../../generated/prisma/index.js';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { Clock } from '../common/clock.js';
 import { apiError } from '../common/errors/api-error.js';
 import { newId } from '../common/id.js';
@@ -64,21 +64,21 @@ export class StaffService {
     staffId: string,
     input: UpdateStaffMemberRequest,
   ): Promise<StaffMember> {
-    await this.requireStaff(businessId, staffId);
-    const row = await this.prisma.staffMember.update({
-      where: { id: staffId },
+    const result = await this.prisma.staffMember.updateMany({
+      where: { id: staffId, businessId, deletedAt: null },
       data: {
         ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
         ...(input.active !== undefined ? { active: input.active } : {}),
         updatedAt: this.clock.now(),
       },
-      select: staffSelect,
     });
-    return this.toStaff(row);
+    if (result.count === 0) {
+      throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Staff member not found.');
+    }
+    return this.get(businessId, staffId);
   }
 
   async softDelete(businessId: string, staffId: string): Promise<void> {
-    await this.requireStaff(businessId, staffId);
     const now = this.clock.now();
     await this.prisma.$transaction(async (tx) => {
       await tx.serviceStaffAssignment.deleteMany({ where: { staffMemberId: staffId } });

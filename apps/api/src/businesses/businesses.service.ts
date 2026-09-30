@@ -63,10 +63,12 @@ export class BusinessesService {
       throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, 'VALIDATION_FAILED', 'Unknown category.');
     }
 
-    const owner = await this.prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      select: { displayName: true, email: true },
-    });
+    const owner = input.ownerIsStaff
+      ? await this.prisma.user.findUniqueOrThrow({
+          where: { id: userId },
+          select: { displayName: true, email: true },
+        })
+      : null;
 
     const base = ensureValidBusinessSlug(slugifyBusinessName(input.name));
     const businessId = newId();
@@ -108,7 +110,7 @@ export class BusinessesService {
           });
 
           let staffMemberId: string | null = null;
-          if (input.ownerIsStaff) {
+          if (input.ownerIsStaff && owner) {
             staffMemberId = newId();
             const displayName = owner.displayName?.trim() || owner.email.split('@')[0] || 'Owner';
             await tx.staffMember.create({

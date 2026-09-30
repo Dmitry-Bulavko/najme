@@ -41,3 +41,5 @@ Prefer the owner's `displayName`; if null/empty, use the email local-part (befor
 - Soft-deleting a staff member deletes service assignments and clears `memberships.staff_member_id`.
 - Soft-deleting a service deletes assignments; custom-field definitions cascade with the row only on
   hard delete — soft-delete keeps definitions for history until hard delete (not exposed).
+- SELECT custom-field options are `{ value, label }[]` with unique `value`s (data-model / AC 8).
+- Duplicate `staffMemberIds` are rejected by the contract (400).
