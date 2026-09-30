@@ -62,6 +62,11 @@ export class BusinessesService {
       throw apiError(HttpStatus.UNPROCESSABLE_ENTITY, 'VALIDATION_FAILED', 'Unknown category.');
     }
 
+    const owner = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { displayName: true, email: true },
+    });
+
     const base = ensureValidBusinessSlug(slugifyBusinessName(input.name));
     const businessId = newId();
     const membershipId = newId();
@@ -88,12 +93,29 @@ export class BusinessesService {
             },
             select: businessSelect,
           });
+
+          let staffMemberId: string | null = null;
+          if (input.ownerIsStaff) {
+            staffMemberId = newId();
+            const displayName = owner.displayName?.trim() || owner.email.split('@')[0] || 'Owner';
+            await tx.staffMember.create({
+              data: {
+                id: staffMemberId,
+                businessId,
+                displayName,
+                createdAt: now,
+                updatedAt: now,
+              },
+            });
+          }
+
           await tx.membership.create({
             data: {
               id: membershipId,
               userId,
               businessId,
               role: 'OWNER',
+              staffMemberId,
               createdAt: now,
               updatedAt: now,
             },
@@ -118,6 +140,7 @@ export class BusinessesService {
       orderBy: { createdAt: 'asc' },
       select: {
         role: true,
+        staffMemberId: true,
         business: {
           select: {
             id: true,
@@ -136,7 +159,7 @@ export class BusinessesService {
       slug: row.business.slug,
       status: row.business.status,
       role: row.role,
-      staffMemberId: null,
+      staffMemberId: row.staffMemberId,
       logoUrl: null,
     }));
   }

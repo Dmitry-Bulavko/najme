@@ -30,10 +30,22 @@ export class BusinessTestTracker {
 
   async cleanup(prisma: PrismaService): Promise<void> {
     if (this.businessIds.length > 0) {
-      await prisma.membership.deleteMany({ where: { businessId: { in: [...this.businessIds] } } });
+      const ids = [...this.businessIds];
+      await prisma.serviceStaffAssignment.deleteMany({
+        where: { service: { businessId: { in: ids } } },
+      });
+      await prisma.serviceCustomFieldDefinition.deleteMany({
+        where: { service: { businessId: { in: ids } } },
+      });
+      await prisma.service.deleteMany({ where: { businessId: { in: ids } } });
+      await prisma.membership.updateMany({
+        where: { businessId: { in: ids } },
+        data: { staffMemberId: null },
+      });
+      await prisma.staffMember.deleteMany({ where: { businessId: { in: ids } } });
+      await prisma.membership.deleteMany({ where: { businessId: { in: ids } } });
       await prisma.business.deleteMany({ where: { id: { in: this.businessIds.splice(0) } } });
     }
-    // Also remove memberships for users who joined others' businesses.
     if (this.userIds.length > 0) {
       await prisma.membership.deleteMany({ where: { userId: { in: [...this.userIds] } } });
       await prisma.user.deleteMany({ where: { id: { in: this.userIds.splice(0) } } });

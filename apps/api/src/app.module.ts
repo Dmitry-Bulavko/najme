@@ -6,6 +6,8 @@ import { ConfigModule } from './config/config.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { ServicesModule } from './services/services.module.js';
+import { StaffModule } from './staff/staff.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -18,6 +20,8 @@ import { UsersModule } from './users/users.module.js';
     MailModule,
     AuthModule,
     BusinessesModule,
+    StaffModule,
+    ServicesModule,
   ],
 })
 export class AppModule {}

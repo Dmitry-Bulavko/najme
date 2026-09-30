@@ -207,27 +207,112 @@ model Business {
   updatedAt                 DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt                 DateTime?        @map("deleted_at") @db.Timestamptz(3)
 
-  category     Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  reviewedBy   User?        @relation("BusinessReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  category     Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  reviewedBy   User?         @relation("BusinessReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
   memberships  Membership[]
+  staffMembers StaffMember[]
+  services     Service[]
 
   @@index([status, categoryId, city])
   @@map("businesses")
 }
 
-// staff_member_id lands with StaffMember in #74.
 model Membership {
-  id         String         @id @db.Uuid
-  userId     String         @map("user_id") @db.Uuid
-  businessId String         @map("business_id") @db.Uuid
-  role       MembershipRole
-  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt  DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id            String         @id @db.Uuid
+  userId        String         @map("user_id") @db.Uuid
+  businessId    String         @map("business_id") @db.Uuid
+  role          MembershipRole
+  staffMemberId String?        @unique @map("staff_member_id") @db.Uuid
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Restrict)
-  business Business @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  staffMember StaffMember? @relation(fields: [staffMemberId], references: [id], onDelete: SetNull)
 
   @@unique([userId, businessId])
   @@index([businessId])
   @@map("memberships")
+}
+
+model StaffMember {
+  id          String    @id @db.Uuid
+  businessId  String    @map("business_id") @db.Uuid
+  displayName String    @map("display_name")
+  photoKey    String?   @map("photo_key")
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  business    Business                 @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  membership  Membership?
+  assignments ServiceStaffAssignment[]
+
+  @@index([businessId])
+  @@map("staff_members")
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  SELECT
+
+  @@map("custom_field_type")
+}
+
+// CHECKs on services: raw SQL in the staff_services migration.
+model Service {
+  id                      String    @id @db.Uuid
+  businessId              String    @map("business_id") @db.Uuid
+  name                    String
+  description             String?
+  durationMinutes         Int       @map("duration_minutes")
+  bufferBeforeMinutes     Int       @default(0) @map("buffer_before_minutes")
+  bufferAfterMinutes      Int       @default(0) @map("buffer_after_minutes")
+  priceAmount             Int       @map("price_amount")
+  priceCurrency           String    @default("EUR") @map("price_currency")
+  minBookingNoticeMinutes Int?      @map("min_booking_notice_minutes")
+  bookingHorizonDays      Int?      @map("booking_horizon_days")
+  active                  Boolean   @default(true)
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt               DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  business     Business                      @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  assignments  ServiceStaffAssignment[]
+  customFields ServiceCustomFieldDefinition[]
+
+  @@index([businessId])
+  @@map("services")
+}
+
+model ServiceStaffAssignment {
+  id            String @id @db.Uuid
+  serviceId     String @map("service_id") @db.Uuid
+  staffMemberId String @map("staff_member_id") @db.Uuid
+
+  service     Service     @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  staffMember StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceId, staffMemberId])
+  @@map("service_staff_assignments")
+}
+
+model ServiceCustomFieldDefinition {
+  id         String          @id @db.Uuid
+  serviceId  String          @map("service_id") @db.Uuid
+  key        String
+  label      String
+  type       CustomFieldType
+  required   Boolean         @default(false)
+  options    Json?
+  sortOrder  Int             @default(0) @map("sort_order")
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceId, key])
+  @@map("service_custom_field_definitions")
 }
