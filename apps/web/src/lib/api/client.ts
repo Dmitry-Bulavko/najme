@@ -110,11 +110,15 @@ export async function apiRequest<T>(
   }
 
   if (response.ok) {
-    // 204 No Content
-    if (response.status === 204) {
+    // 204/205 and empty 202 (forgot-password, verify resend) have no JSON body.
+    if (response.status === 204 || response.status === 205) {
       return undefined as T;
     }
-    return response.json() as Promise<T>;
+    const text = await response.text();
+    if (!text) {
+      return undefined as T;
+    }
+    return JSON.parse(text) as T;
   }
 
   let errorBody: unknown;

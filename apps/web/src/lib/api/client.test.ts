@@ -60,6 +60,14 @@ describe('apiRequest', () => {
 
     await expect(apiRequest('/boom')).rejects.toMatchObject({ code: 'HTTP_ERROR' });
   });
+
+  it('returns undefined for an empty 202 Accepted body', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 202 }));
+
+    await expect(apiRequest('/auth/forgot-password', { method: 'POST', body: {} })).resolves.toBe(
+      undefined,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

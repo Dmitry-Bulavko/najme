@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { loginRequestSchema, type AuthSession, type LoginRequest } from '@najme/contracts';
 import { LOCALE_COOKIE_MAX_AGE, LOCALE_COOKIE_NAME } from '@/i18n/routing';
 import { ApiError, apiRequest } from '@/lib/api/client';
+import { GoogleSignInButton } from './google-sign-in-button';
 import { useSession } from './session-context';
 
 function setLocaleCookie(localeValue: string): void {
@@ -138,6 +139,8 @@ export function SignInForm() {
       <Button type="submit" size="md" loading={isSubmitting} className="w-full">
         {t('signIn.submit')}
       </Button>
+
+      <GoogleSignInButton />
 
       <p className="text-center text-sm text-muted-foreground">
         {t('signIn.noAccount')}{' '}

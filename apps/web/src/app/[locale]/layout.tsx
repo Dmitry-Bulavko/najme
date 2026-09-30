@@ -9,6 +9,7 @@ import { SiteFooter } from '@/components/shell/site-footer';
 import { SiteHeader } from '@/components/shell/site-header';
 import { Toaster } from '@/components/ui/sonner';
 import { AppProviders } from '@/features/auth/query-provider';
+import { UnverifiedEmailBanner } from '@/features/auth/unverified-email-banner';
 import { isSupportedLocale } from '@/i18n/routing';
 
 import '../globals.css';
@@ -50,6 +51,7 @@ export default async function LocaleLayout({
             </a>
             <div className="flex min-h-screen flex-col">
               <SiteHeader />
+              <UnverifiedEmailBanner />
               <main id="content" className="flex-1">
                 {children}
               </main>

@@ -18,6 +18,7 @@ import { registerRequestSchema, type AuthSession, type RegisterRequest } from '@
 import { isSupportedLocale } from '@/i18n/routing';
 import { LOCALE_COOKIE_MAX_AGE, LOCALE_COOKIE_NAME } from '@/i18n/routing';
 import { ApiError, apiRequest } from '@/lib/api/client';
+import { GoogleSignInButton } from './google-sign-in-button';
 import { useSession } from './session-context';
 
 function setLocaleCookie(localeValue: string): void {
@@ -156,6 +157,8 @@ export function SignUpForm() {
       <Button type="submit" size="md" loading={isSubmitting} className="w-full">
         {t('signUp.submit')}
       </Button>
+
+      <GoogleSignInButton />
 
       <p className="text-center text-sm text-muted-foreground">
         {t('signUp.hasAccount')}{' '}
