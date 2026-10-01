@@ -63,6 +63,8 @@ type ServiceFormValues = {
   bufferBeforeMinutes: string;
   bufferAfterMinutes: string;
   priceAmount: number | null;
+  /** True while MoneyInput holds a non-empty draft that does not parse for the UI locale. */
+  priceDraftInvalid: boolean;
   active: boolean;
   staffMemberIds: string[];
   minBookingNoticeMinutes: string;
@@ -112,40 +114,58 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
 
   const formSchema = useMemo(
     () =>
-      z.object({
-        name: z
-          .string()
-          .trim()
-          .min(1, { error: t('services.errors.nameRequired') })
-          .max(80, { error: t('services.errors.nameTooLong') }),
-        description: z.string().superRefine((value, ctx) => {
-          const trimmed = value.trim();
-          if (trimmed === '') return;
-          if (trimmed.length > 1000) {
-            ctx.addIssue({ code: 'custom', message: t('services.errors.descriptionTooLong') });
+      z
+        .object({
+          name: z
+            .string()
+            .trim()
+            .min(1, { error: t('services.errors.nameRequired') })
+            .max(80, { error: t('services.errors.nameTooLong') }),
+          description: z.string().superRefine((value, ctx) => {
+            const trimmed = value.trim();
+            if (trimmed === '') return;
+            if (trimmed.length > 1000) {
+              ctx.addIssue({ code: 'custom', message: t('services.errors.descriptionTooLong') });
+            }
+          }),
+          durationMinutes: z.string().refine((v) => isValidDurationMinutes(Number(v)), {
+            error: t('services.errors.durationInvalid'),
+          }),
+          bufferBeforeMinutes: z.string().refine((v) => isValidBufferMinutes(Number(v)), {
+            error: t('services.errors.bufferInvalid'),
+          }),
+          bufferAfterMinutes: z.string().refine((v) => isValidBufferMinutes(Number(v)), {
+            error: t('services.errors.bufferInvalid'),
+          }),
+          priceAmount: z
+            .number({ error: t('services.errors.priceRequired') })
+            .int()
+            .min(0, { error: t('services.errors.priceInvalid') })
+            .max(99_999_999, { error: t('services.errors.priceInvalid') })
+            .nullable(),
+          priceDraftInvalid: z.boolean(),
+          active: z.boolean(),
+          staffMemberIds: z.array(z.string().uuid()),
+          minBookingNoticeMinutes: z.string(),
+          bookingHorizonDays: z.string(),
+        })
+        .superRefine((data, ctx) => {
+          if (data.priceDraftInvalid) {
+            ctx.addIssue({
+              code: 'custom',
+              path: ['priceAmount'],
+              message: t('services.errors.priceInvalid'),
+            });
+            return;
+          }
+          if (data.priceAmount === null) {
+            ctx.addIssue({
+              code: 'custom',
+              path: ['priceAmount'],
+              message: t('services.errors.priceRequired'),
+            });
           }
         }),
-        durationMinutes: z.string().refine((v) => isValidDurationMinutes(Number(v)), {
-          error: t('services.errors.durationInvalid'),
-        }),
-        bufferBeforeMinutes: z.string().refine((v) => isValidBufferMinutes(Number(v)), {
-          error: t('services.errors.bufferInvalid'),
-        }),
-        bufferAfterMinutes: z.string().refine((v) => isValidBufferMinutes(Number(v)), {
-          error: t('services.errors.bufferInvalid'),
-        }),
-        priceAmount: z
-          .number({ error: t('services.errors.priceRequired') })
-          .int()
-          .min(0, { error: t('services.errors.priceInvalid') })
-          .max(99_999_999, { error: t('services.errors.priceInvalid') })
-          .nullable()
-          .refine((v): v is number => v !== null, { error: t('services.errors.priceRequired') }),
-        active: z.boolean(),
-        staffMemberIds: z.array(z.string().uuid()),
-        minBookingNoticeMinutes: z.string(),
-        bookingHorizonDays: z.string(),
-      }),
     [t],
   );
 
@@ -158,6 +178,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
       bufferBeforeMinutes: '0',
       bufferAfterMinutes: '0',
       priceAmount: null,
+      priceDraftInvalid: false,
       active: true,
       staffMemberIds: [],
       minBookingNoticeMinutes: 'null',
@@ -233,6 +254,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
             bufferBeforeMinutes: String(service.bufferBeforeMinutes),
             bufferAfterMinutes: String(service.bufferAfterMinutes),
             priceAmount: service.price.amount,
+            priceDraftInvalid: false,
             active: service.active,
             staffMemberIds: service.staffMemberIds,
             minBookingNoticeMinutes: toSelectString(service.minBookingNoticeMinutes),
@@ -340,6 +362,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
         bufferBeforeMinutes: String(updated.bufferBeforeMinutes),
         bufferAfterMinutes: String(updated.bufferAfterMinutes),
         priceAmount: updated.price.amount,
+        priceDraftInvalid: false,
         active: updated.active,
         staffMemberIds: updated.staffMemberIds,
         minBookingNoticeMinutes: toSelectString(updated.minBookingNoticeMinutes),
@@ -556,6 +579,12 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
                 id={priceId}
                 value={field.value}
                 onChange={field.onChange}
+                onDraftInvalidChange={(invalid) => {
+                  form.setValue('priceDraftInvalid', invalid, {
+                    shouldDirty: true,
+                    shouldValidate: false,
+                  });
+                }}
                 currency="EUR"
                 disabled={readOnly || form.formState.isSubmitting}
                 aria-invalid={priceError ? true : undefined}

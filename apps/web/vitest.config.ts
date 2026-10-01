@@ -8,6 +8,10 @@ export default withBaseConfig({
     setupFiles: ['./vitest.setup.ts'],
     // Playwright specs live under e2e/ as *.spec.ts; keep them out of Vitest.
     exclude: ['**/node_modules/**', '**/e2e/**', '**/dist/**', '**/.next/**'],
+    // CI runs lint/typecheck/test/build in parallel; jsdom service-form tests that finish
+    // under 2s locally can exceed Vitest's 5s default on the GitHub runner (same idea as
+    // apps/mobile jest.testTimeout: 20000). Prefer this package budget over per-test overrides.
+    testTimeout: 15_000,
   },
   resolve: {
     alias: {

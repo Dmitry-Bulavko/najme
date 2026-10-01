@@ -18,10 +18,18 @@ function MoneyHarness({
   locale?: 'en' | 'me' | 'ru' | 'tr';
 }): ReactElement {
   const [value, setValue] = useState<number | null>(initial);
+  const [draftInvalid, setDraftInvalid] = useState(false);
   return (
     <div>
-      <MoneyInput aria-label="Amount" value={value} onChange={setValue} locale={locale} />
+      <MoneyInput
+        aria-label="Amount"
+        value={value}
+        onChange={setValue}
+        onDraftInvalidChange={setDraftInvalid}
+        locale={locale}
+      />
       <output data-testid="minor">{value === null ? 'null' : String(value)}</output>
+      <output data-testid="draft-invalid">{draftInvalid ? 'yes' : 'no'}</output>
     </div>
   );
 }
@@ -32,17 +40,19 @@ describe('MoneyInput', () => {
     expect(screen.getByLabelText('Amount')).toHaveValue('25.50');
   });
 
-  it('rejects invalid grouping in en locale (12,5 → only 1 digit after comma)', async () => {
+  it('clears the value and flags invalid for en grouping drafts like 12,5', async () => {
     const user = userEvent.setup();
     render(<MoneyHarness />);
 
     const input = screen.getByLabelText('Amount');
     await user.clear(input);
-    // Intermediate "12" commits 1200; the final invalid draft must not clear it.
     await user.type(input, '12,5');
+    expect(screen.getByTestId('minor')).toHaveTextContent('null');
+    expect(screen.getByTestId('draft-invalid')).toHaveTextContent('yes');
     await user.tab();
-    expect(screen.getByTestId('minor')).toHaveTextContent('1200');
-    expect(input).toHaveValue('12.00');
+    expect(screen.getByTestId('minor')).toHaveTextContent('null');
+    expect(input).toHaveValue('12,5');
+    expect(screen.getByTestId('draft-invalid')).toHaveTextContent('yes');
   });
 
   it('round-trip: value=2500 me locale → focus then blur emits 2500', async () => {
@@ -56,16 +66,18 @@ describe('MoneyInput', () => {
     expect(screen.getByTestId('minor')).toHaveTextContent('2500');
   });
 
-  it('rejects 12,50 in en locale (only 2 digits after comma)', async () => {
+  it('clears the value and keeps the draft for en 12,50', async () => {
     const user = userEvent.setup();
-    render(<MoneyHarness locale="en" />);
+    render(<MoneyHarness locale="en" initial={1500} />);
 
     const input = screen.getByLabelText('Amount');
     await user.clear(input);
     await user.type(input, '12,50');
+    expect(screen.getByTestId('minor')).toHaveTextContent('null');
+    expect(screen.getByTestId('draft-invalid')).toHaveTextContent('yes');
     await user.tab();
-    expect(screen.getByTestId('minor')).toHaveTextContent('1200');
-    expect(input).toHaveValue('12.00');
+    expect(input).toHaveValue('12,50');
+    expect(screen.getByTestId('minor')).toHaveTextContent('null');
   });
 
   it('parses dot decimal in en locale on blur', async () => {
@@ -78,6 +90,7 @@ describe('MoneyInput', () => {
     await user.tab();
     expect(screen.getByTestId('minor')).toHaveTextContent('1250');
     expect(input).toHaveValue('12.50');
+    expect(screen.getByTestId('draft-invalid')).toHaveTextContent('no');
   });
 
   it('commits the parsed value on Enter without requiring blur', async () => {
@@ -143,30 +156,30 @@ describe('MoneyInput', () => {
     expect(screen.getByTestId('minor')).toHaveTextContent('101');
   });
 
-  it('rejects strings with non-numeric characters', async () => {
+  it('clears the value and keeps an invalid draft with non-numeric characters', async () => {
     const user = userEvent.setup();
     render(<MoneyHarness />);
 
     const input = screen.getByLabelText('Amount');
     await user.type(input, '12abc');
     await user.tab();
-    // Intermediate "12" commits 1200; invalid suffix must not clear it.
-    expect(screen.getByTestId('minor')).toHaveTextContent('1200');
-    expect(input).toHaveValue('12.00');
+    expect(screen.getByTestId('minor')).toHaveTextContent('null');
+    expect(input).toHaveValue('12abc');
+    expect(screen.getByTestId('draft-invalid')).toHaveTextContent('yes');
   });
 
-  it('keeps the previous value when an invalid draft is blurred', async () => {
+  it('clears a prior amount when an invalid draft is entered at once', async () => {
     const user = userEvent.setup();
     render(<MoneyHarness locale="en" initial={1500} />);
 
     const input = screen.getByLabelText('Amount');
     await user.click(input);
     fireEvent.change(input, { target: { value: '12.3.4' } });
-    // Invalid draft must not clear the committed minor amount.
-    expect(screen.getByTestId('minor')).toHaveTextContent('1500');
+    expect(screen.getByTestId('minor')).toHaveTextContent('null');
+    expect(screen.getByTestId('draft-invalid')).toHaveTextContent('yes');
     await user.tab();
-    expect(screen.getByTestId('minor')).toHaveTextContent('1500');
-    expect(input).toHaveValue('15.00');
+    expect(screen.getByTestId('minor')).toHaveTextContent('null');
+    expect(input).toHaveValue('12.3.4');
   });
 });
 

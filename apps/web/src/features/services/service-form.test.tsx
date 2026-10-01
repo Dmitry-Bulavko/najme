@@ -127,11 +127,11 @@ function makeService(overrides: Partial<Service> = {}): Service {
   };
 }
 
-function renderCreate() {
+function renderCreate(locale: 'en' | 'me' = 'en') {
   return render(
     <NextIntlClientProvider
-      locale="en"
-      messages={{ business: catalogs.en.business, errors: catalogs.en.errors }}
+      locale={locale}
+      messages={{ business: catalogs[locale].business, errors: catalogs[locale].errors }}
     >
       <ServiceForm mode="create" />
     </NextIntlClientProvider>,
@@ -149,12 +149,16 @@ function renderEdit(serviceId = '44444444-4444-4444-8444-444444444444') {
   );
 }
 
-async function fillRequiredCreateFields(user: ReturnType<typeof userEvent.setup>) {
-  expect(await screen.findByLabelText(catalogs.en.business.services.name)).toBeTruthy();
-  const name = screen.getByLabelText(catalogs.en.business.services.name);
+async function fillRequiredCreateFields(
+  user: ReturnType<typeof userEvent.setup>,
+  locale: 'en' | 'me' = 'en',
+) {
+  const business = catalogs[locale].business;
+  expect(await screen.findByLabelText(business.services.name)).toBeTruthy();
+  const name = screen.getByLabelText(business.services.name);
   await user.click(name);
   await user.paste('Cut');
-  const price = screen.getByLabelText(catalogs.en.business.services.price);
+  const price = screen.getByLabelText(business.services.price);
   await user.click(price);
   await user.paste('20');
 }
@@ -313,6 +317,96 @@ describe('ServiceForm', () => {
       expect(posted).toBeTruthy();
     });
     expect((posted as { price: { amount: number } }).price.amount).toBe(2000);
+  });
+
+  it('blocks Enter submit for an invalid en price draft and shows priceInvalid', async () => {
+    const user = userEvent.setup();
+    let posted: unknown;
+    apiRequest.mockImplementation(
+      async (path: string, init?: { method?: string; body?: unknown }) => {
+        if (path.endsWith('/staff')) return [makeStaff()];
+        if (path.endsWith('/services') && init?.method === 'POST') {
+          posted = init.body;
+          return makeService();
+        }
+        throw new Error(`unexpected ${path}`);
+      },
+    );
+
+    renderCreate();
+    expect(await screen.findByLabelText(catalogs.en.business.services.name)).toBeTruthy();
+    const name = screen.getByLabelText(catalogs.en.business.services.name);
+    await user.click(name);
+    await user.paste('Cut');
+    const price = screen.getByLabelText(catalogs.en.business.services.price);
+    await user.click(price);
+    await user.type(price, '12,50');
+    await user.keyboard('{Enter}');
+
+    expect(await screen.findByText(catalogs.en.business.services.errors.priceInvalid)).toBeTruthy();
+    expect(posted).toBeUndefined();
+    expect(price).toHaveValue('12,50');
+  });
+
+  it('blocks Save after blur for an invalid en price draft and shows priceInvalid', async () => {
+    const user = userEvent.setup();
+    let patched: unknown;
+    const existing = makeService({ price: { amount: 1500, currency: 'EUR' } });
+    apiRequest.mockImplementation(
+      async (path: string, init?: { method?: string; body?: unknown }) => {
+        if (path.endsWith('/staff')) return [makeStaff()];
+        if (path.includes('/services/') && (!init || !init.method || init.method === 'GET')) {
+          return existing;
+        }
+        if (path.includes('/services/') && init?.method === 'PATCH') {
+          patched = init.body;
+          return existing;
+        }
+        throw new Error(`unexpected ${path}`);
+      },
+    );
+
+    renderEdit();
+    expect(await screen.findByDisplayValue('Cut')).toBeTruthy();
+    const price = screen.getByLabelText(catalogs.en.business.services.price);
+    await user.clear(price);
+    await user.type(price, '12,50');
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.services.save }));
+
+    expect(await screen.findByText(catalogs.en.business.services.errors.priceInvalid)).toBeTruthy();
+    expect(patched).toBeUndefined();
+    expect(price).toHaveValue('12,50');
+  });
+
+  it('saves me-locale 12,50 as 1250 minor units', async () => {
+    const user = userEvent.setup();
+    let posted: unknown;
+    apiRequest.mockImplementation(
+      async (path: string, init?: { method?: string; body?: unknown }) => {
+        if (path.endsWith('/staff')) return [makeStaff()];
+        if (path.endsWith('/services') && init?.method === 'POST') {
+          posted = init.body;
+          return makeService();
+        }
+        throw new Error(`unexpected ${path}`);
+      },
+    );
+
+    renderCreate('me');
+    await fillRequiredCreateFields(user, 'me');
+    const price = screen.getByLabelText(catalogs.me.business.services.price);
+    await user.clear(price);
+    await user.click(price);
+    await user.paste('12,50');
+    await user.click(
+      screen.getByRole('button', { name: catalogs.me.business.services.createSubmit }),
+    );
+
+    await waitFor(() => {
+      expect(posted).toBeTruthy();
+    });
+    expect((posted as { price: { amount: number } }).price.amount).toBe(1250);
   });
 
   it('PATCHes edits including an updated price committed on Enter', async () => {

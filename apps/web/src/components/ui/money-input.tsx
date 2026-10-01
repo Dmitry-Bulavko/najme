@@ -25,6 +25,12 @@ export interface MoneyInputProps extends Omit<
   /** Amount in minor units (e.g. cents). `null` clears the field. */
   value: number | null;
   onChange: (minor: number | null) => void;
+  /**
+   * Fired when draft validity changes. An invalid non-empty draft calls `onChange(null)` and
+   * `onDraftInvalidChange(true)` so the form can block submit with a price-invalid error
+   * instead of silently keeping a stale partial amount.
+   */
+  onDraftInvalidChange?: (invalid: boolean) => void;
   /** ISO currency shown as a trailing affix; defaults to EUR. */
   currency?: Money['currency'];
   /**
@@ -36,14 +42,15 @@ export interface MoneyInputProps extends Omit<
 
 /**
  * Edits a major-unit amount (accepts `,` and `.`) and emits integer minor units for the API.
- * Commits on change when the draft parses, on Enter, and on blur.
- * Invalid drafts keep the previous committed value (and stay visible while focused / on blur
- * are reverted to the last good value) so Enter/submit never clears a typed price to null.
+ * Valid drafts commit on change / Enter / blur. Invalid non-empty drafts stay visible, clear
+ * the committed value (`onChange(null)`), and signal `onDraftInvalidChange(true)` so submit
+ * cannot save a stale partial amount.
  * The decimal separator follows the current UI locale (next-intl) unless overridden via `locale`.
  */
 export function MoneyInput({
   value,
   onChange,
+  onDraftInvalidChange,
   currency = 'EUR',
   locale: localeProp,
   className,
@@ -58,17 +65,21 @@ export function MoneyInput({
   const [draft, setDraft] = useState<string | null>(null);
   const display = draft ?? (value === null ? '' : formatMinorAsMajor(value, locale));
 
-  function commitParsed(raw: string): boolean {
+  function applyDraft(raw: string): boolean {
     const trimmed = raw.trim();
     if (trimmed.length === 0) {
       onChange(null);
+      onDraftInvalidChange?.(false);
       return true;
     }
     const minor = parseMajorToMinor(trimmed, locale);
     if (minor === null) {
+      onChange(null);
+      onDraftInvalidChange?.(true);
       return false;
     }
     onChange(minor);
+    onDraftInvalidChange?.(false);
     return true;
   }
 
@@ -83,30 +94,22 @@ export function MoneyInput({
         onChange={(event: ChangeEvent<HTMLInputElement>) => {
           const raw = event.target.value;
           setDraft(raw);
-          const trimmed = raw.trim();
-          if (trimmed.length === 0) {
-            onChange(null);
-            return;
-          }
-          const minor = parseMajorToMinor(trimmed, locale);
-          // Valid drafts sync to RHF; invalid ones keep the previous committed value.
-          if (minor !== null) {
-            onChange(minor);
-          }
+          applyDraft(raw);
         }}
         onFocus={(event) => {
           setDraft(value === null ? '' : formatMinorAsMajor(value, locale));
           onFocus?.(event);
         }}
         onBlur={(event) => {
-          commitParsed(event.target.value);
-          // Clear draft: valid parses are committed; invalid drafts revert to last `value`.
-          setDraft(null);
+          if (applyDraft(event.target.value)) {
+            setDraft(null);
+          }
+          // Invalid non-empty drafts stay visible so the user sees what was rejected.
           onBlur?.(event);
         }}
         onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
           if (event.key === 'Enter') {
-            if (commitParsed(event.currentTarget.value)) {
+            if (applyDraft(event.currentTarget.value)) {
               setDraft(null);
             }
           }
