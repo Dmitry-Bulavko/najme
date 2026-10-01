@@ -391,9 +391,101 @@ describe('TeamView', () => {
     });
   });
 
-  it('maps ALREADY_MEMBER and INVITATION_EXISTS from invite', async () => {
+  it('requires staff when inviting as STAFF and does not POST', async () => {
+    mockTeamData();
+    const postSpy = vi.fn();
+    apiRequest.mockImplementation(
+      async (path: string, init?: { method?: string; body?: unknown }) => {
+        if (!init?.method || init.method === 'GET') {
+          if (path.endsWith('/members')) return [makeMember()];
+          if (path.endsWith('/invitations')) return [];
+          if (path.endsWith('/staff')) return [makeStaff()];
+        }
+        if (path.endsWith('/invitations') && init?.method === 'POST') {
+          postSpy(init.body);
+          return makeInvitation();
+        }
+        throw new Error(`unexpected ${init?.method} ${path}`);
+      },
+    );
+    renderTeam();
+    await userEvent.click(
+      await screen.findByRole('button', { name: catalogs.en.business.team.invite }),
+    );
+    await userEvent.type(
+      screen.getByLabelText(catalogs.en.business.team.inviteEmail),
+      'staff@example.com',
+    );
+    // Role select is the first combobox in the dialog; pick Staff.
+    const dialogComboboxes = screen.getAllByRole('combobox');
+    await userEvent.click(dialogComboboxes[0]!);
+    await userEvent.click(screen.getByRole('option', { name: 'Staff' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: catalogs.en.business.team.inviteSubmit }),
+    );
+    expect(await screen.findByText(catalogs.en.business.team.errors.staffRequired)).toBeTruthy();
+    expect(postSpy).not.toHaveBeenCalled();
+  });
+
+  it('PATCHes member role/staff link and removes a member', async () => {
+    const admin = makeMember({
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      userId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      email: 'admin@example.com',
+      displayName: 'Admin User',
+      role: 'ADMIN',
+      staffMemberId: null,
+    });
+    const staff = makeStaff();
+    const updated = { ...admin, staffMemberId: staff.id };
+    mockTeamData({ members: [makeMember(), admin], staff: [staff] });
+    apiRequest.mockImplementation(
+      async (path: string, init?: { method?: string; body?: unknown }) => {
+        if (!init?.method || init.method === 'GET') {
+          if (path.endsWith('/members')) return [makeMember(), admin];
+          if (path.endsWith('/invitations')) return [];
+          if (path.endsWith('/staff')) return [staff];
+        }
+        if (path.includes(`/members/${admin.id}`) && init?.method === 'PATCH') {
+          expect(init.body).toMatchObject({ staffMemberId: staff.id });
+          return updated;
+        }
+        if (path.includes(`/members/${admin.id}`) && init?.method === 'DELETE') {
+          return undefined;
+        }
+        throw new Error(`unexpected ${init?.method} ${path}`);
+      },
+    );
+    renderTeam();
+    expect(await screen.findByText('Admin User')).toBeTruthy();
+
+    // Admin row: role + staff comboboxes — pick staff "Ana" on the second combobox of that row.
+    const comboboxes = screen.getAllByRole('combobox');
+    // Owner row: role + staff; Admin row: role + staff → index 3 is admin staff link.
+    await userEvent.click(comboboxes[3]!);
+    await userEvent.click(screen.getByRole('option', { name: 'Ana' }));
+    const saveButtons = screen.getAllByRole('button', {
+      name: catalogs.en.business.team.saveMember,
+    });
+    await userEvent.click(saveButtons[1]!);
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(catalogs.en.business.team.memberSavedToast);
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: catalogs.en.business.team.remove }));
+    await userEvent.click(
+      screen.getByRole('button', { name: catalogs.en.business.team.removeConfirm }),
+    );
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(catalogs.en.business.team.removedToast);
+    });
+    expect(screen.queryByText('Admin User')).toBeNull();
+  });
+
+  it('maps INVITATION_EXISTS and ALREADY_MEMBER from invite create', async () => {
     const { ApiError } = await import('@/lib/api/client');
     mockTeamData();
+    let invitePosts = 0;
     apiRequest.mockImplementation(async (path: string, init?: { method?: string }) => {
       if (!init?.method || init.method === 'GET') {
         if (path.endsWith('/members')) return [makeMember()];
@@ -401,7 +493,11 @@ describe('TeamView', () => {
         if (path.endsWith('/staff')) return [];
       }
       if (path.endsWith('/invitations') && init?.method === 'POST') {
-        throw new ApiError('INVITATION_EXISTS', 'exists', 409);
+        invitePosts += 1;
+        if (invitePosts === 1) {
+          throw new ApiError('INVITATION_EXISTS', 'exists', 409);
+        }
+        throw new ApiError('ALREADY_MEMBER', 'member', 409);
       }
       throw new Error(`unexpected ${init?.method} ${path}`);
     });
@@ -418,6 +514,14 @@ describe('TeamView', () => {
     );
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(catalogs.en.errors.INVITATION_EXISTS);
+    });
+
+    // Dialog stays open after error; submit again for ALREADY_MEMBER.
+    await userEvent.click(
+      screen.getByRole('button', { name: catalogs.en.business.team.inviteSubmit }),
+    );
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(catalogs.en.errors.ALREADY_MEMBER);
     });
   });
 

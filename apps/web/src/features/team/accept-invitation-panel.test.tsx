@@ -206,6 +206,24 @@ describe('AcceptInvitationPanel', () => {
     expect(signOut).toHaveBeenCalled();
   });
 
+  it('shows already-member state and clears the token', async () => {
+    const { ApiError } = await import('@/lib/api/client');
+    apiRequest.mockImplementation(async (path: string, init?: { method?: string }) => {
+      if (path.startsWith('/invitations/preview')) return preview;
+      if (path === '/invitations/accept' && init?.method === 'POST') {
+        throw new ApiError('ALREADY_MEMBER', 'already', 409);
+      }
+      throw new Error(`unexpected ${path}`);
+    });
+    renderPanel();
+    await userEvent.click(
+      await screen.findByRole('button', { name: catalogs.en.business.inviteAccept.accept }),
+    );
+    expect(await screen.findByTestId('invite-accept-already-member')).toBeTruthy();
+    expect(screen.getByText(catalogs.en.business.inviteAccept.alreadyMemberTitle)).toBeTruthy();
+    expect(sessionStorage.getItem(INVITE_TOKEN_STORAGE_KEY)).toBeNull();
+  });
+
   it('shows expired and invalid terminal states and clears the token', async () => {
     const { ApiError } = await import('@/lib/api/client');
     apiRequest.mockRejectedValue(new ApiError('TOKEN_EXPIRED', 'expired', 400));

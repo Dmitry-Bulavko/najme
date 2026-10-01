@@ -266,7 +266,7 @@ export function AcceptInvitationPanel() {
           <span className="block font-bold">{t('inviteAccept.mismatchTitle')}</span>
           <span className="mt-1 block">
             {t('inviteAccept.mismatchBody', {
-              email: preview?.emailMasked ?? '…',
+              email: preview?.emailMasked ?? t('inviteAccept.emailMaskedUnknown'),
             })}
           </span>
         </p>
