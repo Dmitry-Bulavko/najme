@@ -527,9 +527,9 @@ describe('TeamView', () => {
     );
     await userEvent.click(screen.getByRole('option', { name: 'Ana' }));
     await userEvent.click(
-      screen.getAllByRole('button', {
-        name: catalogs.en.business.team.saveMember,
-      })[1]!,
+      screen.getByRole('button', {
+        name: catalogs.en.business.team.saveMemberNamed.replace('{name}', 'Admin User'),
+      }),
     );
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(catalogs.en.business.team.memberSavedToast);
