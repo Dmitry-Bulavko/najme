@@ -250,7 +250,7 @@ export function InviteDialog({
                 name="staffMemberId"
                 render={({ field }) => (
                   <Select
-                    value={field.value === NONE_VALUE ? undefined : field.value}
+                    value={field.value === NONE_VALUE ? '' : field.value}
                     onValueChange={field.onChange}
                     disabled={form.formState.isSubmitting}
                   >

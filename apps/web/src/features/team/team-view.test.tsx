@@ -549,6 +549,64 @@ describe('TeamView', () => {
     expect(screen.queryByText('Admin User')).toBeNull();
   });
 
+  it('keeps Linked staff controlled when clearing to None after a prior pick', async () => {
+    const bob = makeStaff({
+      id: '55555555-5555-4555-8555-555555555555',
+      displayName: 'Bob',
+    });
+    const ana = makeStaff();
+    const admin = makeMember({
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      userId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      email: 'admin@example.com',
+      displayName: 'Admin User',
+      role: 'ADMIN',
+      staffMemberId: bob.id,
+    });
+    let patched: unknown;
+    mockTeamData({ members: [makeMember(), admin], staff: [bob, ana] });
+    apiRequest.mockImplementation(
+      async (path: string, init?: { method?: string; body?: unknown }) => {
+        if (!init?.method || init.method === 'GET') {
+          if (path.endsWith('/members')) return [makeMember(), admin];
+          if (path.endsWith('/invitations')) return [];
+          if (path.endsWith('/staff')) return [bob, ana];
+        }
+        if (path.includes(`/members/${admin.id}`) && init?.method === 'PATCH') {
+          patched = init.body;
+          return { ...admin, staffMemberId: null };
+        }
+        throw new Error(`unexpected ${init?.method} ${path}`);
+      },
+    );
+    renderTeam();
+    expect(await screen.findByText('Admin User')).toBeTruthy();
+
+    const staffSelect = screen.getByRole('combobox', {
+      name: catalogs.en.business.team.linkStaffNamed.replace('{name}', 'Admin User'),
+    });
+    expect(staffSelect).toHaveTextContent('Bob');
+
+    await userEvent.click(staffSelect);
+    await userEvent.click(screen.getByRole('option', { name: 'Ana' }));
+    expect(staffSelect).toHaveTextContent('Ana');
+
+    await userEvent.click(staffSelect);
+    await userEvent.click(
+      screen.getByRole('option', { name: catalogs.en.business.team.linkStaffNone }),
+    );
+    expect(staffSelect).toHaveTextContent(catalogs.en.business.team.linkStaffNone);
+
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: catalogs.en.business.team.saveMemberNamed.replace('{name}', 'Admin User'),
+      }),
+    );
+    await waitFor(() => {
+      expect(patched).toEqual({ staffMemberId: null });
+    });
+  });
+
   it('maps INVITATION_EXISTS and ALREADY_MEMBER onto the email field', async () => {
     const { ApiError } = await import('@/lib/api/client');
     mockTeamData();

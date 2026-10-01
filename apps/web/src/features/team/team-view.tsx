@@ -475,7 +475,9 @@ export function TeamView() {
                             </label>
                             <Select
                               value={
-                                draft.staffMemberId === NONE_VALUE ? undefined : draft.staffMemberId
+                                draft.role === 'STAFF' && draft.staffMemberId === NONE_VALUE
+                                  ? ''
+                                  : draft.staffMemberId
                               }
                               onValueChange={(value) =>
                                 setDrafts((prev) => ({
