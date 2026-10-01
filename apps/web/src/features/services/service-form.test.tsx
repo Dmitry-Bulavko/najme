@@ -91,8 +91,9 @@ function makeBusiness(overrides: Partial<Business> = {}): Business {
 }
 
 const staffId = '33333333-3333-4333-8333-333333333333';
+const inactiveStaffId = '55555555-5555-4555-8555-555555555555';
 
-function makeStaff(): StaffMember {
+function makeStaff(overrides: Partial<StaffMember> = {}): StaffMember {
   return {
     id: staffId,
     businessId: '11111111-1111-4111-8111-111111111111',
@@ -101,10 +102,11 @@ function makeStaff(): StaffMember {
     active: true,
     createdAt: '2026-06-01T10:00:00.000Z',
     updatedAt: '2026-06-01T10:00:00.000Z',
+    ...overrides,
   };
 }
 
-function makeService(): Service {
+function makeService(overrides: Partial<Service> = {}): Service {
   return {
     id: '44444444-4444-4444-8444-444444444444',
     businessId: '11111111-1111-4111-8111-111111111111',
@@ -121,6 +123,7 @@ function makeService(): Service {
     customFields: [],
     createdAt: '2026-06-01T10:00:00.000Z',
     updatedAt: '2026-06-01T10:00:00.000Z',
+    ...overrides,
   };
 }
 
@@ -135,6 +138,23 @@ function renderCreate() {
   );
 }
 
+function renderEdit(serviceId = '44444444-4444-4444-8444-444444444444') {
+  return render(
+    <NextIntlClientProvider
+      locale="en"
+      messages={{ business: catalogs.en.business, errors: catalogs.en.errors }}
+    >
+      <ServiceForm mode="edit" serviceId={serviceId} />
+    </NextIntlClientProvider>,
+  );
+}
+
+async function fillRequiredCreateFields(user: ReturnType<typeof userEvent.setup>) {
+  expect(await screen.findByLabelText(catalogs.en.business.services.name)).toBeTruthy();
+  await user.type(screen.getByLabelText(catalogs.en.business.services.name), 'Cut');
+  await user.type(screen.getByLabelText(catalogs.en.business.services.price), '20');
+}
+
 describe('ServiceForm', () => {
   beforeEach(() => {
     apiRequest.mockReset();
@@ -143,6 +163,17 @@ describe('ServiceForm', () => {
     push.mockReset();
     formBusiness = makeBusiness();
     emitBusiness();
+  });
+
+  it('labels duration and price for assistive tech', async () => {
+    apiRequest.mockImplementation(async (path: string) => {
+      if (path.endsWith('/staff')) return [makeStaff()];
+      throw new Error(`unexpected ${path}`);
+    });
+    renderCreate();
+    expect(await screen.findByLabelText(catalogs.en.business.services.duration)).toBeTruthy();
+    expect(screen.getByLabelText(catalogs.en.business.services.price)).toBeTruthy();
+    expect(screen.getByLabelText(catalogs.en.business.services.bufferBefore)).toBeTruthy();
   });
 
   it('maps staffMemberIds VALIDATION_FAILED details onto the staff fieldset', async () => {
@@ -157,8 +188,7 @@ describe('ServiceForm', () => {
     });
 
     renderCreate();
-    expect(await screen.findByLabelText(catalogs.en.business.services.name)).toBeTruthy();
-    await user.type(screen.getByLabelText(catalogs.en.business.services.name), 'Haircut');
+    await fillRequiredCreateFields(user);
     await user.click(
       screen.getByRole('button', { name: catalogs.en.business.services.createSubmit }),
     );
@@ -168,24 +198,211 @@ describe('ServiceForm', () => {
     });
   }, 20_000);
 
-  it('creates a service and navigates to edit', async () => {
+  it('POSTs minor-unit price, staffMemberIds, customFields order and null overrides', async () => {
     const user = userEvent.setup();
+    let posted: unknown;
     const created = makeService();
-    apiRequest.mockImplementation(async (path: string, init?: { method?: string }) => {
-      if (path.endsWith('/staff')) return [makeStaff()];
-      if (path.endsWith('/services') && init?.method === 'POST') return created;
-      throw new Error(`unexpected ${path}`);
-    });
+    apiRequest.mockImplementation(
+      async (path: string, init?: { method?: string; body?: unknown }) => {
+        if (path.endsWith('/staff')) return [makeStaff()];
+        if (path.endsWith('/services') && init?.method === 'POST') {
+          posted = init.body;
+          return created;
+        }
+        throw new Error(`unexpected ${path}`);
+      },
+    );
 
     renderCreate();
-    expect(await screen.findByLabelText(catalogs.en.business.services.name)).toBeTruthy();
-    await user.type(screen.getByLabelText(catalogs.en.business.services.name), 'Cut');
+    await fillRequiredCreateFields(user);
+    await user.click(screen.getByLabelText('Ana'));
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.customFields.add }));
+    await user.type(screen.getByLabelText(catalogs.en.business.customFields.label), 'Notes');
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.customFields.add }));
+    const labels = screen.getAllByLabelText(catalogs.en.business.customFields.label);
+    await user.type(labels[1]!, 'Allergies');
+
+    await user.click(screen.getByText(catalogs.en.business.services.advancedHeading));
+    // leave notice/horizon on inherit (null)
+
     await user.click(
       screen.getByRole('button', { name: catalogs.en.business.services.createSubmit }),
     );
 
     await waitFor(() => {
-      expect(push).toHaveBeenCalledWith(`/en/business/${formBusiness.id}/services/${created.id}`);
+      expect(posted).toBeTruthy();
     });
+    const body = posted as {
+      price: { amount: number; currency: string };
+      staffMemberIds: string[];
+      minBookingNoticeMinutes: number | null;
+      bookingHorizonDays: number | null;
+      customFields: Array<{ key: string; sortOrder: number }>;
+    };
+    expect(body.price).toEqual({ amount: 2000, currency: 'EUR' });
+    expect(body.staffMemberIds).toEqual([staffId]);
+    expect(body.minBookingNoticeMinutes).toBeNull();
+    expect(body.bookingHorizonDays).toBeNull();
+    expect(body.customFields.map((f) => f.key)).toEqual(['notes', 'allergies']);
+    expect(body.customFields.map((f) => f.sortOrder)).toEqual([0, 1]);
+    expect(push).toHaveBeenCalledWith(`/en/business/${formBusiness.id}/services/${created.id}`);
+  }, 30_000);
+
+  it('commits price on Enter during create so amount is not stale 0', async () => {
+    const user = userEvent.setup();
+    let posted: unknown;
+    apiRequest.mockImplementation(
+      async (path: string, init?: { method?: string; body?: unknown }) => {
+        if (path.endsWith('/staff')) return [makeStaff()];
+        if (path.endsWith('/services') && init?.method === 'POST') {
+          posted = init.body;
+          return makeService();
+        }
+        throw new Error(`unexpected ${path}`);
+      },
+    );
+
+    renderCreate();
+    expect(await screen.findByLabelText(catalogs.en.business.services.name)).toBeTruthy();
+    await user.type(screen.getByLabelText(catalogs.en.business.services.name), 'Cut');
+    await user.type(screen.getByLabelText(catalogs.en.business.services.price), '20{Enter}');
+
+    await waitFor(() => {
+      expect(posted).toBeTruthy();
+    });
+    expect((posted as { price: { amount: number } }).price.amount).toBe(2000);
+  }, 20_000);
+
+  it('PATCHes edits including an updated price committed on Enter', async () => {
+    const user = userEvent.setup();
+    let patched: unknown;
+    const existing = makeService({ price: { amount: 1500, currency: 'EUR' } });
+    apiRequest.mockImplementation(
+      async (path: string, init?: { method?: string; body?: unknown }) => {
+        if (path.endsWith('/staff')) return [makeStaff()];
+        if (path.includes('/services/') && (!init || !init.method || init.method === 'GET')) {
+          return existing;
+        }
+        if (path.includes('/services/') && init?.method === 'PATCH') {
+          patched = init.body;
+          return { ...existing, price: { amount: 3500, currency: 'EUR' }, name: 'Fade' };
+        }
+        throw new Error(`unexpected ${path}`);
+      },
+    );
+
+    renderEdit();
+    expect(await screen.findByDisplayValue('Cut')).toBeTruthy();
+    const name = screen.getByLabelText(catalogs.en.business.services.name);
+    await user.clear(name);
+    await user.type(name, 'Fade');
+    const price = screen.getByLabelText(catalogs.en.business.services.price);
+    await user.clear(price);
+    await user.type(price, '35{Enter}');
+
+    await waitFor(() => {
+      expect(patched).toBeTruthy();
+    });
+    expect((patched as { price: { amount: number }; name: string }).price.amount).toBe(3500);
+    expect((patched as { name: string }).name).toBe('Fade');
+  }, 20_000);
+
+  it('toasts the catalog formInvalid string for local custom-field validation', async () => {
+    const user = userEvent.setup();
+    apiRequest.mockImplementation(async (path: string) => {
+      if (path.endsWith('/staff')) return [makeStaff()];
+      throw new Error(`unexpected ${path}`);
+    });
+
+    renderCreate();
+    await fillRequiredCreateFields(user);
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.customFields.add }));
+    // leave label empty → local validation fails
+    await user.click(
+      screen.getByRole('button', { name: catalogs.en.business.services.createSubmit }),
+    );
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        catalogs.en.business.customFields.errors.formInvalid,
+      );
+    });
+  }, 20_000);
+
+  it('locks custom-field keys after a successful save round-trip', async () => {
+    const user = userEvent.setup();
+    const existing = makeService({
+      customFields: [
+        {
+          id: '88888888-8888-4888-8888-888888888888',
+          key: 'notes',
+          label: 'Notes',
+          type: 'TEXT',
+          required: false,
+          options: null,
+          sortOrder: 0,
+        },
+      ],
+    });
+    apiRequest.mockImplementation(
+      async (path: string, init?: { method?: string; body?: unknown }) => {
+        if (path.endsWith('/staff')) return [makeStaff()];
+        if (path.includes('/services/') && (!init || !init.method || init.method === 'GET')) {
+          return existing;
+        }
+        if (path.includes('/services/') && init?.method === 'PATCH') {
+          return existing;
+        }
+        throw new Error(`unexpected ${path}`);
+      },
+    );
+
+    renderEdit();
+    expect(await screen.findByDisplayValue('Notes')).toBeTruthy();
+    expect(screen.getByLabelText(catalogs.en.business.customFields.key)).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.services.save }));
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalled();
+    });
+    expect(screen.getByLabelText(catalogs.en.business.customFields.key)).toBeDisabled();
+  }, 20_000);
+
+  it('renders STAFF edit as read-only without a submit button', async () => {
+    formBusiness = makeBusiness({ myRole: 'STAFF' });
+    emitBusiness();
+    apiRequest.mockImplementation(async (path: string) => {
+      if (path.endsWith('/staff')) return [makeStaff()];
+      if (path.includes('/services/')) return makeService();
+      throw new Error(`unexpected ${path}`);
+    });
+
+    renderEdit();
+    expect(await screen.findByDisplayValue('Cut')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: catalogs.en.business.services.save })).toBeNull();
+    expect(screen.getByLabelText(catalogs.en.business.services.name)).toBeDisabled();
+  }, 20_000);
+
+  it('allows unchecking an inactive assigned staff member', async () => {
+    const user = userEvent.setup();
+    const inactive = makeStaff({
+      id: inactiveStaffId,
+      displayName: 'Bojan',
+      active: false,
+    });
+    const existing = makeService({ staffMemberIds: [inactiveStaffId] });
+    apiRequest.mockImplementation(async (path: string) => {
+      if (path.endsWith('/staff')) return [inactive];
+      if (path.includes('/services/')) return existing;
+      throw new Error(`unexpected ${path}`);
+    });
+
+    renderEdit();
+    const checkbox = await screen.findByLabelText(
+      catalogs.en.business.services.staffInactiveName.replace('{name}', 'Bojan'),
+    );
+    expect(checkbox).not.toBeDisabled();
+    await user.click(checkbox);
+    expect(checkbox).not.toBeChecked();
   }, 20_000);
 });

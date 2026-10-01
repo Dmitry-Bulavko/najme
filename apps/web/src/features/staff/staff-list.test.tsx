@@ -140,6 +140,40 @@ describe('StaffList', () => {
     expect(screen.queryByRole('link', { name: catalogs.en.business.staff.add })).toBeNull();
     expect(screen.queryByRole('link', { name: catalogs.en.business.staff.edit })).toBeNull();
     expect(screen.queryByRole('button', { name: catalogs.en.business.staff.delete })).toBeNull();
+    expect(
+      screen.getByText(
+        catalogs.en.business.staff.linkedLabel.replace(
+          '{name}',
+          catalogs.en.business.staff.notLinked,
+        ),
+      ),
+    ).toBeTruthy();
+  });
+
+  it('joins linked member display name for OWNER/ADMIN', async () => {
+    apiRequest.mockImplementation(async (path: string) => {
+      if (path.endsWith('/staff')) return [makeStaff()];
+      if (path.endsWith('/members')) {
+        return [
+          {
+            id: '66666666-6666-4666-8666-666666666666',
+            userId: '77777777-7777-4777-8777-777777777777',
+            role: 'STAFF',
+            email: 'ana@example.com',
+            displayName: 'Ana Account',
+            staffMemberId: '33333333-3333-4333-8333-333333333333',
+            createdAt: '2026-06-01T10:00:00.000Z',
+            updatedAt: '2026-06-01T10:00:00.000Z',
+          },
+        ];
+      }
+      throw new Error(`unexpected ${path}`);
+    });
+    renderList();
+    expect(await screen.findByText('Ana')).toBeTruthy();
+    expect(
+      screen.getByText(catalogs.en.business.staff.linkedLabel.replace('{name}', 'Ana Account')),
+    ).toBeTruthy();
   });
 
   it('deletes after confirmation', async () => {

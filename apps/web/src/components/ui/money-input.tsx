@@ -7,7 +7,13 @@ import {
   type Money,
 } from '@najme/contracts';
 import { useLocale } from 'next-intl';
-import { useState, type ChangeEvent, type ComponentProps, type ReactElement } from 'react';
+import {
+  useState,
+  type ChangeEvent,
+  type ComponentProps,
+  type KeyboardEvent,
+  type ReactElement,
+} from 'react';
 
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -30,7 +36,7 @@ export interface MoneyInputProps extends Omit<
 
 /**
  * Edits a major-unit amount (accepts `,` and `.`) and emits integer minor units for the API.
- * While focused, edits a local draft; when blurred, commits and falls back to the controlled value.
+ * Commits on change when the draft parses, on Enter, and on blur (blur clears the draft).
  * The decimal separator follows the current UI locale (next-intl) unless overridden via `locale`.
  */
 export function MoneyInput({
@@ -41,6 +47,7 @@ export function MoneyInput({
   className,
   onBlur,
   onFocus,
+  onKeyDown,
   ...props
 }: MoneyInputProps): ReactElement {
   // useLocale() reads the next-intl locale from context; prop overrides when provided.
@@ -71,7 +78,16 @@ export function MoneyInput({
         value={display}
         className={cn('pr-12 tabular-nums', className)}
         onChange={(event: ChangeEvent<HTMLInputElement>) => {
-          setDraft(event.target.value);
+          const raw = event.target.value;
+          setDraft(raw);
+          const trimmed = raw.trim();
+          if (trimmed.length === 0) {
+            onChange(null);
+            return;
+          }
+          // Keep RHF in sync while focused so Enter/submit never sends a stale amount.
+          // Invalid drafts emit null so a partial type cannot submit a previous value.
+          onChange(parseMajorToMinor(trimmed, locale));
         }}
         onFocus={(event) => {
           setDraft(value === null ? '' : formatMinorAsMajor(value, locale));
@@ -81,6 +97,13 @@ export function MoneyInput({
           commit(event.target.value);
           setDraft(null);
           onBlur?.(event);
+        }}
+        onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+          if (event.key === 'Enter') {
+            commit(event.currentTarget.value);
+            setDraft(null);
+          }
+          onKeyDown?.(event);
         }}
         {...props}
       />

@@ -10,7 +10,7 @@ import {
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -50,6 +50,7 @@ export function StaffForm({ mode, staffId }: StaffFormProps) {
   const [member, setMember] = useState<StaffMember | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(mode === 'edit');
+  const [loadNonce, setLoadNonce] = useState(0);
 
   const formSchema = useMemo(
     () =>
@@ -69,8 +70,14 @@ export function StaffForm({ mode, staffId }: StaffFormProps) {
     defaultValues: { displayName: '', active: true },
   });
 
+  const reload = useCallback(() => {
+    setLoadNonce((n) => n + 1);
+  }, []);
+
   useEffect(() => {
-    if (mode !== 'edit' || !staffId) return;
+    if (mode !== 'edit' || !staffId) {
+      return;
+    }
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -93,7 +100,7 @@ export function StaffForm({ mode, staffId }: StaffFormProps) {
     return () => {
       cancelled = true;
     };
-  }, [business.id, form, mode, staffId, tErrors]);
+  }, [business.id, form, mode, staffId, tErrors, loadNonce]);
 
   async function onSubmit(values: StaffFormValues): Promise<void> {
     if (!canEdit) return;
@@ -172,9 +179,14 @@ export function StaffForm({ mode, staffId }: StaffFormProps) {
         <p className="text-sm text-destructive" role="alert">
           {loadError}
         </p>
-        <Button asChild variant="secondary" className="mt-3">
-          <Link href={listHref}>{t('staff.backToList')}</Link>
-        </Button>
+        <div className="mt-3 flex flex-wrap justify-center gap-2">
+          <Button type="button" variant="secondary" onClick={reload}>
+            {t('staff.retry')}
+          </Button>
+          <Button asChild variant="secondary">
+            <Link href={listHref}>{t('staff.backToList')}</Link>
+          </Button>
+        </div>
       </div>
     );
   }

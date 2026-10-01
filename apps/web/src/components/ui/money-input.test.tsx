@@ -78,6 +78,26 @@ describe('MoneyInput', () => {
     expect(input).toHaveValue('12.50');
   });
 
+  it('commits the parsed value on Enter without requiring blur', async () => {
+    const user = userEvent.setup();
+    render(<MoneyHarness locale="en" initial={0} />);
+
+    const input = screen.getByLabelText('Amount');
+    await user.clear(input);
+    await user.type(input, '20{Enter}');
+    expect(screen.getByTestId('minor')).toHaveTextContent('2000');
+  });
+
+  it('updates the controlled value while typing so submit is not stale', async () => {
+    const user = userEvent.setup();
+    render(<MoneyHarness locale="en" initial={1500} />);
+
+    const input = screen.getByLabelText('Amount');
+    await user.clear(input);
+    await user.type(input, '35');
+    expect(screen.getByTestId('minor')).toHaveTextContent('3500');
+  });
+
   it('parses comma decimal in me locale on blur', async () => {
     const user = userEvent.setup();
     render(<MoneyHarness locale="me" />);

@@ -68,7 +68,8 @@ export function StaffList() {
           setMembers(null);
         }
       } else {
-        setMembers(null);
+        // STAFF cannot list members; treat as empty so the column shows “not linked”.
+        setMembers([]);
       }
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';

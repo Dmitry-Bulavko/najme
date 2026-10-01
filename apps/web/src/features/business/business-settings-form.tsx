@@ -43,6 +43,8 @@ import { errorMessage } from '@/lib/i18n/error-message';
 import {
   BOOKING_HORIZON_DAY_PRESETS,
   CANCELLATION_WINDOW_PRESETS,
+  formatHorizonLabel,
+  formatMinutesLabel,
   MIN_BOOKING_NOTICE_PRESETS,
   optionsWithCurrentValue,
 } from './booking-presets';
@@ -69,29 +71,6 @@ function toSettingsFormValues(business: {
     minBookingNoticeMinutes: String(business.minBookingNoticeMinutes),
     bookingHorizonDays: String(business.bookingHorizonDays),
   };
-}
-
-function formatMinutesLabel(
-  minutes: number,
-  t: ReturnType<typeof useTranslations<'business'>>,
-): string {
-  if (minutes === 0) return t('settings.durationNone');
-  if (minutes < 60) return t('settings.durationMinutes', { count: minutes });
-  if (minutes % 1440 === 0) {
-    const days = minutes / 1440;
-    return t('settings.durationDays', { count: days });
-  }
-  if (minutes % 60 === 0) {
-    return t('settings.durationHours', { count: minutes / 60 });
-  }
-  return t('settings.durationMinutes', { count: minutes });
-}
-
-function formatHorizonLabel(
-  days: number,
-  t: ReturnType<typeof useTranslations<'business'>>,
-): string {
-  return t('settings.durationDays', { count: days });
 }
 
 /** Booking policy settings + OWNER danger zone. STAFF should not reach this view. */

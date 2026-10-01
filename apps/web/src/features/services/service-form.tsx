@@ -11,7 +11,7 @@ import {
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -32,6 +32,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { formatMinutesLabel } from '@/features/business/booking-presets';
 import { useBusinessContext } from '@/features/business/business-shell';
 import { ApiError, apiRequest } from '@/lib/api/client';
 import { errorMessage } from '@/lib/i18n/error-message';
@@ -42,7 +43,7 @@ import {
   draftsToPayload,
   type DraftCustomField,
 } from './custom-fields-editor';
-import { mapServiceValidationErrors } from './map-service-validation';
+import { mapServiceValidationErrors, normalizeServiceIssuePath } from './map-service-validation';
 import {
   BUFFER_MINUTE_OPTIONS,
   DURATION_MINUTE_OPTIONS,
@@ -90,12 +91,19 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
   const listHref = `/${locale}/business/${business.id}/services`;
   const activeId = useId();
   const staffGroupId = useId();
+  const durationId = useId();
+  const bufferBeforeId = useId();
+  const bufferAfterId = useId();
+  const priceId = useId();
+  const noticeId = useId();
+  const horizonId = useId();
 
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [customFields, setCustomFields] = useState<DraftCustomField[]>([]);
   const [customFieldErrors, setCustomFieldErrors] = useState<Partial<Record<string, string>>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadNonce, setLoadNonce] = useState(0);
 
   const formSchema = useMemo(
     () =>
@@ -144,7 +152,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
       durationMinutes: '30',
       bufferBeforeMinutes: '0',
       bufferAfterMinutes: '0',
-      priceAmount: 0,
+      priceAmount: null,
       active: true,
       staffMemberIds: [],
       minBookingNoticeMinutes: 'null',
@@ -162,6 +170,10 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
     () => optionsWithNullableCurrent(SERVICE_HORIZON_PRESETS, horizonCurrent),
     [horizonCurrent],
   );
+
+  const reload = useCallback(() => {
+    setLoadNonce((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -204,31 +216,39 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
     return () => {
       cancelled = true;
     };
-  }, [business.id, form, mode, serviceId, tErrors]);
+  }, [business.id, form, mode, serviceId, tErrors, loadNonce]);
 
   function validateCustomFieldsLocally(): boolean {
     const errors: Partial<Record<string, string>> = {};
     const keys = new Set<string>();
-    customFields.forEach((field, index) => {
-      if (!field.label.trim()) {
-        errors[`customFields.${index}.label`] = t('customFields.errors.labelRequired');
+    customFields.forEach((field) => {
+      const label = field.label.trim();
+      if (!label) {
+        errors[`${field.clientId}.label`] = t('customFields.errors.labelRequired');
+      } else if (label.length > 80) {
+        errors[`${field.clientId}.label`] = t('customFields.errors.labelTooLong');
       }
       if (!isValidCustomFieldKey(field.key)) {
-        errors[`customFields.${index}.key`] = t('customFields.errors.keyInvalid');
+        errors[`${field.clientId}.key`] = t('customFields.errors.keyInvalid');
       } else if (keys.has(field.key)) {
-        errors[`customFields.${index}.key`] = t('customFields.errors.keyDuplicate');
+        errors[`${field.clientId}.key`] = t('customFields.errors.keyDuplicate');
       } else {
         keys.add(field.key);
       }
       if (field.type === 'SELECT') {
         if (field.options.length < 1) {
-          errors[`customFields.${index}.options`] = t('customFields.errors.optionsRequired');
+          errors[`${field.clientId}.options`] = t('customFields.errors.optionsRequired');
         } else {
           const values = field.options.map((o) => o.value.trim());
           if (values.some((v) => !v) || field.options.some((o) => !o.label.trim())) {
-            errors[`customFields.${index}.options`] = t('customFields.errors.optionIncomplete');
+            errors[`${field.clientId}.options`] = t('customFields.errors.optionIncomplete');
+          } else if (
+            values.some((v) => v.length > 80) ||
+            field.options.some((o) => o.label.trim().length > 80)
+          ) {
+            errors[`${field.clientId}.options`] = t('customFields.errors.optionTooLong');
           } else if (new Set(values).size !== values.length) {
-            errors[`customFields.${index}.options`] = t('customFields.errors.optionDuplicate');
+            errors[`${field.clientId}.options`] = t('customFields.errors.optionDuplicate');
           }
         }
       }
@@ -240,7 +260,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
   async function onSubmit(values: ServiceFormValues): Promise<void> {
     if (!canEdit) return;
     if (!validateCustomFieldsLocally()) {
-      toast.error(t('customFields.errors.fixInvalid'));
+      toast.error(t('customFields.errors.formInvalid'));
       return;
     }
 
@@ -293,7 +313,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
       setCustomFieldErrors({});
       toast.success(t('services.savedToast'));
     } catch (err) {
-      const mapped = mapServiceValidationErrors(err, form.setError, t('services.errors.invalid'));
+      mapServiceValidationErrors(err, form.setError, t('services.errors.invalid'));
       if (err instanceof ApiError && err.code === 'VALIDATION_FAILED' && err.details) {
         const issues = err.details.issues;
         if (Array.isArray(issues)) {
@@ -302,15 +322,19 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
             if (!issue || typeof issue !== 'object') continue;
             const path = 'path' in issue ? issue.path : undefined;
             if (!Array.isArray(path) || path[0] !== 'customFields') continue;
-            next[path.map(String).join('.')] = t('services.errors.invalid');
+            const normalized = normalizeServiceIssuePath(path);
+            if (!normalized || !normalized.startsWith('customFields.')) continue;
+            const parts = normalized.split('.');
+            const index = Number(parts[1]);
+            const prop = parts[2] ?? 'label';
+            const field = customFields[index];
+            if (!field || Number.isNaN(index)) continue;
+            next[`${field.clientId}.${prop}`] = t('services.errors.invalid');
           }
           if (Object.keys(next).length > 0) {
             setCustomFieldErrors((prev) => ({ ...prev, ...next }));
           }
         }
-      }
-      if (!mapped) {
-        // still show toast for field-mapped cases too
       }
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
       toast.error(errorMessage(tErrors, code));
@@ -345,15 +369,26 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
         <p className="text-sm text-destructive" role="alert">
           {loadError}
         </p>
-        <Button asChild variant="secondary" className="mt-3">
-          <Link href={listHref}>{t('services.backToList')}</Link>
-        </Button>
+        <div className="mt-3 flex flex-wrap justify-center gap-2">
+          <Button type="button" variant="secondary" onClick={reload}>
+            {t('services.retry')}
+          </Button>
+          <Button asChild variant="secondary">
+            <Link href={listHref}>{t('services.backToList')}</Link>
+          </Button>
+        </div>
       </div>
     );
   }
 
   const readOnly = !canEdit;
   const staffError = form.formState.errors.staffMemberIds?.message;
+  const durationError = form.formState.errors.durationMinutes?.message;
+  const bufferBeforeError = form.formState.errors.bufferBeforeMinutes?.message;
+  const bufferAfterError = form.formState.errors.bufferAfterMinutes?.message;
+  const priceError = form.formState.errors.priceAmount?.message;
+  const noticeError = form.formState.errors.minBookingNoticeMinutes?.message;
+  const horizonError = form.formState.errors.bookingHorizonDays?.message;
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
@@ -387,10 +422,8 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
         </FormField>
 
         <div className="grid gap-4 sm:grid-cols-3">
-          <FormField
-            label={t('services.duration')}
-            error={form.formState.errors.durationMinutes?.message}
-          >
+          <div className="grid gap-2">
+            <Label htmlFor={durationId}>{t('services.duration')}</Label>
             <Controller
               control={form.control}
               name="durationMinutes"
@@ -400,7 +433,11 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
                   onValueChange={field.onChange}
                   disabled={readOnly || form.formState.isSubmitting}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger
+                    id={durationId}
+                    aria-invalid={durationError ? true : undefined}
+                    aria-describedby={durationError ? `${durationId}-error` : undefined}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-72">
@@ -413,12 +450,19 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
                 </Select>
               )}
             />
-          </FormField>
+            {durationError ? (
+              <p
+                id={`${durationId}-error`}
+                role="alert"
+                className="text-xs font-medium text-destructive"
+              >
+                {durationError}
+              </p>
+            ) : null}
+          </div>
 
-          <FormField
-            label={t('services.bufferBefore')}
-            error={form.formState.errors.bufferBeforeMinutes?.message}
-          >
+          <div className="grid gap-2">
+            <Label htmlFor={bufferBeforeId}>{t('services.bufferBefore')}</Label>
             <Controller
               control={form.control}
               name="bufferBeforeMinutes"
@@ -428,7 +472,11 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
                   onValueChange={field.onChange}
                   disabled={readOnly || form.formState.isSubmitting}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger
+                    id={bufferBeforeId}
+                    aria-invalid={bufferBeforeError ? true : undefined}
+                    aria-describedby={bufferBeforeError ? `${bufferBeforeId}-error` : undefined}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-72">
@@ -441,12 +489,19 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
                 </Select>
               )}
             />
-          </FormField>
+            {bufferBeforeError ? (
+              <p
+                id={`${bufferBeforeId}-error`}
+                role="alert"
+                className="text-xs font-medium text-destructive"
+              >
+                {bufferBeforeError}
+              </p>
+            ) : null}
+          </div>
 
-          <FormField
-            label={t('services.bufferAfter')}
-            error={form.formState.errors.bufferAfterMinutes?.message}
-          >
+          <div className="grid gap-2">
+            <Label htmlFor={bufferAfterId}>{t('services.bufferAfter')}</Label>
             <Controller
               control={form.control}
               name="bufferAfterMinutes"
@@ -456,7 +511,11 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
                   onValueChange={field.onChange}
                   disabled={readOnly || form.formState.isSubmitting}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger
+                    id={bufferAfterId}
+                    aria-invalid={bufferAfterError ? true : undefined}
+                    aria-describedby={bufferAfterError ? `${bufferAfterId}-error` : undefined}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-72">
@@ -469,23 +528,45 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
                 </Select>
               )}
             />
-          </FormField>
+            {bufferAfterError ? (
+              <p
+                id={`${bufferAfterId}-error`}
+                role="alert"
+                className="text-xs font-medium text-destructive"
+              >
+                {bufferAfterError}
+              </p>
+            ) : null}
+          </div>
         </div>
 
-        <FormField label={t('services.price')} error={form.formState.errors.priceAmount?.message}>
+        <div className="grid gap-2">
+          <Label htmlFor={priceId}>{t('services.price')}</Label>
           <Controller
             control={form.control}
             name="priceAmount"
             render={({ field }) => (
               <MoneyInput
+                id={priceId}
                 value={field.value}
                 onChange={field.onChange}
                 currency="EUR"
                 disabled={readOnly || form.formState.isSubmitting}
+                aria-invalid={priceError ? true : undefined}
+                aria-describedby={priceError ? `${priceId}-error` : undefined}
               />
             )}
           />
-        </FormField>
+          {priceError ? (
+            <p
+              id={`${priceId}-error`}
+              role="alert"
+              className="text-xs font-medium text-destructive"
+            >
+              {priceError}
+            </p>
+          ) : null}
+        </div>
 
         <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
           <Label htmlFor={activeId} className="text-sm font-bold">
@@ -529,7 +610,9 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
                         <Checkbox
                           id={id}
                           checked={checked}
-                          disabled={readOnly || form.formState.isSubmitting || !member.active}
+                          disabled={
+                            readOnly || form.formState.isSubmitting || (!member.active && !checked)
+                          }
                           onCheckedChange={(next) => {
                             if (next === true) {
                               field.onChange([...field.value, member.id]);
@@ -564,7 +647,8 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
         <CustomFieldsEditor
           value={customFields}
           onChange={setCustomFields}
-          disabled={readOnly || form.formState.isSubmitting}
+          readOnly={readOnly}
+          disabled={form.formState.isSubmitting}
           errors={customFieldErrors}
         />
 
@@ -573,11 +657,8 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
             {t('services.advancedHeading')}
           </summary>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
-            <FormField
-              label={t('services.minNotice')}
-              description={t('services.minNoticeHint')}
-              error={form.formState.errors.minBookingNoticeMinutes?.message}
-            >
+            <div className="grid gap-2">
+              <Label htmlFor={noticeId}>{t('services.minNotice')}</Label>
               <Controller
                 control={form.control}
                 name="minBookingNoticeMinutes"
@@ -587,7 +668,11 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
                     onValueChange={field.onChange}
                     disabled={readOnly || form.formState.isSubmitting}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger
+                      id={noticeId}
+                      aria-invalid={noticeError ? true : undefined}
+                      aria-describedby={noticeError ? `${noticeId}-error` : `${noticeId}-hint`}
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -595,20 +680,30 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
                         <SelectItem key={toSelectString(value)} value={toSelectString(value)}>
                           {value === null
                             ? t('services.inheritDefault')
-                            : t('services.minutesOption', { count: value })}
+                            : formatMinutesLabel(value, t)}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 )}
               />
-            </FormField>
+              {noticeError ? (
+                <p
+                  id={`${noticeId}-error`}
+                  role="alert"
+                  className="text-xs font-medium text-destructive"
+                >
+                  {noticeError}
+                </p>
+              ) : (
+                <p id={`${noticeId}-hint`} className="text-xs text-muted-foreground">
+                  {t('services.minNoticeHint')}
+                </p>
+              )}
+            </div>
 
-            <FormField
-              label={t('services.horizon')}
-              description={t('services.horizonHint')}
-              error={form.formState.errors.bookingHorizonDays?.message}
-            >
+            <div className="grid gap-2">
+              <Label htmlFor={horizonId}>{t('services.horizon')}</Label>
               <Controller
                 control={form.control}
                 name="bookingHorizonDays"
@@ -618,7 +713,11 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
                     onValueChange={field.onChange}
                     disabled={readOnly || form.formState.isSubmitting}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger
+                      id={horizonId}
+                      aria-invalid={horizonError ? true : undefined}
+                      aria-describedby={horizonError ? `${horizonId}-error` : `${horizonId}-hint`}
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -633,7 +732,20 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
                   </Select>
                 )}
               />
-            </FormField>
+              {horizonError ? (
+                <p
+                  id={`${horizonId}-error`}
+                  role="alert"
+                  className="text-xs font-medium text-destructive"
+                >
+                  {horizonError}
+                </p>
+              ) : (
+                <p id={`${horizonId}-hint`} className="text-xs text-muted-foreground">
+                  {t('services.horizonHint')}
+                </p>
+              )}
+            </div>
           </div>
         </details>
 

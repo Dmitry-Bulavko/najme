@@ -16,9 +16,17 @@ describe('slugCustomFieldKey', () => {
     expect(slugCustomFieldKey('2nd preference')).toBe('f_2nd_preference');
   });
 
-  it('returns empty for empty or non-ascii-only labels', () => {
+  it('transliterates Russian, Montenegrin and Turkish labels', () => {
+    expect(slugCustomFieldKey('Аллергии')).toBe('allergii');
+    expect(isValidCustomFieldKey(slugCustomFieldKey('Аллергии'))).toBe(true);
+    expect(slugCustomFieldKey('Đorđe preferenca')).toBe('djordje_preferenca');
+    expect(slugCustomFieldKey('Iğdır notu')).toBe('igdir_notu');
+  });
+
+  it('returns empty for empty or symbol-only labels', () => {
     expect(slugCustomFieldKey('')).toBe('');
     expect(slugCustomFieldKey('   ')).toBe('');
+    expect(slugCustomFieldKey('!!!')).toBe('');
   });
 });
 

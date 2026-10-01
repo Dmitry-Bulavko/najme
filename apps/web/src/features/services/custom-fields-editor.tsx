@@ -2,7 +2,7 @@
 
 import type { CustomFieldType, SelectOption, ServiceCustomField } from '@najme/contracts';
 import { useTranslations } from 'next-intl';
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,6 +29,8 @@ export type DraftCustomField = {
   key: string;
   /** True once the field exists on the server (key locked). */
   keyLocked: boolean;
+  /** True after the user edits the key manually; stops auto-slug from label. */
+  keyTouched: boolean;
   label: string;
   type: CustomFieldType;
   required: boolean;
@@ -48,6 +50,7 @@ export function draftFromResponse(
     clientId: `saved-${field.key}-${index}`,
     key: field.key,
     keyLocked: true,
+    keyTouched: false,
     label: field.label,
     type: field.type,
     required: field.required,
@@ -69,24 +72,31 @@ export function draftsToPayload(drafts: DraftCustomField[]): ServiceCustomField[
 type CustomFieldsEditorProps = {
   value: DraftCustomField[];
   onChange: (next: DraftCustomField[]) => void;
+  /** Hide add/move/remove when true (STAFF read-only). */
+  readOnly?: boolean;
+  /** Disable controls while submitting without unmounting actions. */
   disabled?: boolean;
-  /** Field-level error messages keyed by `customFields.${index}.${prop}` or root. */
+  /** Field-level error messages keyed by `${clientId}.${prop}` or root. */
   errors?: Partial<Record<string, string>>;
 };
-
-function newClientId(): string {
-  return `new-${crypto.randomUUID()}`;
-}
 
 /** Editable list of service custom fields (add, reorder, remove, slug key until saved). */
 export function CustomFieldsEditor({
   value,
   onChange,
+  readOnly = false,
   disabled = false,
   errors = {},
 }: CustomFieldsEditorProps) {
   const t = useTranslations('business');
   const headingId = useId();
+  const nextClientSeq = useRef(0);
+  const controlsDisabled = readOnly || disabled;
+
+  function newClientId(): string {
+    nextClientSeq.current += 1;
+    return `new-${nextClientSeq.current}`;
+  }
 
   function updateAt(index: number, patch: Partial<DraftCustomField>): void {
     const next = value.map((field, i) => (i === index ? { ...field, ...patch } : field));
@@ -96,7 +106,7 @@ export function CustomFieldsEditor({
   function onLabelChange(index: number, label: string): void {
     const field = value[index];
     if (!field) return;
-    if (field.keyLocked) {
+    if (field.keyLocked || field.keyTouched) {
       updateAt(index, { label });
       return;
     }
@@ -108,7 +118,7 @@ export function CustomFieldsEditor({
   function onKeyChange(index: number, key: string): void {
     const field = value[index];
     if (!field || field.keyLocked) return;
-    updateAt(index, { key: key.trim().toLowerCase() });
+    updateAt(index, { key: key.trim().toLowerCase(), keyTouched: true });
   }
 
   function addField(): void {
@@ -121,6 +131,7 @@ export function CustomFieldsEditor({
         clientId: newClientId(),
         key,
         keyLocked: false,
+        keyTouched: false,
         label: '',
         type: 'TEXT',
         required: false,
@@ -177,13 +188,13 @@ export function CustomFieldsEditor({
         <h2 id={headingId} className="text-sm font-bold text-foreground">
           {t('customFields.heading')}
         </h2>
-        {!disabled ? (
+        {!readOnly ? (
           <Button
             type="button"
             variant="secondary"
             size="sm"
             onClick={addField}
-            disabled={value.length >= 10}
+            disabled={controlsDisabled || value.length >= 10}
           >
             {t('customFields.add')}
           </Button>
@@ -196,21 +207,24 @@ export function CustomFieldsEditor({
       ) : (
         <ul className="space-y-4">
           {value.map((field, index) => {
-            const keyError =
-              errors[`customFields.${index}.key`] ??
-              (field.key && !isValidCustomFieldKey(field.key)
+            const typeId = `${field.clientId}-type`;
+            const emptyKeyError =
+              !field.key || !isValidCustomFieldKey(field.key)
                 ? t('customFields.errors.keyInvalid')
-                : undefined);
-            const labelError = errors[`customFields.${index}.label`];
-            const optionsError = errors[`customFields.${index}.options`];
+                : undefined;
+            const keyError = errors[`${field.clientId}.key`] ?? emptyKeyError;
+            const labelError = errors[`${field.clientId}.label`];
+            const optionsError = errors[`${field.clientId}.options`];
+            const rowLabel = field.label.trim() || t('customFields.label');
             return (
               <li key={field.clientId} className="space-y-3 rounded-md border border-border p-3">
                 <FormField label={t('customFields.label')} error={labelError}>
                   <Input
                     value={field.label}
                     onChange={(event) => onLabelChange(index, event.target.value)}
-                    disabled={disabled}
+                    disabled={controlsDisabled}
                     autoComplete="off"
+                    maxLength={80}
                   />
                 </FormField>
 
@@ -226,15 +240,16 @@ export function CustomFieldsEditor({
                   <Input
                     value={field.key}
                     onChange={(event) => onKeyChange(index, event.target.value)}
-                    disabled={disabled || field.keyLocked}
+                    disabled={controlsDisabled || field.keyLocked}
                     autoComplete="off"
                     spellCheck={false}
+                    maxLength={40}
                   />
                 </FormField>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="grid gap-2">
-                    <Label>{t('customFields.type')}</Label>
+                    <Label htmlFor={typeId}>{t('customFields.type')}</Label>
                     <Select
                       value={field.type}
                       onValueChange={(next) => {
@@ -249,9 +264,9 @@ export function CustomFieldsEditor({
                               : [],
                         });
                       }}
-                      disabled={disabled}
+                      disabled={controlsDisabled}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id={typeId}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -267,7 +282,7 @@ export function CustomFieldsEditor({
                       id={`${field.clientId}-required`}
                       checked={field.required}
                       onCheckedChange={(checked) => updateAt(index, { required: checked === true })}
-                      disabled={disabled}
+                      disabled={controlsDisabled}
                     />
                     <Label htmlFor={`${field.clientId}-required`}>
                       {t('customFields.required')}
@@ -295,9 +310,10 @@ export function CustomFieldsEditor({
                               value: event.target.value,
                             })
                           }
-                          disabled={disabled}
+                          disabled={controlsDisabled}
                           className="flex-1"
                           autoComplete="off"
+                          maxLength={80}
                         />
                         <Input
                           aria-label={t('customFields.optionLabel')}
@@ -307,29 +323,31 @@ export function CustomFieldsEditor({
                               label: event.target.value,
                             })
                           }
-                          disabled={disabled}
+                          disabled={controlsDisabled}
                           className="flex-1"
                           autoComplete="off"
+                          maxLength={80}
                         />
-                        {!disabled ? (
+                        {!readOnly ? (
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => removeOption(index, optionIndex)}
+                            disabled={controlsDisabled}
                           >
                             {t('customFields.removeOption')}
                           </Button>
                         ) : null}
                       </div>
                     ))}
-                    {!disabled ? (
+                    {!readOnly ? (
                       <Button
                         type="button"
                         variant="secondary"
                         size="sm"
                         onClick={() => addOption(index)}
-                        disabled={field.options.length >= 20}
+                        disabled={controlsDisabled || field.options.length >= 20}
                       >
                         {t('customFields.addOption')}
                       </Button>
@@ -337,14 +355,15 @@ export function CustomFieldsEditor({
                   </div>
                 ) : null}
 
-                {!disabled ? (
+                {!readOnly ? (
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
                       variant="secondary"
                       size="sm"
                       onClick={() => move(index, -1)}
-                      disabled={index === 0}
+                      disabled={controlsDisabled || index === 0}
+                      aria-label={t('customFields.moveUpNamed', { label: rowLabel })}
                     >
                       {t('customFields.moveUp')}
                     </Button>
@@ -353,7 +372,8 @@ export function CustomFieldsEditor({
                       variant="secondary"
                       size="sm"
                       onClick={() => move(index, 1)}
-                      disabled={index === value.length - 1}
+                      disabled={controlsDisabled || index === value.length - 1}
+                      aria-label={t('customFields.moveDownNamed', { label: rowLabel })}
                     >
                       {t('customFields.moveDown')}
                     </Button>
@@ -362,12 +382,14 @@ export function CustomFieldsEditor({
                       variant="destructive"
                       size="sm"
                       onClick={() => removeAt(index)}
+                      disabled={controlsDisabled}
+                      aria-label={t('customFields.removeNamed', { label: rowLabel })}
                     >
                       {t('customFields.remove')}
                     </Button>
                   </div>
                 ) : null}
-                {!disabled ? (
+                {!readOnly ? (
                   <p className="text-xs text-muted-foreground">{t('customFields.removeHint')}</p>
                 ) : null}
               </li>

@@ -1,17 +1,13 @@
+import { transliterateAscii } from '@najme/contracts';
+
 const KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
 
 /**
  * Derive a custom-field key from a label. Must match `^[a-z][a-z0-9_]{0,39}$`.
- * Returns '' when nothing usable can be produced (empty / non-Latin-only label).
+ * Returns '' when nothing usable can be produced (empty / symbol-only label).
  */
 export function slugCustomFieldKey(label: string): string {
-  const ascii = label
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '');
+  const ascii = transliterateAscii(label, '_');
 
   if (ascii.length === 0) {
     return '';

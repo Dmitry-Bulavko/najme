@@ -17,7 +17,8 @@ STAFF see read-only lists. Empty states include CTAs.
 - Reuse kit `MoneyInput` (minor units), `Select` (duration/buffers), `Checkbox` (staff
   assignments), `AlertDialog` (delete), `ImageUpload` (`STAFF_PHOTO` after create).
 - Linked member on the staff list: join `GET .../members` (OWNER/ADMIN) by `staffMemberId`.
-  STAFF cannot call members → column shows “not linked” without a members fetch.
+  STAFF cannot call members → column shows “not linked” without a members fetch
+  (`linkedUnknown` “—” only when a members fetch fails for managers).
 - Custom-field keys auto-slug from label (`^[a-z][a-z0-9_]{0,39}$`), editable until first
   successful save; save sends full `customFields` array (replace semantics).
 - Map `VALIDATION_FAILED` for `staffMemberIds` (zod issues and `{ staffMemberIds: [...] }`
@@ -61,6 +62,7 @@ None.
 ## Implementation notes
 
 - Staff photo only on edit (API needs `staffId`); create redirects to edit.
-- Linked member via `GET .../members` for OWNER/ADMIN; STAFF list shows “—” without fetch.
+- Linked member via `GET .../members` for OWNER/ADMIN; STAFF list shows “not linked” without fetch
+  (`linkedUnknown` “—” only when a members fetch fails for managers).
 - Custom-field editor keeps local drafts; keys lock after a successful save round-trip.
 - No new ADR; nav segments from #80 already pointed at these routes.

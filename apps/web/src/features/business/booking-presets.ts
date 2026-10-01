@@ -32,3 +32,29 @@ export function optionsWithCurrentValue(presets: readonly number[], current: num
   }
   return [...presets, current].sort((a, b) => a - b);
 }
+
+type DurationMessages = {
+  (key: 'settings.durationNone'): string;
+  (key: 'settings.durationMinutes', values: { count: number }): string;
+  (key: 'settings.durationHours', values: { count: number }): string;
+  (key: 'settings.durationDays', values: { count: number }): string;
+};
+
+/** Human-readable duration for booking-policy selects (minutes → hours/days when exact). */
+export function formatMinutesLabel(minutes: number, t: DurationMessages): string {
+  if (minutes === 0) return t('settings.durationNone');
+  if (minutes < 60) return t('settings.durationMinutes', { count: minutes });
+  if (minutes % 1440 === 0) {
+    const days = minutes / 1440;
+    return t('settings.durationDays', { count: days });
+  }
+  if (minutes % 60 === 0) {
+    return t('settings.durationHours', { count: minutes / 60 });
+  }
+  return t('settings.durationMinutes', { count: minutes });
+}
+
+/** Human-readable horizon in days. */
+export function formatHorizonLabel(days: number, t: DurationMessages): string {
+  return t('settings.durationDays', { count: days });
+}
