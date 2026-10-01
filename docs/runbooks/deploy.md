@@ -149,3 +149,5 @@ docker compose -f compose.prod.yml exec api \
 docker compose -f compose.prod.yml exec api \
   node scripts/admin-flag.mjs revoke someone@example.com
 ```
+
+Requires an API image built after `scripts/admin-flag.mjs` was added to the runtime stage.

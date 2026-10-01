@@ -65,8 +65,14 @@ dialog. Namespace `admin`.
 ## Implementation notes
 
 - Category name comes from the English `CategoryTranslation` (slug fallback).
-- Admin list cursor is opaque base64url `{ createdAt, id }` for oldest-first pagination.
+- Admin list cursor is opaque base64url `{ createdAt, id }` for oldest-first pagination;
+  decoded payloads are validated with zod (`datetime` + `uuid`) before hitting Prisma.
+- Owner fields on list/detail are nullable when the OWNER membership is missing or the owner
+  user is soft-deleted — never 500 the queue for one bad row.
+- Approve clears `rejectionReason` so a re-approved business does not keep a stale reject note
+  (resubmit clears it on the way back to PENDING).
 - Web account-menu Admin link uses `admin.menuLink`; page gated with `notFound()` for
   non-admins. Resubmit UI stays out of scope (#80).
+- Runtime API image copies `scripts/admin-flag.mjs` for `admin:grant` / `admin:revoke`.
 - `request.test.ts` now only checks spread namespaces (`common`/`shell`); nested catalogs may
   share root keys.

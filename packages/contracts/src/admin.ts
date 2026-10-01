@@ -20,8 +20,8 @@ export const adminBusinessListItemSchema = z.object({
   city: citySchema,
   categoryId: z.string().uuid(),
   categoryName: z.string().min(1),
-  ownerEmail: z.string().email(),
-  ownerEmailVerified: z.boolean(),
+  ownerEmail: z.string().email().nullable(),
+  ownerEmailVerified: z.boolean().nullable(),
   staffCount: z.number().int().nonnegative(),
   servicesCount: z.number().int().nonnegative(),
   staffWithWorkingHoursCount: z.number().int().nonnegative(),
@@ -46,3 +46,9 @@ export const rejectBusinessRequestSchema = z.object({
 });
 
 export type RejectBusinessRequest = z.infer<typeof rejectBusinessRequestSchema>;
+
+/** Opaque admin list cursor payload. */
+export const adminListCursorSchema = z.object({
+  createdAt: z.string().datetime(),
+  id: z.string().uuid(),
+});

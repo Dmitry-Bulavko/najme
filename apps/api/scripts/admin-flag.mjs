@@ -10,7 +10,7 @@ import pg from 'pg';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '../../..');
-loadEnv({ path: resolve(root, '.env') });
+loadEnv({ path: resolve(root, '.env'), quiet: true });
 
 const [action, emailRaw] = process.argv.slice(2);
 const email = typeof emailRaw === 'string' ? emailRaw.trim().toLowerCase() : '';

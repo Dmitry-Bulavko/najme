@@ -9,8 +9,14 @@ describe('admin contracts', () => {
 
   it('requires a reject reason of 10–500 characters', () => {
     expect(() => rejectBusinessRequestSchema.parse({ reason: 'too short' })).toThrow();
+    expect(() => rejectBusinessRequestSchema.parse({ reason: '123456789' })).toThrow();
+    expect(() => rejectBusinessRequestSchema.parse({ reason: 'x'.repeat(501) })).toThrow();
     expect(rejectBusinessRequestSchema.parse({ reason: 'Needs more documentation.' }).reason).toBe(
       'Needs more documentation.',
     );
+    expect(rejectBusinessRequestSchema.parse({ reason: 'x'.repeat(500) }).reason).toHaveLength(500);
+    expect(
+      rejectBusinessRequestSchema.parse({ reason: '  Needs more documentation.  ' }).reason,
+    ).toBe('Needs more documentation.');
   });
 });

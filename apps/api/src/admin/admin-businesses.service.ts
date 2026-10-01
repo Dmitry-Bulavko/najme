@@ -7,6 +7,7 @@ import type {
   BusinessStatus,
   RejectBusinessRequest,
 } from '@najme/contracts';
+import { adminListCursorSchema } from '@najme/contracts';
 import { Clock } from '../common/clock.js';
 import { apiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -63,7 +64,7 @@ export class AdminBusinessesService {
           },
         },
         memberships: {
-          where: { role: 'OWNER' },
+          where: { role: 'OWNER', user: { deletedAt: null } },
           orderBy: { createdAt: 'asc' },
           take: 1,
           select: {
@@ -120,7 +121,7 @@ export class AdminBusinessesService {
           },
         },
         memberships: {
-          where: { role: 'OWNER' },
+          where: { role: 'OWNER', user: { deletedAt: null } },
           orderBy: { createdAt: 'asc' },
           take: 1,
           select: {
@@ -144,6 +145,13 @@ export class AdminBusinessesService {
 
   async approve(businessId: string, adminUserId: string): Promise<AdminBusinessDetail> {
     const now = this.clock.now();
+    const existing = await this.prisma.business.findFirst({
+      where: { id: businessId, deletedAt: null },
+      select: { id: true, status: true },
+    });
+    if (!existing) {
+      throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Business not found.');
+    }
     const result = await this.prisma.business.updateMany({
       where: {
         id: businessId,
@@ -155,6 +163,7 @@ export class AdminBusinessesService {
         approvedAt: now,
         reviewedAt: now,
         reviewedByUserId: adminUserId,
+        // Cleared on approve so the queue does not keep a stale reject note after re-approval.
         rejectionReason: null,
         updatedAt: now,
       },
@@ -175,6 +184,13 @@ export class AdminBusinessesService {
     input: RejectBusinessRequest,
   ): Promise<AdminBusinessDetail> {
     const now = this.clock.now();
+    const existing = await this.prisma.business.findFirst({
+      where: { id: businessId, deletedAt: null },
+      select: { id: true, status: true },
+    });
+    if (!existing) {
+      throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Business not found.');
+    }
     const result = await this.prisma.business.updateMany({
       where: {
         id: businessId,
@@ -244,9 +260,6 @@ export class AdminBusinessesService {
     staffWithWorkingHoursCount: number,
   ): AdminBusinessListItem {
     const owner = row.memberships[0]?.user;
-    if (!owner || owner.deletedAt) {
-      throw apiError(HttpStatus.INTERNAL_SERVER_ERROR, 'INTERNAL_ERROR', 'Business has no owner.');
-    }
     return {
       id: row.id,
       name: row.name,
@@ -255,8 +268,8 @@ export class AdminBusinessesService {
       city: row.city,
       categoryId: row.categoryId,
       categoryName: row.category.translations[0]?.name ?? row.category.slug,
-      ownerEmail: owner.email,
-      ownerEmailVerified: owner.emailVerifiedAt !== null,
+      ownerEmail: owner && !owner.deletedAt ? owner.email : null,
+      ownerEmailVerified: owner && !owner.deletedAt ? owner.emailVerifiedAt !== null : null,
       staffCount: row._count.staffMembers,
       servicesCount: row._count.services,
       staffWithWorkingHoursCount,
@@ -275,16 +288,10 @@ function encodeCursor(payload: CursorPayload): string {
 
 function decodeCursor(raw: string): CursorPayload {
   try {
-    const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as unknown;
-    if (
-      !parsed ||
-      typeof parsed !== 'object' ||
-      typeof (parsed as CursorPayload).createdAt !== 'string' ||
-      typeof (parsed as CursorPayload).id !== 'string'
-    ) {
-      throw new Error('invalid');
-    }
-    return parsed as CursorPayload;
+    const json: unknown = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
+    const parsed = adminListCursorSchema.safeParse(json);
+    if (!parsed.success) throw new Error('invalid');
+    return parsed.data;
   } catch {
     throw apiError(HttpStatus.BAD_REQUEST, 'VALIDATION_FAILED', 'Invalid cursor.');
   }

@@ -118,6 +118,29 @@ describe('AccountSlot', () => {
     expect(screen.getByText('AB')).toBeInTheDocument();
   });
 
+  it('shows email in the dropdown when displayName is null', async () => {
+    const noNameUser = { ...fakeUser, displayName: null };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({
+          accessToken: 'tok',
+          accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+          user: noNameUser,
+        }),
+      )
+      .mockResolvedValueOnce(makeJsonResponse(noNameUser));
+
+    renderSlot();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: catalogs.en.auth.header.menuLabel }),
+      ).toBeInTheDocument();
+    });
+    // Initials from email: "al" → "AL"
+    expect(screen.getByText('AL')).toBeInTheDocument();
+  });
+
   it('shows the admin link only for platform admins', async () => {
     const adminUser = { ...fakeUser, isPlatformAdmin: true };
     vi.mocked(fetch)
@@ -146,5 +169,31 @@ describe('AccountSlot', () => {
       'href',
       '/en/admin/businesses',
     );
+  });
+
+  it('hides the admin link for non-admins', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({
+          accessToken: 'tok',
+          accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+          user: fakeUser,
+        }),
+      )
+      .mockResolvedValueOnce(makeJsonResponse(fakeUser));
+
+    const { user } = await (async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      return { user: userEvent.setup() };
+    })();
+    renderSlot();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: catalogs.en.auth.header.menuLabel }),
+      ).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: catalogs.en.auth.header.menuLabel }));
+    expect(screen.queryByRole('menuitem', { name: catalogs.en.admin.menuLink })).toBeNull();
   });
 });

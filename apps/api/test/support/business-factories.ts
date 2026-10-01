@@ -204,12 +204,8 @@ export function collectBusinessIdRoutes(
     if (!route?.path.includes(':businessId')) {
       continue;
     }
-    // Platform-admin routes use `:businessId` but are authz'd by PlatformAdminGuard (403), not tenancy.
-    if (route.path.includes('/admin')) {
-      continue;
-    }
-    // Platform-admin routes use `:businessId` but are authz'd by PlatformAdminGuard (403), not tenancy.
-    if (route.path.includes('/admin')) {
+    // Platform-admin routes use `:businessId` but PlatformAdminGuard (403), not tenancy 404.
+    if (/\/admin(\/|$)/.test(route.path)) {
       continue;
     }
     for (const [method, on] of Object.entries(route.methods)) {
@@ -231,7 +227,7 @@ export function collectAdminRoutes(app: INestApplication): Array<{ method: strin
   const routes: Array<{ method: string; path: string }> = [];
   for (const layer of stack) {
     const route = layer.route;
-    if (!route?.path.includes('/admin')) {
+    if (!route || !/\/admin(\/|$)/.test(route.path)) {
       continue;
     }
     for (const [method, on] of Object.entries(route.methods)) {
