@@ -37,8 +37,14 @@ describe('proxy', () => {
     expect(response.headers.get('x-middleware-request-x-next-intl-locale')).toBe('ru');
   });
 
-  it('sets Referrer-Policy: no-referrer on verify-email and reset-password', () => {
-    for (const path of ['/en/verify-email', '/me/reset-password', '/ru/verify-email?token=x']) {
+  it('sets Referrer-Policy: no-referrer on verify-email, reset-password and invitations/accept', () => {
+    for (const path of [
+      '/en/verify-email',
+      '/me/reset-password',
+      '/ru/verify-email?token=x',
+      '/en/invitations/accept',
+      '/tr/invitations/accept?token=abc',
+    ]) {
       const response = proxy(new NextRequest(`https://najme.example${path}`));
       expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
     }

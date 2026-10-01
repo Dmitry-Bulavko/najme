@@ -10,7 +10,8 @@ const NEXT_INTL_LOCALE_HEADER = 'x-next-intl-locale';
  * Email-link pages that carry a secret in the query string (ADR-0011). Response header required;
  * metadata `referrer: 'no-referrer'` alone only emits a `<meta>` tag.
  */
-const TOKEN_LINK_PATH = /^\/(?:en|me|ru|tr)\/(?:verify-email|reset-password)(?:\/|$)/;
+const TOKEN_LINK_PATH =
+  /^\/(?:en|me|ru|tr)\/(?:verify-email|reset-password|invitations\/accept)(?:\/|$)/;
 
 export const config = {
   // Skip Next.js internals, static files and the API dev-proxy path. `api`, `_next` and `_vercel`
