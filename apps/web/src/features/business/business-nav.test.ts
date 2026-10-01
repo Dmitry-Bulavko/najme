@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { businessHref, navItemsForRole } from './business-nav';
+import { BUSINESS_NAV, businessHref, navItemsForRole } from './business-nav';
 
 describe('business-nav', () => {
   it('hides Team and Settings for STAFF', () => {
@@ -23,5 +23,10 @@ describe('business-nav', () => {
   it('builds overview and nested hrefs', () => {
     expect(businessHref('en', 'b1', '')).toBe('/en/business/b1');
     expect(businessHref('ru', 'b1', 'team')).toBe('/ru/business/b1/team');
+  });
+
+  it('marks schedule as a dynamic href', () => {
+    const schedule = BUSINESS_NAV.find((item) => item.key === 'schedule');
+    expect(schedule?.dynamicHref).toBe('schedule');
   });
 });

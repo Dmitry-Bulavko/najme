@@ -23,8 +23,11 @@ import { ApiError, apiRequest } from '@/lib/api/client';
 import { errorMessage } from '@/lib/i18n/error-message';
 import { cn } from '@/lib/utils';
 
+import { isSchedulePathActive, resolveScheduleHref } from '@/features/schedule/schedule-href';
+
 import { businessHref, navItemsForRole } from './business-nav';
 import { writeLastBusinessId } from './last-business';
+import { useMyBusinesses } from './use-my-businesses';
 
 type BusinessContextValue = {
   business: Business;
@@ -58,17 +61,34 @@ function BusinessNavLinks({
   onNavigate,
 }: BusinessNavLinksProps) {
   const t = useTranslations('business');
+  const { data: myBusinesses } = useMyBusinesses();
+  const staffMemberId = useMemo(() => {
+    const row = myBusinesses?.find((b) => b.businessId === businessId);
+    return row?.staffMemberId ?? null;
+  }, [businessId, myBusinesses]);
   const items = navItemsForRole(role);
 
   return (
     <nav aria-label={t('shell.navLabel')}>
       <ul className="grid gap-1">
         {items.map((item) => {
-          const href = businessHref(locale, businessId, item.segment);
+          const href =
+            item.dynamicHref === 'schedule'
+              ? resolveScheduleHref(locale, businessId, role, staffMemberId)
+              : businessHref(locale, businessId, item.segment);
+          if (!href) {
+            return null;
+          }
           const active =
-            item.segment === ''
-              ? pathname === href
-              : pathname === href || pathname.startsWith(`${href}/`);
+            item.dynamicHref === 'schedule'
+              ? isSchedulePathActive(pathname, locale, businessId, role, staffMemberId)
+              : item.segment === ''
+                ? pathname === href
+                : pathname === href || pathname.startsWith(`${href}/`);
+          const label =
+            item.key === 'schedule' && role === 'STAFF'
+              ? t('shell.mySchedule')
+              : t(`shell.${item.labelKey}`);
           return (
             <li key={item.key}>
               <Link
@@ -81,7 +101,7 @@ function BusinessNavLinks({
                     'bg-secondary text-secondary-foreground shadow-[inset_3px_0_0_0_var(--color-primary)]',
                 )}
               >
-                {t(`shell.${item.labelKey}`)}
+                {label}
               </Link>
             </li>
           );

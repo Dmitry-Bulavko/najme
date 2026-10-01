@@ -11,6 +11,11 @@ export type BusinessNavItem = {
   labelKey: BusinessNavKey;
   /** Roles that see this item. */
   roles: readonly MembershipRole[];
+  /**
+   * When true, href is resolved at render time (STAFF → own staff schedule;
+   * OWNER/ADMIN → schedule picker). See `resolveScheduleHref`.
+   */
+  dynamicHref?: 'schedule';
 };
 
 /** Role-aware business dashboard nav (ADR-0013: STAFF skip Team and Settings). */
@@ -28,6 +33,7 @@ export const BUSINESS_NAV: readonly BusinessNavItem[] = [
     segment: 'schedule',
     labelKey: 'schedule',
     roles: ['OWNER', 'ADMIN', 'STAFF'],
+    dynamicHref: 'schedule',
   },
   { key: 'team', segment: 'team', labelKey: 'team', roles: ['OWNER', 'ADMIN'] },
   { key: 'profile', segment: 'profile', labelKey: 'profile', roles: ['OWNER', 'ADMIN', 'STAFF'] },

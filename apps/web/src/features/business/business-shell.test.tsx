@@ -24,6 +24,23 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+vi.mock('./use-my-businesses', () => ({
+  useMyBusinesses: () => ({
+    data: [
+      {
+        businessId: '11111111-1111-4111-8111-111111111111',
+        name: 'Salon Ada',
+        slug: 'salon-ada',
+        status: 'APPROVED',
+        role: 'STAFF',
+        staffMemberId: '33333333-3333-4333-8333-333333333333',
+        logoUrl: null,
+      },
+    ],
+    isLoading: false,
+  }),
+}));
+
 function makeJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
