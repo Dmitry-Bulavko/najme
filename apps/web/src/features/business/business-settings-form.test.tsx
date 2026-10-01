@@ -11,6 +11,8 @@ import { BusinessSettingsForm } from './business-settings-form';
 const apiRequest = vi.fn();
 const setBusiness = vi.fn();
 const replace = vi.fn();
+const clearLastBusinessId = vi.fn();
+const invalidateMyBusinesses = vi.fn(async () => undefined);
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace, push: vi.fn() }),
@@ -44,7 +46,11 @@ vi.mock('./business-shell', () => ({
 }));
 
 vi.mock('./last-business', () => ({
-  clearLastBusinessId: vi.fn(),
+  clearLastBusinessId: (...args: unknown[]) => clearLastBusinessId(...args),
+}));
+
+vi.mock('./use-my-businesses', () => ({
+  useInvalidateMyBusinesses: () => invalidateMyBusinesses,
 }));
 
 function makeBusiness(overrides: Partial<Business> = {}): Business {
@@ -96,6 +102,9 @@ beforeEach(() => {
   apiRequest.mockReset();
   setBusiness.mockReset();
   replace.mockReset();
+  clearLastBusinessId.mockReset();
+  invalidateMyBusinesses.mockReset();
+  invalidateMyBusinesses.mockResolvedValue(undefined);
   settingsBusiness = makeBusiness();
 });
 
@@ -104,8 +113,9 @@ afterEach(() => {
 });
 
 describe('BusinessSettingsForm', () => {
-  it('saves confirmation mode and presets', async () => {
+  it('PATCHes only dirty fields so a non-preset notice survives', async () => {
     const user = userEvent.setup();
+    settingsBusiness = makeBusiness({ minBookingNoticeMinutes: 45 });
     apiRequest.mockImplementation(async (_path, init?: { method?: string; body?: unknown }) => {
       if (init?.method === 'PATCH') {
         return { ...settingsBusiness, ...(init.body as object) };
@@ -113,6 +123,9 @@ describe('BusinessSettingsForm', () => {
       throw new Error('unexpected');
     });
     renderSettings();
+    expect(
+      screen.getByRole('combobox', { name: catalogs.en.business.settings.minNotice }),
+    ).toHaveTextContent(/45/);
     await user.click(screen.getByRole('radio', { name: /Manual/i }));
     await user.click(screen.getByRole('button', { name: catalogs.en.business.settings.save }));
     await waitFor(() => {
@@ -120,15 +133,14 @@ describe('BusinessSettingsForm', () => {
         `/businesses/${settingsBusiness.id}`,
         expect.objectContaining({
           method: 'PATCH',
-          body: expect.objectContaining({
-            confirmationMode: 'MANUAL',
-            cancellationWindowMinutes: 120,
-            minBookingNoticeMinutes: 60,
-            bookingHorizonDays: 60,
-          }),
+          body: { confirmationMode: 'MANUAL' },
         }),
       );
     });
+    const patchBody = apiRequest.mock.calls.find(
+      (call) => (call[1] as { method?: string } | undefined)?.method === 'PATCH',
+    )?.[1] as { body: Record<string, unknown> };
+    expect(patchBody.body).not.toHaveProperty('minBookingNoticeMinutes');
   });
 
   it('shows forbidden for STAFF', () => {
@@ -138,7 +150,26 @@ describe('BusinessSettingsForm', () => {
     expect(screen.queryByRole('button', { name: catalogs.en.business.settings.save })).toBeNull();
   });
 
-  it('deletes after typing the business name (OWNER)', async () => {
+  it('hides the danger zone for ADMIN', () => {
+    settingsBusiness = makeBusiness({ myRole: 'ADMIN' });
+    renderSettings();
+    expect(screen.queryByRole('button', { name: catalogs.en.business.settings.delete })).toBeNull();
+  });
+
+  it('keeps delete confirm disabled for a wrong name', async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.settings.delete }));
+    await user.type(
+      screen.getByLabelText(catalogs.en.business.settings.deleteConfirmLabel),
+      'Wrong Name',
+    );
+    expect(
+      screen.getByRole('button', { name: catalogs.en.business.settings.deleteConfirm }),
+    ).toBeDisabled();
+  });
+
+  it('deletes after typing the business name and clears local state (OWNER)', async () => {
     const user = userEvent.setup();
     apiRequest.mockResolvedValue(undefined);
     renderSettings();
@@ -155,6 +186,8 @@ describe('BusinessSettingsForm', () => {
         method: 'DELETE',
       });
     });
+    expect(clearLastBusinessId).toHaveBeenCalled();
+    expect(invalidateMyBusinesses).toHaveBeenCalled();
     expect(replace).toHaveBeenCalledWith('/en');
   });
 });

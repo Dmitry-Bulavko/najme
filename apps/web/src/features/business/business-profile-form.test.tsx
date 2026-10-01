@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Business } from '@najme/contracts';
 import { catalogs } from '@najme/i18n';
@@ -9,13 +9,17 @@ import { BusinessProfileForm } from './business-profile-form';
 
 const apiRequest = vi.fn();
 const setBusiness = vi.fn();
+const toast = { success: vi.fn(), error: vi.fn() };
 
 vi.mock('sonner', () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: {
+    success: (...args: unknown[]) => toast.success(...args),
+    error: (...args: unknown[]) => toast.error(...args),
+  },
 }));
 
-vi.mock('@/lib/api/client', () => ({
-  ApiError: class ApiError extends Error {
+vi.mock('@/lib/api/client', () => {
+  class ApiError extends Error {
     code: string;
     status: number;
     details?: Record<string, unknown>;
@@ -25,9 +29,12 @@ vi.mock('@/lib/api/client', () => ({
       this.status = status;
       this.details = details;
     }
-  },
-  apiRequest: (...args: unknown[]) => apiRequest(...args),
-}));
+  }
+  return {
+    ApiError,
+    apiRequest: (...args: unknown[]) => apiRequest(...args),
+  };
+});
 
 vi.mock('@/features/uploads/image-upload', () => ({
   ImageUpload: ({ kind }: { kind: string }) => <div data-testid={`upload-${kind}`} />,
@@ -49,12 +56,12 @@ function makeBusiness(overrides: Partial<Business> = {}): Business {
     name: 'Salon Ada',
     slug: 'salon-ada',
     categoryId: '22222222-2222-4222-8222-222222222222',
-    description: null,
+    description: 'A cozy place',
     timezone: 'Europe/Podgorica',
     city: 'PODGORICA',
-    address: null,
-    contactPhone: null,
-    contactEmail: null,
+    address: 'Main 1',
+    contactPhone: '+38267000000',
+    contactEmail: 'ada@example.com',
     logoUrl: null,
     coverUrl: null,
     confirmationMode: 'AUTO',
@@ -96,6 +103,8 @@ function renderProfile() {
 beforeEach(() => {
   apiRequest.mockReset();
   setBusiness.mockReset();
+  toast.success.mockReset();
+  toast.error.mockReset();
   profileBusiness = makeBusiness();
 });
 
@@ -104,13 +113,13 @@ afterEach(() => {
 });
 
 describe('BusinessProfileForm', () => {
-  it('PATCHes profile fields for OWNER', async () => {
-    const user = userEvent.setup();
+  it('PATCHes only dirty profile fields for OWNER', async () => {
+    const user = userEvent.setup({ delay: null });
     apiRequest.mockImplementation(
       async (path: string, init?: { method?: string; body?: unknown }) => {
         if (String(path).includes('/categories')) return [category];
         if (init?.method === 'PATCH') {
-          return { ...profileBusiness, name: (init.body as { name: string }).name };
+          return { ...profileBusiness, ...(init.body as object) };
         }
         throw new Error(`unexpected ${path}`);
       },
@@ -128,20 +137,100 @@ describe('BusinessProfileForm', () => {
         `/businesses/${profileBusiness.id}`,
         expect.objectContaining({
           method: 'PATCH',
-          body: expect.objectContaining({ name: 'Salon Novo' }),
+          body: { name: 'Salon Novo' },
         }),
       );
     });
     expect(setBusiness).toHaveBeenCalled();
-  }, 15_000);
+  });
 
-  it('locks the slug when APPROVED', async () => {
-    profileBusiness = makeBusiness({ status: 'APPROVED' });
-    apiRequest.mockResolvedValue([category]);
+  it('sends null when clearing an optional field', async () => {
+    const user = userEvent.setup({ delay: null });
+    apiRequest.mockImplementation(
+      async (path: string, init?: { method?: string; body?: unknown }) => {
+        if (String(path).includes('/categories')) return [category];
+        if (init?.method === 'PATCH') {
+          return { ...profileBusiness, description: null };
+        }
+        throw new Error(`unexpected ${path}`);
+      },
+    );
+    renderProfile();
+    await waitFor(() => {
+      expect(screen.getByLabelText(catalogs.en.business.profile.description)).toBeInTheDocument();
+    });
+    const description = screen.getByLabelText(catalogs.en.business.profile.description);
+    fireEvent.change(description, { target: { value: '' } });
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.profile.save }));
+    await waitFor(() => {
+      expect(apiRequest).toHaveBeenCalledWith(
+        `/businesses/${profileBusiness.id}`,
+        expect.objectContaining({
+          method: 'PATCH',
+          body: { description: null },
+        }),
+      );
+    });
+  });
+
+  it('maps SLUG_TAKEN to the slug field', async () => {
+    const { ApiError } = await import('@/lib/api/client');
+    const user = userEvent.setup({ delay: null });
+    apiRequest.mockImplementation(async (path: string, init?: { method?: string }) => {
+      if (String(path).includes('/categories')) return [category];
+      if (init?.method === 'PATCH') {
+        throw new ApiError('SLUG_TAKEN', 'taken', 409);
+      }
+      throw new Error(`unexpected ${path}`);
+    });
+    renderProfile();
+    await waitFor(() => {
+      expect(screen.getByLabelText(catalogs.en.business.profile.slug)).toBeEnabled();
+    });
+    fireEvent.change(screen.getByLabelText(catalogs.en.business.profile.slug), {
+      target: { value: 'taken-slug' },
+    });
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.profile.save }));
+    await waitFor(() => {
+      expect(screen.getByText(catalogs.en.errors.SLUG_TAKEN)).toBeInTheDocument();
+    });
+  });
+
+  it('locks the slug when APPROVED and omits it from PATCH', async () => {
+    const user = userEvent.setup({ delay: null });
+    profileBusiness = makeBusiness({ status: 'APPROVED', slug: 'Grandfathered_Slug!' });
+    apiRequest.mockImplementation(
+      async (path: string, init?: { method?: string; body?: unknown }) => {
+        if (String(path).includes('/categories')) return [category];
+        if (init?.method === 'PATCH') {
+          return { ...profileBusiness, ...(init.body as object) };
+        }
+        throw new Error(`unexpected ${path}`);
+      },
+    );
     renderProfile();
     await waitFor(() => {
       expect(screen.getByLabelText(catalogs.en.business.profile.slug)).toBeDisabled();
     });
+    fireEvent.change(screen.getByLabelText(catalogs.en.business.profile.name), {
+      target: { value: 'Salon Locked' },
+    });
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.profile.save }));
+    await waitFor(() => {
+      expect(apiRequest).toHaveBeenCalledWith(
+        `/businesses/${profileBusiness.id}`,
+        expect.objectContaining({
+          method: 'PATCH',
+          body: { name: 'Salon Locked' },
+        }),
+      );
+    });
+    const patchCall = apiRequest.mock.calls.find(
+      (call) => (call[1] as { method?: string } | undefined)?.method === 'PATCH',
+    );
+    expect(patchCall?.[1]).not.toEqual(
+      expect.objectContaining({ body: expect.objectContaining({ slug: expect.anything() }) }),
+    );
   });
 
   it('is read-only for STAFF', async () => {

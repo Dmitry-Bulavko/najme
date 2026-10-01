@@ -28,7 +28,7 @@ import { writeLastBusinessId } from './last-business';
 
 type BusinessContextValue = {
   business: Business;
-  setBusiness: (business: Business) => void;
+  setBusiness: (update: Business | ((prev: Business) => Business)) => void;
   reload: () => Promise<void>;
 };
 
@@ -161,9 +161,16 @@ export function BusinessShell({ businessId, children }: BusinessShellProps) {
     void load();
   }, [load, session.state]);
 
+  const updateBusiness = useCallback((update: Business | ((prev: Business) => Business)) => {
+    setBusiness((prev) => {
+      if (!prev) return prev;
+      return typeof update === 'function' ? update(prev) : update;
+    });
+  }, []);
+
   const ctxValue = useMemo(
-    () => (business ? { business, setBusiness, reload: load } : null),
-    [business, load],
+    () => (business ? { business, setBusiness: updateBusiness, reload: load } : null),
+    [business, load, updateBusiness],
   );
 
   if (missing) {

@@ -10,7 +10,7 @@ import {
   type UploadKind,
 } from '@najme/contracts';
 import { useTranslations } from 'next-intl';
-import { useId, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ import { ApiError, apiRequest } from '@/lib/api/client';
 import { errorMessage } from '@/lib/i18n/error-message';
 import { cn } from '@/lib/utils';
 
-import { downscaleImageFile } from './downscale-image';
+import { IMAGE_INPUT_MAX_BYTES, downscaleImageFile } from './downscale-image';
 import { uploadPresignedPost } from './presigned-post';
 
 export type ImageUploadProps = {
@@ -47,6 +47,47 @@ function attachPath(businessId: string, kind: UploadKind, staffId?: string): str
   return `/businesses/${businessId}/staff/${staffId}/photo`;
 }
 
+function mapUploadError(
+  err: unknown,
+  t: ReturnType<typeof useTranslations<'business'>>,
+  tErrors: ReturnType<typeof useTranslations<'errors'>>,
+): void {
+  if (
+    (err instanceof Error && err.name === 'AbortError') ||
+    (err instanceof Error && err.message === 'UPLOAD_ABORTED')
+  ) {
+    return;
+  }
+  if (err instanceof Error && err.message === 'UPLOAD_TYPE') {
+    toast.error(t('upload.invalidType'));
+    return;
+  }
+  if (
+    err instanceof Error &&
+    (err.message === 'UPLOAD_SIZE' || err.message === 'UPLOAD_INPUT_SIZE')
+  ) {
+    const maxMb =
+      err.message === 'UPLOAD_INPUT_SIZE'
+        ? Math.floor(IMAGE_INPUT_MAX_BYTES / (1024 * 1024))
+        : Math.floor(UPLOAD_MAX_BYTES / (1024 * 1024));
+    toast.error(t('upload.invalidSize', { maxMb }));
+    return;
+  }
+  if (err instanceof Error && err.message === 'UPLOAD_STORAGE') {
+    toast.error(errorMessage(tErrors, 'UPLOAD_INVALID'));
+    return;
+  }
+  if (err instanceof Error && err.message === 'UPLOAD_CANVAS') {
+    toast.error(t('upload.invalidType'));
+    return;
+  }
+  if (err instanceof ApiError) {
+    toast.error(errorMessage(tErrors, err.code));
+    return;
+  }
+  toast.error(errorMessage(tErrors, 'INTERNAL_ERROR'));
+}
+
 /**
  * Presigned image upload with client checks, canvas downscale, progress, replace and remove.
  * Uses plain `<img>` (no next/image) because storage hosts differ per environment.
@@ -65,16 +106,27 @@ export function ImageUpload({
   const tErrors = useTranslations('errors');
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
 
   const canEdit = !readOnly && !disabled;
 
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
   async function runUpload(file: File): Promise<void> {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setBusy(true);
     setProgress(0);
     try {
       const prepared = await downscaleImageFile(file);
+      if (controller.signal.aborted) return;
       const createBody = createUploadRequestSchema.parse({
         kind,
         contentType: prepared.contentType,
@@ -83,6 +135,7 @@ export function ImageUpload({
       const rawPresign = await apiRequest<unknown>(`/businesses/${businessId}/uploads`, {
         method: 'POST',
         body: createBody,
+        signal: controller.signal,
       });
       const presign = createUploadResponseSchema.parse(rawPresign);
       await uploadPresignedPost(
@@ -91,11 +144,13 @@ export function ImageUpload({
         prepared.blob,
         prepared.fileName,
         setProgress,
+        controller.signal,
       );
       const attachBody = attachUploadRequestSchema.parse({ key: presign.key });
       const rawAttach = await apiRequest<unknown>(attachPath(businessId, kind, staffId), {
         method: 'PUT',
         body: attachBody,
+        signal: controller.signal,
       });
       if (kind === 'STAFF_PHOTO') {
         const attached = attachStaffPhotoResponseSchema.parse(rawAttach);
@@ -106,18 +161,11 @@ export function ImageUpload({
       }
       toast.success(t('upload.success'));
     } catch (err) {
-      if (err instanceof Error && err.message === 'UPLOAD_TYPE') {
-        toast.error(t('upload.invalidType'));
-      } else if (err instanceof Error && err.message === 'UPLOAD_SIZE') {
-        toast.error(
-          t('upload.invalidSize', { maxMb: Math.floor(UPLOAD_MAX_BYTES / (1024 * 1024)) }),
-        );
-      } else if (err instanceof ApiError) {
-        toast.error(errorMessage(tErrors, err.code));
-      } else {
-        toast.error(errorMessage(tErrors, 'INTERNAL_ERROR'));
-      }
+      mapUploadError(err, t, tErrors);
     } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
       setBusy(false);
       setProgress(null);
       if (inputRef.current) {
@@ -153,7 +201,9 @@ export function ImageUpload({
 
   return (
     <div className="space-y-3">
-      <p className="text-sm font-bold text-foreground">{label}</p>
+      <p className="text-sm font-bold text-foreground" id={`${inputId}-label`}>
+        {label}
+      </p>
       <div
         className={cn(
           'relative overflow-hidden rounded-md border border-border bg-muted',
@@ -194,6 +244,7 @@ export function ImageUpload({
             accept="image/jpeg,image/png,image/webp"
             className="sr-only"
             disabled={busy}
+            aria-labelledby={`${inputId}-label`}
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (file) void runUpload(file);
@@ -204,6 +255,13 @@ export function ImageUpload({
             variant="outline"
             size="sm"
             disabled={busy}
+            aria-label={
+              busy && progress !== null
+                ? t('upload.uploading', { percent: progress })
+                : currentUrl
+                  ? t('upload.replaceNamed', { label })
+                  : t('upload.chooseNamed', { label })
+            }
             onClick={() => inputRef.current?.click()}
           >
             {busy && progress !== null
@@ -218,6 +276,7 @@ export function ImageUpload({
               variant="outline"
               size="sm"
               disabled={busy}
+              aria-label={t('upload.removeNamed', { label })}
               onClick={() => void removeImage()}
             >
               {t('upload.remove')}
@@ -225,7 +284,7 @@ export function ImageUpload({
           ) : null}
         </div>
       ) : null}
-      <p className="text-xs text-muted-foreground">{t('upload.hint')}</p>
+      {canEdit ? <p className="text-xs text-muted-foreground">{t('upload.hint')}</p> : null}
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
 } from '@najme/contracts';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -37,9 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { clearLastBusinessId } from './last-business';
-import { useInvalidateMyBusinesses } from './use-my-businesses';
-import { useBusinessContext } from './business-shell';
 import { ApiError, apiRequest } from '@/lib/api/client';
 import { errorMessage } from '@/lib/i18n/error-message';
 
@@ -47,8 +44,11 @@ import {
   BOOKING_HORIZON_DAY_PRESETS,
   CANCELLATION_WINDOW_PRESETS,
   MIN_BOOKING_NOTICE_PRESETS,
-  nearestPreset,
+  optionsWithCurrentValue,
 } from './booking-presets';
+import { useBusinessContext } from './business-shell';
+import { clearLastBusinessId } from './last-business';
+import { useInvalidateMyBusinesses } from './use-my-businesses';
 
 type SettingsFormValues = {
   confirmationMode: ConfirmationMode;
@@ -73,6 +73,13 @@ function formatMinutesLabel(
   return t('settings.durationMinutes', { count: minutes });
 }
 
+function formatHorizonLabel(
+  days: number,
+  t: ReturnType<typeof useTranslations<'business'>>,
+): string {
+  return t('settings.durationDays', { count: days });
+}
+
 /** Booking policy settings + OWNER danger zone. STAFF should not reach this view. */
 export function BusinessSettingsForm() {
   const t = useTranslations('business');
@@ -85,49 +92,72 @@ export function BusinessSettingsForm() {
   const canEdit = business.myRole === 'OWNER' || business.myRole === 'ADMIN';
   const [confirmName, setConfirmName] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const autoId = useId();
+  const manualId = useId();
+  const cancellationId = useId();
+  const noticeId = useId();
+  const horizonId = useId();
+  const confirmDeleteId = useId();
+
+  const cancellationOptions = useMemo(
+    () => optionsWithCurrentValue(CANCELLATION_WINDOW_PRESETS, business.cancellationWindowMinutes),
+    [business.cancellationWindowMinutes],
+  );
+  const noticeOptions = useMemo(
+    () => optionsWithCurrentValue(MIN_BOOKING_NOTICE_PRESETS, business.minBookingNoticeMinutes),
+    [business.minBookingNoticeMinutes],
+  );
+  const horizonOptions = useMemo(
+    () => optionsWithCurrentValue(BOOKING_HORIZON_DAY_PRESETS, business.bookingHorizonDays),
+    [business.bookingHorizonDays],
+  );
 
   const formSchema = useMemo(
     () =>
       z.object({
         confirmationMode: confirmationModeSchema,
-        cancellationWindowMinutes: z.enum(
-          CANCELLATION_WINDOW_PRESETS.map(String) as [string, ...string[]],
-        ),
-        minBookingNoticeMinutes: z.enum(
-          MIN_BOOKING_NOTICE_PRESETS.map(String) as [string, ...string[]],
-        ),
-        bookingHorizonDays: z.enum(
-          BOOKING_HORIZON_DAY_PRESETS.map(String) as [string, ...string[]],
-        ),
+        cancellationWindowMinutes: z
+          .string()
+          .refine((value) => cancellationOptions.includes(Number(value))),
+        minBookingNoticeMinutes: z
+          .string()
+          .refine((value) => noticeOptions.includes(Number(value))),
+        bookingHorizonDays: z.string().refine((value) => horizonOptions.includes(Number(value))),
       }),
-    [],
+    [cancellationOptions, horizonOptions, noticeOptions],
   );
 
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(formSchema),
     values: {
       confirmationMode: business.confirmationMode,
-      cancellationWindowMinutes: String(
-        nearestPreset(business.cancellationWindowMinutes, CANCELLATION_WINDOW_PRESETS),
-      ),
-      minBookingNoticeMinutes: String(
-        nearestPreset(business.minBookingNoticeMinutes, MIN_BOOKING_NOTICE_PRESETS),
-      ),
-      bookingHorizonDays: String(
-        nearestPreset(business.bookingHorizonDays, BOOKING_HORIZON_DAY_PRESETS),
-      ),
+      cancellationWindowMinutes: String(business.cancellationWindowMinutes),
+      minBookingNoticeMinutes: String(business.minBookingNoticeMinutes),
+      bookingHorizonDays: String(business.bookingHorizonDays),
     },
     resetOptions: { keepDirtyValues: true },
   });
 
   async function onSubmit(values: SettingsFormValues): Promise<void> {
     if (!canEdit) return;
-    const body: UpdateBusinessRequest = {
-      confirmationMode: values.confirmationMode,
-      cancellationWindowMinutes: Number(values.cancellationWindowMinutes),
-      minBookingNoticeMinutes: Number(values.minBookingNoticeMinutes),
-      bookingHorizonDays: Number(values.bookingHorizonDays),
-    };
+    const dirty = form.formState.dirtyFields;
+    const body: UpdateBusinessRequest = {};
+    if (dirty.confirmationMode) {
+      body.confirmationMode = values.confirmationMode;
+    }
+    if (dirty.cancellationWindowMinutes) {
+      body.cancellationWindowMinutes = Number(values.cancellationWindowMinutes);
+    }
+    if (dirty.minBookingNoticeMinutes) {
+      body.minBookingNoticeMinutes = Number(values.minBookingNoticeMinutes);
+    }
+    if (dirty.bookingHorizonDays) {
+      body.bookingHorizonDays = Number(values.bookingHorizonDays);
+    }
+    if (Object.keys(body).length === 0) {
+      toast.success(t('settings.saved'));
+      return;
+    }
     const parsed = updateBusinessRequestSchema.safeParse(body);
     if (!parsed.success) {
       toast.error(errorMessage(tErrors, 'VALIDATION_FAILED'));
@@ -147,7 +177,7 @@ export function BusinessSettingsForm() {
   }
 
   async function deleteBusiness(): Promise<void> {
-    if (!isOwner || confirmName !== business.name) return;
+    if (!isOwner || confirmName.trim() !== business.name) return;
     setDeleting(true);
     try {
       await apiRequest(`/businesses/${business.id}`, { method: 'DELETE' });
@@ -199,7 +229,7 @@ export function BusinessSettingsForm() {
                 className="gap-4"
               >
                 <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3">
-                  <RadioGroupItem value="AUTO" id="confirmation-auto" className="mt-1" />
+                  <RadioGroupItem value="AUTO" id={autoId} className="mt-1" />
                   <span>
                     <span className="block text-sm font-medium">
                       {t('settings.confirmationAuto')}
@@ -210,7 +240,7 @@ export function BusinessSettingsForm() {
                   </span>
                 </label>
                 <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3">
-                  <RadioGroupItem value="MANUAL" id="confirmation-manual" className="mt-1" />
+                  <RadioGroupItem value="MANUAL" id={manualId} className="mt-1" />
                   <span>
                     <span className="block text-sm font-medium">
                       {t('settings.confirmationManual')}
@@ -226,17 +256,17 @@ export function BusinessSettingsForm() {
         </fieldset>
 
         <div className="grid gap-2">
-          <Label htmlFor="cancellation-window">{t('settings.cancellationWindow')}</Label>
+          <Label htmlFor={cancellationId}>{t('settings.cancellationWindow')}</Label>
           <Controller
             control={form.control}
             name="cancellationWindowMinutes"
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger id="cancellation-window">
+                <SelectTrigger id={cancellationId}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CANCELLATION_WINDOW_PRESETS.map((value) => (
+                  {cancellationOptions.map((value) => (
                     <SelectItem key={value} value={String(value)}>
                       {formatMinutesLabel(value, t)}
                     </SelectItem>
@@ -249,17 +279,17 @@ export function BusinessSettingsForm() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="min-notice">{t('settings.minNotice')}</Label>
+          <Label htmlFor={noticeId}>{t('settings.minNotice')}</Label>
           <Controller
             control={form.control}
             name="minBookingNoticeMinutes"
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger id="min-notice">
+                <SelectTrigger id={noticeId}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {MIN_BOOKING_NOTICE_PRESETS.map((value) => (
+                  {noticeOptions.map((value) => (
                     <SelectItem key={value} value={String(value)}>
                       {formatMinutesLabel(value, t)}
                     </SelectItem>
@@ -272,19 +302,19 @@ export function BusinessSettingsForm() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="horizon">{t('settings.horizon')}</Label>
+          <Label htmlFor={horizonId}>{t('settings.horizon')}</Label>
           <Controller
             control={form.control}
             name="bookingHorizonDays"
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger id="horizon">
+                <SelectTrigger id={horizonId}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {BOOKING_HORIZON_DAY_PRESETS.map((value) => (
+                  {horizonOptions.map((value) => (
                     <SelectItem key={value} value={String(value)}>
-                      {t('settings.durationDays', { count: value })}
+                      {formatHorizonLabel(value, t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -319,12 +349,13 @@ export function BusinessSettingsForm() {
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <div className="grid gap-2">
-                <Label htmlFor="confirm-delete-name">{t('settings.deleteConfirmLabel')}</Label>
+                <Label htmlFor={confirmDeleteId}>{t('settings.deleteConfirmLabel')}</Label>
                 <Input
-                  id="confirm-delete-name"
+                  id={confirmDeleteId}
                   value={confirmName}
                   onChange={(event) => setConfirmName(event.target.value)}
                   autoComplete="off"
+                  spellCheck={false}
                 />
               </div>
               <AlertDialogFooter>
@@ -332,7 +363,7 @@ export function BusinessSettingsForm() {
                   {t('settings.deleteCancel')}
                 </AlertDialogCancel>
                 <AlertDialogAction
-                  disabled={deleting || confirmName !== business.name}
+                  disabled={deleting || confirmName.trim() !== business.name}
                   onClick={(event) => {
                     event.preventDefault();
                     void deleteBusiness();

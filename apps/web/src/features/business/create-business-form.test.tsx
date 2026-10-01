@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { catalogs } from '@najme/i18n';
 import { NextIntlClientProvider } from 'next-intl';
@@ -198,7 +198,7 @@ describe('CreateBusinessForm', () => {
   });
 
   it('submits omitting empty optionals, remembers id, and redirects', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     let postedBody: unknown;
     vi.mocked(fetch).mockImplementation(async (input, init) => {
       const url = String(input);
@@ -228,7 +228,9 @@ describe('CreateBusinessForm', () => {
       ).toBeEnabled();
     });
 
-    await user.type(screen.getByLabelText(catalogs.en.business.create.name), 'New Salon');
+    fireEvent.change(screen.getByLabelText(catalogs.en.business.create.name), {
+      target: { value: 'New Salon' },
+    });
     await user.click(screen.getByLabelText(catalogs.en.business.create.category));
     await user.click(await screen.findByRole('option', { name: 'Beauty' }));
     await user.click(screen.getByLabelText(catalogs.en.business.create.city));
@@ -252,5 +254,5 @@ describe('CreateBusinessForm', () => {
       ),
     ).toBe(createdBusiness.id);
     expect(push).toHaveBeenCalledWith(`/en/business/${createdBusiness.id}`);
-  }, 15_000);
+  });
 });

@@ -69,5 +69,15 @@ All stay within CHECKs: window/notice 0…525 600 minutes; horizon 1…365 day
 ## Implementation notes
 
 - `ImageUpload` takes `kind` + business id (+ optional `staffId`) so #82 can reuse it.
-- After successful profile/settings PATCH, call `setBusiness` from shell context.
+- After successful profile/settings PATCH, call `setBusiness` from shell context (functional
+  updates so concurrent logo/cover uploads do not clobber each other).
 - After delete: clear last-business id, invalidate my-businesses, navigate to `/${locale}`.
+- Booking selects use `optionsWithCurrentValue` so non-preset API/mobile values round-trip;
+  profile and settings PATCH only dirty fields.
+- Upload: accept originals ≤25 MB; apply `UPLOAD_MAX_BYTES` (5 MB) to the downscaled output;
+  re-encode oversized PNG output as JPEG; abort in-flight XHR on unmount.
+
+## Review notes (round 2)
+
+Addressed CR round 1: non-preset policy options + dirty PATCH; 25 MB input / 5 MB output with
+PNG recompress; upload/profile/settings tests for the paths above.

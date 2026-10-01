@@ -21,3 +21,14 @@ export function nearestPreset<T extends number>(value: number, presets: readonly
   }
   return best;
 }
+
+/**
+ * Select options: presets plus the current stored value when it is not a preset, so a
+ * round-trip save cannot silently rewrite API/mobile/seed values.
+ */
+export function optionsWithCurrentValue(presets: readonly number[], current: number): number[] {
+  if (presets.includes(current)) {
+    return [...presets];
+  }
+  return [...presets, current].sort((a, b) => a - b);
+}

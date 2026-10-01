@@ -65,7 +65,22 @@ function isProfileField(value: unknown): value is (typeof PROFILE_FIELDS)[number
   return typeof value === 'string' && (PROFILE_FIELDS as readonly string[]).includes(value);
 }
 
-function buildProfileSchema(t: ReturnType<typeof useTranslations<'business'>>) {
+function buildProfileSchema(
+  t: ReturnType<typeof useTranslations<'business'>>,
+  options: { validateSlug: boolean },
+) {
+  const slugSchema = options.validateSlug
+    ? z
+        .string()
+        .trim()
+        .min(3, { error: t('profile.errors.slugInvalid') })
+        .max(60, { error: t('profile.errors.slugInvalid') })
+        .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, { error: t('profile.errors.slugInvalid') })
+        .refine((slug) => !RESERVED_BUSINESS_SLUGS.has(slug), {
+          error: t('profile.errors.slugReserved'),
+        })
+    : z.string();
+
   return z.object({
     name: z
       .string()
@@ -82,15 +97,7 @@ function buildProfileSchema(t: ReturnType<typeof useTranslations<'business'>>) {
       .refine((value): value is City => (CITY_CODES as readonly string[]).includes(value), {
         error: t('profile.errors.cityRequired'),
       }),
-    slug: z
-      .string()
-      .trim()
-      .min(3, { error: t('profile.errors.slugInvalid') })
-      .max(60, { error: t('profile.errors.slugInvalid') })
-      .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, { error: t('profile.errors.slugInvalid') })
-      .refine((slug) => !RESERVED_BUSINESS_SLUGS.has(slug), {
-        error: t('profile.errors.slugReserved'),
-      }),
+    slug: slugSchema,
     description: z.string().superRefine((value, ctx) => {
       const trimmed = value.trim();
       if (trimmed === '') return;
@@ -141,7 +148,10 @@ export function BusinessProfileForm() {
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [categoriesNonce, setCategoriesNonce] = useState(0);
 
-  const formSchema = useMemo(() => buildProfileSchema(t), [t]);
+  const formSchema = useMemo(
+    () => buildProfileSchema(t, { validateSlug: canEditSlug }),
+    [canEditSlug, t],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -190,17 +200,29 @@ export function BusinessProfileForm() {
 
   async function onSubmit(values: ProfileFormValues): Promise<void> {
     if (!canEdit) return;
-    const body: UpdateBusinessRequest = {
-      name: values.name,
-      categoryId: values.categoryId,
-      city: values.city as City,
-      description: values.description.trim() ? values.description.trim() : null,
-      address: values.address.trim() ? values.address.trim() : null,
-      contactPhone: values.contactPhone.trim() ? values.contactPhone.trim() : null,
-      contactEmail: values.contactEmail.trim() ? values.contactEmail.trim() : null,
-    };
-    if (canEditSlug && values.slug !== business.slug) {
+    const dirty = form.formState.dirtyFields;
+    const body: UpdateBusinessRequest = {};
+    if (dirty.name) body.name = values.name;
+    if (dirty.categoryId) body.categoryId = values.categoryId;
+    if (dirty.city) body.city = values.city as City;
+    if (dirty.description) {
+      body.description = values.description.trim() ? values.description.trim() : null;
+    }
+    if (dirty.address) {
+      body.address = values.address.trim() ? values.address.trim() : null;
+    }
+    if (dirty.contactPhone) {
+      body.contactPhone = values.contactPhone.trim() ? values.contactPhone.trim() : null;
+    }
+    if (dirty.contactEmail) {
+      body.contactEmail = values.contactEmail.trim() ? values.contactEmail.trim() : null;
+    }
+    if (dirty.slug && canEditSlug) {
       body.slug = values.slug;
+    }
+    if (Object.keys(body).length === 0) {
+      toast.success(t('profile.saved'));
+      return;
     }
     const parsedBody = updateBusinessRequestSchema.safeParse(body);
     if (!parsedBody.success) {
@@ -257,11 +279,11 @@ export function BusinessProfileForm() {
           frame="square"
           readOnly={!canEdit}
           onChanged={(urls) => {
-            setBusiness({
-              ...business,
-              logoUrl: urls.logoUrl !== undefined ? urls.logoUrl : business.logoUrl,
-              coverUrl: urls.coverUrl !== undefined ? urls.coverUrl : business.coverUrl,
-            });
+            setBusiness((prev) => ({
+              ...prev,
+              ...(urls.logoUrl !== undefined ? { logoUrl: urls.logoUrl } : {}),
+              ...(urls.coverUrl !== undefined ? { coverUrl: urls.coverUrl } : {}),
+            }));
           }}
         />
         <ImageUpload
@@ -271,11 +293,11 @@ export function BusinessProfileForm() {
           frame="wide"
           readOnly={!canEdit}
           onChanged={(urls) => {
-            setBusiness({
-              ...business,
-              logoUrl: urls.logoUrl !== undefined ? urls.logoUrl : business.logoUrl,
-              coverUrl: urls.coverUrl !== undefined ? urls.coverUrl : business.coverUrl,
-            });
+            setBusiness((prev) => ({
+              ...prev,
+              ...(urls.logoUrl !== undefined ? { logoUrl: urls.logoUrl } : {}),
+              ...(urls.coverUrl !== undefined ? { coverUrl: urls.coverUrl } : {}),
+            }));
           }}
         />
       </div>
@@ -334,7 +356,8 @@ export function BusinessProfileForm() {
             <Input
               id={categoryFieldId}
               value={
-                categories?.find((c) => c.id === business.categoryId)?.name ?? business.categoryId
+                categories?.find((c) => c.id === business.categoryId)?.name ??
+                t('profile.categoryUnavailable')
               }
               disabled
               readOnly
@@ -435,8 +458,9 @@ export function BusinessProfileForm() {
       </form>
 
       {canEdit && !categories && !categoriesError ? (
-        <div className="sr-only" aria-busy="true">
-          <Skeleton className="h-8 w-32" />
+        <div className="space-y-2" aria-busy="true" aria-label={t('profile.loadingCategories')}>
+          <Skeleton className="h-10 w-full max-w-md" />
+          <Skeleton className="h-10 w-full max-w-md" />
         </div>
       ) : null}
     </div>
