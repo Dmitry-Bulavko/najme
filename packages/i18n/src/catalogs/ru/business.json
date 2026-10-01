@@ -305,10 +305,10 @@
     "removeOption": "Удалить",
     "moveUp": "Выше",
     "moveDown": "Ниже",
-    "moveUpNamed": "Переместить «{label}» выше",
-    "moveDownNamed": "Переместить «{label}» ниже",
+    "moveUpNamed": "Выше — {label}",
+    "moveDownNamed": "Ниже — {label}",
     "remove": "Удалить поле",
-    "removeNamed": "Удалить «{label}»",
+    "removeNamed": "Удалить поле — {label}",
     "removeHint": "Удаление поля сохраняет исторические ответы с исходной подписью.",
     "errors": {
       "labelRequired": "Введите подпись.",

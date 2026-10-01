@@ -305,10 +305,10 @@
     "removeOption": "Remove",
     "moveUp": "Move up",
     "moveDown": "Move down",
-    "moveUpNamed": "Move “{label}” up",
-    "moveDownNamed": "Move “{label}” down",
+    "moveUpNamed": "Move up — {label}",
+    "moveDownNamed": "Move down — {label}",
     "remove": "Remove field",
-    "removeNamed": "Remove “{label}”",
+    "removeNamed": "Remove field — {label}",
     "removeHint": "Removing a field keeps historic booking answers with their original label.",
     "errors": {
       "labelRequired": "Enter a label.",

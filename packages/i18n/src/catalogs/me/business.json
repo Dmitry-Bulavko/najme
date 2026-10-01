@@ -305,10 +305,10 @@
     "removeOption": "Ukloni",
     "moveUp": "Pomjeri gore",
     "moveDown": "Pomjeri dole",
-    "moveUpNamed": "Pomjeri „{label}“ gore",
-    "moveDownNamed": "Pomjeri „{label}“ dole",
+    "moveUpNamed": "Pomjeri gore — {label}",
+    "moveDownNamed": "Pomjeri dole — {label}",
     "remove": "Ukloni polje",
-    "removeNamed": "Ukloni „{label}“",
+    "removeNamed": "Ukloni polje — {label}",
     "removeHint": "Uklanjanje polja čuva istorijske odgovore sa originalnom oznakom.",
     "errors": {
       "labelRequired": "Unesite oznaku.",

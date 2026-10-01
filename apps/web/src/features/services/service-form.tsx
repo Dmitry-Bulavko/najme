@@ -12,7 +12,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -44,11 +44,14 @@ import {
   type DraftCustomField,
 } from './custom-fields-editor';
 import { mapServiceValidationErrors, normalizeServiceIssuePath } from './map-service-validation';
+import { MinutesSelect } from './minutes-select';
 import {
-  BUFFER_MINUTE_OPTIONS,
-  DURATION_MINUTE_OPTIONS,
   SERVICE_HORIZON_PRESETS,
   SERVICE_NOTICE_PRESETS,
+  bufferOptionsWithCurrent,
+  durationOptionsWithCurrent,
+  isValidBufferMinutes,
+  isValidDurationMinutes,
   optionsWithNullableCurrent,
 } from './service-presets';
 import { isValidCustomFieldKey } from './slug-custom-field-key';
@@ -104,6 +107,8 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadNonce, setLoadNonce] = useState(0);
+  /** Mount notice/horizon Selects only when opened — closed details still keep children in the DOM. */
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const formSchema = useMemo(
     () =>
@@ -120,13 +125,13 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
             ctx.addIssue({ code: 'custom', message: t('services.errors.descriptionTooLong') });
           }
         }),
-        durationMinutes: z.string().refine((v) => DURATION_MINUTE_OPTIONS.includes(Number(v)), {
+        durationMinutes: z.string().refine((v) => isValidDurationMinutes(Number(v)), {
           error: t('services.errors.durationInvalid'),
         }),
-        bufferBeforeMinutes: z.string().refine((v) => BUFFER_MINUTE_OPTIONS.includes(Number(v)), {
+        bufferBeforeMinutes: z.string().refine((v) => isValidBufferMinutes(Number(v)), {
           error: t('services.errors.bufferInvalid'),
         }),
-        bufferAfterMinutes: z.string().refine((v) => BUFFER_MINUTE_OPTIONS.includes(Number(v)), {
+        bufferAfterMinutes: z.string().refine((v) => isValidBufferMinutes(Number(v)), {
           error: t('services.errors.bufferInvalid'),
         }),
         priceAmount: z
@@ -160,8 +165,34 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
     },
   });
 
-  const noticeCurrent = nullableSelectValue(form.watch('minBookingNoticeMinutes'));
-  const horizonCurrent = nullableSelectValue(form.watch('bookingHorizonDays'));
+  const durationCurrent = Number(
+    useWatch({ control: form.control, name: 'durationMinutes' }) ?? '30',
+  );
+  const bufferBeforeCurrent = Number(
+    useWatch({ control: form.control, name: 'bufferBeforeMinutes' }) ?? '0',
+  );
+  const bufferAfterCurrent = Number(
+    useWatch({ control: form.control, name: 'bufferAfterMinutes' }) ?? '0',
+  );
+  const noticeCurrent = nullableSelectValue(
+    useWatch({ control: form.control, name: 'minBookingNoticeMinutes' }) ?? 'null',
+  );
+  const horizonCurrent = nullableSelectValue(
+    useWatch({ control: form.control, name: 'bookingHorizonDays' }) ?? 'null',
+  );
+
+  const durationOptions = useMemo(
+    () => durationOptionsWithCurrent(durationCurrent),
+    [durationCurrent],
+  );
+  const bufferBeforeOptions = useMemo(
+    () => bufferOptionsWithCurrent(bufferBeforeCurrent),
+    [bufferBeforeCurrent],
+  );
+  const bufferAfterOptions = useMemo(
+    () => bufferOptionsWithCurrent(bufferAfterCurrent),
+    [bufferAfterCurrent],
+  );
   const noticeOptions = useMemo(
     () => optionsWithNullableCurrent(SERVICE_NOTICE_PRESETS, noticeCurrent),
     [noticeCurrent],
@@ -169,6 +200,11 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
   const horizonOptions = useMemo(
     () => optionsWithNullableCurrent(SERVICE_HORIZON_PRESETS, horizonCurrent),
     [horizonCurrent],
+  );
+
+  const formatDurationOption = useCallback(
+    (minutes: number) => t('services.minutesOption', { count: minutes }),
+    [t],
   );
 
   const reload = useCallback(() => {
@@ -428,26 +464,16 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
               control={form.control}
               name="durationMinutes"
               render={({ field }) => (
-                <Select
+                <MinutesSelect
+                  id={durationId}
                   value={field.value}
                   onValueChange={field.onChange}
                   disabled={readOnly || form.formState.isSubmitting}
-                >
-                  <SelectTrigger
-                    id={durationId}
-                    aria-invalid={durationError ? true : undefined}
-                    aria-describedby={durationError ? `${durationId}-error` : undefined}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {DURATION_MINUTE_OPTIONS.map((minutes) => (
-                      <SelectItem key={minutes} value={String(minutes)}>
-                        {t('services.minutesOption', { count: minutes })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={durationOptions}
+                  formatOption={formatDurationOption}
+                  aria-invalid={durationError ? true : undefined}
+                  aria-describedby={durationError ? `${durationId}-error` : undefined}
+                />
               )}
             />
             {durationError ? (
@@ -467,26 +493,16 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
               control={form.control}
               name="bufferBeforeMinutes"
               render={({ field }) => (
-                <Select
+                <MinutesSelect
+                  id={bufferBeforeId}
                   value={field.value}
                   onValueChange={field.onChange}
                   disabled={readOnly || form.formState.isSubmitting}
-                >
-                  <SelectTrigger
-                    id={bufferBeforeId}
-                    aria-invalid={bufferBeforeError ? true : undefined}
-                    aria-describedby={bufferBeforeError ? `${bufferBeforeId}-error` : undefined}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {BUFFER_MINUTE_OPTIONS.map((minutes) => (
-                      <SelectItem key={minutes} value={String(minutes)}>
-                        {t('services.minutesOption', { count: minutes })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={bufferBeforeOptions}
+                  formatOption={formatDurationOption}
+                  aria-invalid={bufferBeforeError ? true : undefined}
+                  aria-describedby={bufferBeforeError ? `${bufferBeforeId}-error` : undefined}
+                />
               )}
             />
             {bufferBeforeError ? (
@@ -506,26 +522,16 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
               control={form.control}
               name="bufferAfterMinutes"
               render={({ field }) => (
-                <Select
+                <MinutesSelect
+                  id={bufferAfterId}
                   value={field.value}
                   onValueChange={field.onChange}
                   disabled={readOnly || form.formState.isSubmitting}
-                >
-                  <SelectTrigger
-                    id={bufferAfterId}
-                    aria-invalid={bufferAfterError ? true : undefined}
-                    aria-describedby={bufferAfterError ? `${bufferAfterId}-error` : undefined}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {BUFFER_MINUTE_OPTIONS.map((minutes) => (
-                      <SelectItem key={minutes} value={String(minutes)}>
-                        {t('services.minutesOption', { count: minutes })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={bufferAfterOptions}
+                  formatOption={formatDurationOption}
+                  aria-invalid={bufferAfterError ? true : undefined}
+                  aria-describedby={bufferAfterError ? `${bufferAfterId}-error` : undefined}
+                />
               )}
             />
             {bufferAfterError ? (
@@ -652,101 +658,106 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps) {
           errors={customFieldErrors}
         />
 
-        <details className="rounded-md border border-border p-3">
+        <details
+          className="rounded-md border border-border p-3"
+          onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+        >
           <summary className="cursor-pointer text-sm font-bold text-foreground">
             {t('services.advancedHeading')}
           </summary>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor={noticeId}>{t('services.minNotice')}</Label>
-              <Controller
-                control={form.control}
-                name="minBookingNoticeMinutes"
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    disabled={readOnly || form.formState.isSubmitting}
-                  >
-                    <SelectTrigger
-                      id={noticeId}
-                      aria-invalid={noticeError ? true : undefined}
-                      aria-describedby={noticeError ? `${noticeId}-error` : `${noticeId}-hint`}
+          {advancedOpen ? (
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor={noticeId}>{t('services.minNotice')}</Label>
+                <Controller
+                  control={form.control}
+                  name="minBookingNoticeMinutes"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={readOnly || form.formState.isSubmitting}
                     >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {noticeOptions.map((value) => (
-                        <SelectItem key={toSelectString(value)} value={toSelectString(value)}>
-                          {value === null
-                            ? t('services.inheritDefault')
-                            : formatMinutesLabel(value, t)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      <SelectTrigger
+                        id={noticeId}
+                        aria-invalid={noticeError ? true : undefined}
+                        aria-describedby={noticeError ? `${noticeId}-error` : `${noticeId}-hint`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {noticeOptions.map((value) => (
+                          <SelectItem key={toSelectString(value)} value={toSelectString(value)}>
+                            {value === null
+                              ? t('services.inheritDefault')
+                              : formatMinutesLabel(value, t)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {noticeError ? (
+                  <p
+                    id={`${noticeId}-error`}
+                    role="alert"
+                    className="text-xs font-medium text-destructive"
+                  >
+                    {noticeError}
+                  </p>
+                ) : (
+                  <p id={`${noticeId}-hint`} className="text-xs text-muted-foreground">
+                    {t('services.minNoticeHint')}
+                  </p>
                 )}
-              />
-              {noticeError ? (
-                <p
-                  id={`${noticeId}-error`}
-                  role="alert"
-                  className="text-xs font-medium text-destructive"
-                >
-                  {noticeError}
-                </p>
-              ) : (
-                <p id={`${noticeId}-hint`} className="text-xs text-muted-foreground">
-                  {t('services.minNoticeHint')}
-                </p>
-              )}
-            </div>
+              </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor={horizonId}>{t('services.horizon')}</Label>
-              <Controller
-                control={form.control}
-                name="bookingHorizonDays"
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    disabled={readOnly || form.formState.isSubmitting}
-                  >
-                    <SelectTrigger
-                      id={horizonId}
-                      aria-invalid={horizonError ? true : undefined}
-                      aria-describedby={horizonError ? `${horizonId}-error` : `${horizonId}-hint`}
+              <div className="grid gap-2">
+                <Label htmlFor={horizonId}>{t('services.horizon')}</Label>
+                <Controller
+                  control={form.control}
+                  name="bookingHorizonDays"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={readOnly || form.formState.isSubmitting}
                     >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {horizonOptions.map((value) => (
-                        <SelectItem key={toSelectString(value)} value={toSelectString(value)}>
-                          {value === null
-                            ? t('services.inheritDefault')
-                            : t('settings.durationDays', { count: value })}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      <SelectTrigger
+                        id={horizonId}
+                        aria-invalid={horizonError ? true : undefined}
+                        aria-describedby={horizonError ? `${horizonId}-error` : `${horizonId}-hint`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {horizonOptions.map((value) => (
+                          <SelectItem key={toSelectString(value)} value={toSelectString(value)}>
+                            {value === null
+                              ? t('services.inheritDefault')
+                              : t('settings.durationDays', { count: value })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {horizonError ? (
+                  <p
+                    id={`${horizonId}-error`}
+                    role="alert"
+                    className="text-xs font-medium text-destructive"
+                  >
+                    {horizonError}
+                  </p>
+                ) : (
+                  <p id={`${horizonId}-hint`} className="text-xs text-muted-foreground">
+                    {t('services.horizonHint')}
+                  </p>
                 )}
-              />
-              {horizonError ? (
-                <p
-                  id={`${horizonId}-error`}
-                  role="alert"
-                  className="text-xs font-medium text-destructive"
-                >
-                  {horizonError}
-                </p>
-              ) : (
-                <p id={`${horizonId}-hint`} className="text-xs text-muted-foreground">
-                  {t('services.horizonHint')}
-                </p>
-              )}
+              </div>
             </div>
-          </div>
+          ) : null}
         </details>
 
         <div className="flex flex-wrap gap-2">

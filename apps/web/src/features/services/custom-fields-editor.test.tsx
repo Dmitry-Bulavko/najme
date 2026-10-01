@@ -73,7 +73,23 @@ describe('CustomFieldsEditor', () => {
     expect(screen.getByTestId('key-value').textContent).toBe('allergies');
   });
 
-  it('shows an empty-key error when the auto-slug is empty', async () => {
+  it('does not show a key error on a freshly added blank field', () => {
+    render(
+      <EditorHarness
+        initial={[
+          {
+            ...emptyField(),
+            key: '',
+            label: '',
+            keyTouched: false,
+          },
+        ]}
+      />,
+    );
+    expect(screen.queryByText(catalogs.en.business.customFields.errors.keyInvalid)).toBeNull();
+  });
+
+  it('shows an empty-key error once the label is typed and the auto-slug is empty', async () => {
     const user = userEvent.setup();
     render(
       <EditorHarness

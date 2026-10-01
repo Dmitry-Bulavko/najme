@@ -151,8 +151,12 @@ function renderEdit(serviceId = '44444444-4444-4444-8444-444444444444') {
 
 async function fillRequiredCreateFields(user: ReturnType<typeof userEvent.setup>) {
   expect(await screen.findByLabelText(catalogs.en.business.services.name)).toBeTruthy();
-  await user.type(screen.getByLabelText(catalogs.en.business.services.name), 'Cut');
-  await user.type(screen.getByLabelText(catalogs.en.business.services.price), '20');
+  const name = screen.getByLabelText(catalogs.en.business.services.name);
+  await user.click(name);
+  await user.paste('Cut');
+  const price = screen.getByLabelText(catalogs.en.business.services.price);
+  await user.click(price);
+  await user.paste('20');
 }
 
 describe('ServiceForm', () => {
@@ -165,7 +169,8 @@ describe('ServiceForm', () => {
     emitBusiness();
   });
 
-  it('labels duration and price for assistive tech', async () => {
+  it('labels duration, buffers, price, notice and horizon for assistive tech', async () => {
+    const user = userEvent.setup();
     apiRequest.mockImplementation(async (path: string) => {
       if (path.endsWith('/staff')) return [makeStaff()];
       throw new Error(`unexpected ${path}`);
@@ -174,6 +179,10 @@ describe('ServiceForm', () => {
     expect(await screen.findByLabelText(catalogs.en.business.services.duration)).toBeTruthy();
     expect(screen.getByLabelText(catalogs.en.business.services.price)).toBeTruthy();
     expect(screen.getByLabelText(catalogs.en.business.services.bufferBefore)).toBeTruthy();
+    expect(screen.getByLabelText(catalogs.en.business.services.bufferAfter)).toBeTruthy();
+    await user.click(screen.getByText(catalogs.en.business.services.advancedHeading));
+    expect(await screen.findByLabelText(catalogs.en.business.services.minNotice)).toBeTruthy();
+    expect(screen.getByLabelText(catalogs.en.business.services.horizon)).toBeTruthy();
   });
 
   it('maps staffMemberIds VALIDATION_FAILED details onto the staff fieldset', async () => {
@@ -196,7 +205,35 @@ describe('ServiceForm', () => {
     await waitFor(() => {
       expect(screen.getByText(catalogs.en.business.services.errors.invalid)).toBeTruthy();
     });
-  }, 20_000);
+  });
+
+  it('maps server customFields errors onto the matching clientId row', async () => {
+    const user = userEvent.setup();
+    const { ApiError } = await import('@/lib/api/client');
+    apiRequest.mockImplementation(async (path: string, init?: { method?: string }) => {
+      if (path.endsWith('/staff')) return [makeStaff()];
+      if (path.endsWith('/services') && init?.method === 'POST') {
+        throw new ApiError('VALIDATION_FAILED', 'invalid', 422, {
+          issues: [{ path: ['customFields', 0, 'key'] }],
+        });
+      }
+      throw new Error(`unexpected ${path}`);
+    });
+
+    renderCreate();
+    await fillRequiredCreateFields(user);
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.customFields.add }));
+    const label = screen.getByLabelText(catalogs.en.business.customFields.label);
+    await user.click(label);
+    await user.paste('Notes');
+    await user.click(
+      screen.getByRole('button', { name: catalogs.en.business.services.createSubmit }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(catalogs.en.business.services.errors.invalid)).toBeTruthy();
+    });
+  });
 
   it('POSTs minor-unit price, staffMemberIds, customFields order and null overrides', async () => {
     const user = userEvent.setup();
@@ -217,13 +254,13 @@ describe('ServiceForm', () => {
     await fillRequiredCreateFields(user);
     await user.click(screen.getByLabelText('Ana'));
     await user.click(screen.getByRole('button', { name: catalogs.en.business.customFields.add }));
-    await user.type(screen.getByLabelText(catalogs.en.business.customFields.label), 'Notes');
+    const firstLabel = screen.getByLabelText(catalogs.en.business.customFields.label);
+    await user.click(firstLabel);
+    await user.paste('Notes');
     await user.click(screen.getByRole('button', { name: catalogs.en.business.customFields.add }));
     const labels = screen.getAllByLabelText(catalogs.en.business.customFields.label);
-    await user.type(labels[1]!, 'Allergies');
-
-    await user.click(screen.getByText(catalogs.en.business.services.advancedHeading));
-    // leave notice/horizon on inherit (null)
+    await user.click(labels[1]!);
+    await user.paste('Allergies');
 
     await user.click(
       screen.getByRole('button', { name: catalogs.en.business.services.createSubmit }),
@@ -246,7 +283,7 @@ describe('ServiceForm', () => {
     expect(body.customFields.map((f) => f.key)).toEqual(['notes', 'allergies']);
     expect(body.customFields.map((f) => f.sortOrder)).toEqual([0, 1]);
     expect(push).toHaveBeenCalledWith(`/en/business/${formBusiness.id}/services/${created.id}`);
-  }, 30_000);
+  });
 
   it('commits price on Enter during create so amount is not stale 0', async () => {
     const user = userEvent.setup();
@@ -264,14 +301,19 @@ describe('ServiceForm', () => {
 
     renderCreate();
     expect(await screen.findByLabelText(catalogs.en.business.services.name)).toBeTruthy();
-    await user.type(screen.getByLabelText(catalogs.en.business.services.name), 'Cut');
-    await user.type(screen.getByLabelText(catalogs.en.business.services.price), '20{Enter}');
+    const name = screen.getByLabelText(catalogs.en.business.services.name);
+    await user.click(name);
+    await user.paste('Cut');
+    const price = screen.getByLabelText(catalogs.en.business.services.price);
+    await user.click(price);
+    await user.paste('20');
+    await user.keyboard('{Enter}');
 
     await waitFor(() => {
       expect(posted).toBeTruthy();
     });
     expect((posted as { price: { amount: number } }).price.amount).toBe(2000);
-  }, 20_000);
+  });
 
   it('PATCHes edits including an updated price committed on Enter', async () => {
     const user = userEvent.setup();
@@ -295,17 +337,20 @@ describe('ServiceForm', () => {
     expect(await screen.findByDisplayValue('Cut')).toBeTruthy();
     const name = screen.getByLabelText(catalogs.en.business.services.name);
     await user.clear(name);
-    await user.type(name, 'Fade');
+    await user.click(name);
+    await user.paste('Fade');
     const price = screen.getByLabelText(catalogs.en.business.services.price);
     await user.clear(price);
-    await user.type(price, '35{Enter}');
+    await user.click(price);
+    await user.paste('35');
+    await user.keyboard('{Enter}');
 
     await waitFor(() => {
       expect(patched).toBeTruthy();
     });
     expect((patched as { price: { amount: number }; name: string }).price.amount).toBe(3500);
     expect((patched as { name: string }).name).toBe('Fade');
-  }, 20_000);
+  });
 
   it('toasts the catalog formInvalid string for local custom-field validation', async () => {
     const user = userEvent.setup();
@@ -317,7 +362,6 @@ describe('ServiceForm', () => {
     renderCreate();
     await fillRequiredCreateFields(user);
     await user.click(screen.getByRole('button', { name: catalogs.en.business.customFields.add }));
-    // leave label empty → local validation fails
     await user.click(
       screen.getByRole('button', { name: catalogs.en.business.services.createSubmit }),
     );
@@ -327,7 +371,31 @@ describe('ServiceForm', () => {
         catalogs.en.business.customFields.errors.formInvalid,
       );
     });
-  }, 20_000);
+  });
+
+  it('retries after a load error', async () => {
+    const user = userEvent.setup();
+    const { ApiError } = await import('@/lib/api/client');
+    let fail = true;
+    apiRequest.mockImplementation(async (path: string) => {
+      if (path.endsWith('/staff')) {
+        if (fail) {
+          fail = false;
+          throw new ApiError('INTERNAL_ERROR', 'boom', 500);
+        }
+        return [makeStaff()];
+      }
+      if (path.includes('/services/')) return makeService();
+      throw new Error(`unexpected ${path}`);
+    });
+
+    renderEdit();
+    expect(
+      await screen.findByRole('button', { name: catalogs.en.business.services.retry }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.services.retry }));
+    expect(await screen.findByDisplayValue('Cut')).toBeTruthy();
+  });
 
   it('locks custom-field keys after a successful save round-trip', async () => {
     const user = userEvent.setup();
@@ -366,7 +434,7 @@ describe('ServiceForm', () => {
       expect(toast.success).toHaveBeenCalled();
     });
     expect(screen.getByLabelText(catalogs.en.business.customFields.key)).toBeDisabled();
-  }, 20_000);
+  });
 
   it('renders STAFF edit as read-only without a submit button', async () => {
     formBusiness = makeBusiness({ myRole: 'STAFF' });
@@ -381,7 +449,7 @@ describe('ServiceForm', () => {
     expect(await screen.findByDisplayValue('Cut')).toBeTruthy();
     expect(screen.queryByRole('button', { name: catalogs.en.business.services.save })).toBeNull();
     expect(screen.getByLabelText(catalogs.en.business.services.name)).toBeDisabled();
-  }, 20_000);
+  });
 
   it('allows unchecking an inactive assigned staff member', async () => {
     const user = userEvent.setup();
@@ -404,5 +472,5 @@ describe('ServiceForm', () => {
     expect(checkbox).not.toBeDisabled();
     await user.click(checkbox);
     expect(checkbox).not.toBeChecked();
-  }, 20_000);
+  });
 });

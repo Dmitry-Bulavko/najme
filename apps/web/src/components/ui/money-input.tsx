@@ -36,7 +36,9 @@ export interface MoneyInputProps extends Omit<
 
 /**
  * Edits a major-unit amount (accepts `,` and `.`) and emits integer minor units for the API.
- * Commits on change when the draft parses, on Enter, and on blur (blur clears the draft).
+ * Commits on change when the draft parses, on Enter, and on blur.
+ * Invalid drafts keep the previous committed value (and stay visible while focused / on blur
+ * are reverted to the last good value) so Enter/submit never clears a typed price to null.
  * The decimal separator follows the current UI locale (next-intl) unless overridden via `locale`.
  */
 export function MoneyInput({
@@ -56,17 +58,18 @@ export function MoneyInput({
   const [draft, setDraft] = useState<string | null>(null);
   const display = draft ?? (value === null ? '' : formatMinorAsMajor(value, locale));
 
-  function commit(raw: string): void {
+  function commitParsed(raw: string): boolean {
     const trimmed = raw.trim();
     if (trimmed.length === 0) {
       onChange(null);
-      return;
+      return true;
     }
     const minor = parseMajorToMinor(trimmed, locale);
     if (minor === null) {
-      return;
+      return false;
     }
     onChange(minor);
+    return true;
   }
 
   return (
@@ -85,23 +88,27 @@ export function MoneyInput({
             onChange(null);
             return;
           }
-          // Keep RHF in sync while focused so Enter/submit never sends a stale amount.
-          // Invalid drafts emit null so a partial type cannot submit a previous value.
-          onChange(parseMajorToMinor(trimmed, locale));
+          const minor = parseMajorToMinor(trimmed, locale);
+          // Valid drafts sync to RHF; invalid ones keep the previous committed value.
+          if (minor !== null) {
+            onChange(minor);
+          }
         }}
         onFocus={(event) => {
           setDraft(value === null ? '' : formatMinorAsMajor(value, locale));
           onFocus?.(event);
         }}
         onBlur={(event) => {
-          commit(event.target.value);
+          commitParsed(event.target.value);
+          // Clear draft: valid parses are committed; invalid drafts revert to last `value`.
           setDraft(null);
           onBlur?.(event);
         }}
         onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
           if (event.key === 'Enter') {
-            commit(event.currentTarget.value);
-            setDraft(null);
+            if (commitParsed(event.currentTarget.value)) {
+              setDraft(null);
+            }
           }
           onKeyDown?.(event);
         }}

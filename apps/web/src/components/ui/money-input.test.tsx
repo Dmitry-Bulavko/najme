@@ -38,10 +38,11 @@ describe('MoneyInput', () => {
 
     const input = screen.getByLabelText('Amount');
     await user.clear(input);
-    // '12,5' is not valid grouping (needs 3 digits after the thousands sep) → null
+    // Intermediate "12" commits 1200; the final invalid draft must not clear it.
     await user.type(input, '12,5');
     await user.tab();
-    expect(screen.getByTestId('minor')).toHaveTextContent('null');
+    expect(screen.getByTestId('minor')).toHaveTextContent('1200');
+    expect(input).toHaveValue('12.00');
   });
 
   it('round-trip: value=2500 me locale → focus then blur emits 2500', async () => {
@@ -63,7 +64,8 @@ describe('MoneyInput', () => {
     await user.clear(input);
     await user.type(input, '12,50');
     await user.tab();
-    expect(screen.getByTestId('minor')).toHaveTextContent('null');
+    expect(screen.getByTestId('minor')).toHaveTextContent('1200');
+    expect(input).toHaveValue('12.00');
   });
 
   it('parses dot decimal in en locale on blur', async () => {
@@ -148,8 +150,23 @@ describe('MoneyInput', () => {
     const input = screen.getByLabelText('Amount');
     await user.type(input, '12abc');
     await user.tab();
-    // parseMajorToMinor returns null → onChange not called → stays null
-    expect(screen.getByTestId('minor')).toHaveTextContent('null');
+    // Intermediate "12" commits 1200; invalid suffix must not clear it.
+    expect(screen.getByTestId('minor')).toHaveTextContent('1200');
+    expect(input).toHaveValue('12.00');
+  });
+
+  it('keeps the previous value when an invalid draft is blurred', async () => {
+    const user = userEvent.setup();
+    render(<MoneyHarness locale="en" initial={1500} />);
+
+    const input = screen.getByLabelText('Amount');
+    await user.click(input);
+    fireEvent.change(input, { target: { value: '12.3.4' } });
+    // Invalid draft must not clear the committed minor amount.
+    expect(screen.getByTestId('minor')).toHaveTextContent('1500');
+    await user.tab();
+    expect(screen.getByTestId('minor')).toHaveTextContent('1500');
+    expect(input).toHaveValue('15.00');
   });
 });
 

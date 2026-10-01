@@ -208,11 +208,12 @@ export function CustomFieldsEditor({
         <ul className="space-y-4">
           {value.map((field, index) => {
             const typeId = `${field.clientId}-type`;
-            const emptyKeyError =
-              !field.key || !isValidCustomFieldKey(field.key)
+            const keyError =
+              errors[`${field.clientId}.key`] ??
+              ((field.keyTouched || field.label.trim() !== '') &&
+              (!field.key || !isValidCustomFieldKey(field.key))
                 ? t('customFields.errors.keyInvalid')
-                : undefined;
-            const keyError = errors[`${field.clientId}.key`] ?? emptyKeyError;
+                : undefined);
             const labelError = errors[`${field.clientId}.label`];
             const optionsError = errors[`${field.clientId}.options`];
             const rowLabel = field.label.trim() || t('customFields.label');

@@ -184,4 +184,36 @@ describe('StaffForm', () => {
       expect(toast.success).toHaveBeenCalledWith(catalogs.en.business.staff.savedToast);
     });
   });
+
+  it('retries after a load error', async () => {
+    const user = userEvent.setup();
+    const { ApiError } = await import('@/lib/api/client');
+    const existing = makeStaff();
+    let fail = true;
+    apiRequest.mockImplementation(async (path: string) => {
+      if (path.includes('/staff/')) {
+        if (fail) {
+          fail = false;
+          throw new ApiError('INTERNAL_ERROR', 'boom', 500);
+        }
+        return existing;
+      }
+      throw new Error(`unexpected ${path}`);
+    });
+
+    render(
+      <NextIntlClientProvider
+        locale="en"
+        messages={{ business: catalogs.en.business, errors: catalogs.en.errors }}
+      >
+        <StaffForm mode="edit" staffId={existing.id} />
+      </NextIntlClientProvider>,
+    );
+
+    expect(
+      await screen.findByRole('button', { name: catalogs.en.business.staff.retry }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.staff.retry }));
+    expect(await screen.findByDisplayValue('Ana')).toBeTruthy();
+  });
 });
