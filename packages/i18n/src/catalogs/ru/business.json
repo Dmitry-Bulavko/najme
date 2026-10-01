@@ -434,6 +434,7 @@
     "linkStaffPlaceholder": "Выберите сотрудника",
     "staffRequiredHint": "Роли «Сотрудник» нужна привязка к сотруднику.",
     "saveMember": "Сохранить",
+    "saveMemberNamed": "Сохранить — {name}",
     "savingMember": "Сохранение…",
     "memberSavedToast": "Участник обновлён.",
     "saveFailedToast": "Не удалось обновить участника. Проверьте роль и привязку к сотруднику.",

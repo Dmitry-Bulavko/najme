@@ -434,6 +434,7 @@
     "linkStaffPlaceholder": "Izaberite člana osoblja",
     "staffRequiredHint": "Uloga Osoblje zahtijeva povezanog člana osoblja.",
     "saveMember": "Sačuvaj",
+    "saveMemberNamed": "Sačuvaj — {name}",
     "savingMember": "Čuvanje…",
     "memberSavedToast": "Član ažuriran.",
     "saveFailedToast": "Nije moguće ažurirati člana. Provjerite ulogu i vezu sa osobljem.",

@@ -434,6 +434,7 @@
     "linkStaffPlaceholder": "Personel seçin",
     "staffRequiredHint": "Personel rolü için bağlı bir personel gerekir.",
     "saveMember": "Kaydet",
+    "saveMemberNamed": "Kaydet — {name}",
     "savingMember": "Kaydediliyor…",
     "memberSavedToast": "Üye güncellendi.",
     "saveFailedToast": "Üye güncellenemedi. Rolü ve personel bağlantısını kontrol edin.",

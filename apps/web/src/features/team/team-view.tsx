@@ -515,6 +515,7 @@ export function TeamView() {
                             disabled={!dirty || busy || staffRequiredMissing}
                             loading={busy}
                             onClick={() => void saveMember(member)}
+                            aria-label={t('team.saveMemberNamed', { name: displayName })}
                           >
                             {busy ? t('team.savingMember') : t('team.saveMember')}
                           </Button>

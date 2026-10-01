@@ -434,6 +434,7 @@
     "linkStaffPlaceholder": "Select a staff member",
     "staffRequiredHint": "Staff role needs a linked staff member.",
     "saveMember": "Save",
+    "saveMemberNamed": "Save — {name}",
     "savingMember": "Saving…",
     "memberSavedToast": "Member updated.",
     "saveFailedToast": "Could not update the member. Check the role and staff link.",
