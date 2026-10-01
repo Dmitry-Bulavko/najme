@@ -11,13 +11,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import {
   createInvitationRequestSchema,
   type CreateInvitationRequest,
   type Invitation,
 } from '@najme/contracts';
 import { RequireJsonGuard } from '../auth/require-json.guard.js';
+import { UserThrottlerGuard } from '../auth/user-throttler.guard.js';
 import { BusinessAccessGuard } from '../businesses/business-access.guard.js';
 import type { BusinessMembership } from '../businesses/business-access.types.js';
 import { BusinessRoles } from '../businesses/business-roles.decorator.js';
@@ -25,7 +26,9 @@ import { CurrentMembership } from '../businesses/current-membership.decorator.js
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { InvitationsService } from './invitations.service.js';
 
+const HOUR_MS = 60 * 60 * 1000;
 const MINUTE_MS = 60_000;
+const CREATE_INVITE_LIMIT = { default: { limit: 20, ttl: HOUR_MS } };
 const RESEND_LIMIT = { default: { limit: 3, ttl: MINUTE_MS } };
 
 @ApiTags('invitations')
@@ -37,7 +40,8 @@ export class BusinessInvitationsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(RequireJsonGuard)
+  @UseGuards(UserThrottlerGuard, RequireJsonGuard)
+  @Throttle(CREATE_INVITE_LIMIT)
   @ApiOperation({ summary: 'Invite a colleague by email link.' })
   create(
     @CurrentMembership() membership: BusinessMembership,
@@ -58,7 +62,7 @@ export class BusinessInvitationsController {
 
   @Post(':invitationId/resend')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(ThrottlerGuard)
+  @UseGuards(UserThrottlerGuard)
   @Throttle(RESEND_LIMIT)
   @ApiOperation({ summary: 'Rotate the invitation token and resend the email.' })
   resend(

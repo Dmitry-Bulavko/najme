@@ -63,9 +63,11 @@ export function formatMessage(
     const chosen = form.replaceAll('#', String(raw));
     out = out.replace(plural[0], () => chosen);
   }
-  for (const [name, raw] of Object.entries(values)) {
-    out = out.replaceAll(`{${name}}`, () => String(raw));
-  }
+  // Single pass so a substituted value containing `{otherKey}` is not re-expanded.
+  out = out.replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (match, name: string) => {
+    if (!Object.hasOwn(values, name)) return match;
+    return String(values[name]);
+  });
   return out;
 }
 

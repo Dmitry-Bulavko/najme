@@ -59,7 +59,9 @@ API only. Email + error strings in four locales.
   via zod `superRefine`, so the create pipe keeps a plain object schema.
 - Accept uses `updateMany` with `status = PENDING AND expires_at > now` inside a transaction;
   unique membership collisions map to 409 `ALREADY_MEMBER`.
-- Resend is throttled (3/min); preview 30/min; accept 10/min. Invitation locale is not persisted —
-  resend emails use `en`.
-- Fake-mailer e2e covers invite/preview/accept, OWNER-only invite, STAFF link, conflicts,
-  LAST_OWNER, revoke, resend token rotation, and member PATCH/DELETE authz.
+- Resend is throttled (3/min per user); create 20/hour per user; preview 30/min; accept 10/min.
+- Invitation `locale` is persisted and reused on resend. Stale PENDING rows can be resent (token
+  rotated); `list` flips past-expiry PENDING → EXPIRED.
+- Member demote / remove / leave lock the business row (`FOR UPDATE`) before the LAST_OWNER count.
+- Cross-tenant `staffMemberId` on PATCH is always validated via `requireUnlinkedStaff`. Role changes
+  keep the existing staff link unless `staffMemberId` is sent explicitly.

@@ -299,12 +299,21 @@ describe('Invitations and members (e2e)', () => {
       .send({ role: 'OWNER' });
     expect(promoteDenied.status).toBe(403);
 
+    const promoted = await request(app.getHttpServer())
+      .patch(`/api/v1/businesses/${business.id}/members/${accepted.body.id}`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .set('Content-Type', 'application/json')
+      .send({ role: 'OWNER' });
+    expect(promoted.status).toBe(200);
+    expect(promoted.body.role).toBe('OWNER');
+
     const demoted = await request(app.getHttpServer())
       .patch(`/api/v1/businesses/${business.id}/members/${accepted.body.id}`)
       .set('Authorization', `Bearer ${owner.accessToken}`)
       .set('Content-Type', 'application/json')
       .send({ role: 'ADMIN' });
     expect(demoted.status).toBe(200);
+    expect(demoted.body.role).toBe('ADMIN');
 
     const staff = await request(app.getHttpServer())
       .post(`/api/v1/businesses/${business.id}/staff`)
@@ -347,5 +356,217 @@ describe('Invitations and members (e2e)', () => {
       .send({ role: 'ADMIN' });
     expect(demoteLast.status).toBe(422);
     expect(demoteLast.body.error.code).toBe('LAST_OWNER');
+  });
+
+  it('rejects a foreign staffMemberId on PATCH and keeps the staff link on role change', async () => {
+    const ownerA = await createUser(app, tracker, 'ten-a');
+    const coOwner = await createUser(app, tracker, 'ten-co');
+    const ownerB = await createUser(app, tracker, 'ten-b');
+    const categoryId = (await prisma.category.findFirstOrThrow({ select: { id: true } })).id;
+
+    const withStaff = await request(app.getHttpServer())
+      .post('/api/v1/businesses')
+      .set('Authorization', `Bearer ${ownerA.accessToken}`)
+      .set('Content-Type', 'application/json')
+      .send({
+        name: `Linked ${Date.now()}`,
+        categoryId,
+        city: 'PODGORICA',
+        ownerIsStaff: true,
+      });
+    expect(withStaff.status).toBe(201);
+    tracker.businessIds.push(withStaff.body.id as string);
+    await addMember(app, withStaff.body.id, coOwner.id, 'OWNER');
+
+    const meBiz = await request(app.getHttpServer())
+      .get('/api/v1/me/businesses')
+      .set('Authorization', `Bearer ${ownerA.accessToken}`);
+    const linked = meBiz.body.find(
+      (b: { businessId: string }) => b.businessId === withStaff.body.id,
+    );
+    expect(linked?.staffMemberId).toBeTruthy();
+
+    const members = await request(app.getHttpServer())
+      .get(`/api/v1/businesses/${withStaff.body.id}/members`)
+      .set('Authorization', `Bearer ${ownerA.accessToken}`);
+    const ownerMembership = members.body.find((m: { userId: string }) => m.userId === ownerA.id);
+    expect(ownerMembership.staffMemberId).toBe(linked.staffMemberId);
+
+    const keepLink = await request(app.getHttpServer())
+      .patch(`/api/v1/businesses/${withStaff.body.id}/members/${ownerMembership.id}`)
+      .set('Authorization', `Bearer ${ownerA.accessToken}`)
+      .set('Content-Type', 'application/json')
+      .send({ role: 'ADMIN' });
+    expect(keepLink.status).toBe(200);
+    expect(keepLink.body.staffMemberId).toBe(linked.staffMemberId);
+
+    const businessA = await createBusiness(app, tracker, ownerA);
+    const businessB = await createBusiness(app, tracker, ownerB);
+    const staffB = await request(app.getHttpServer())
+      .post(`/api/v1/businesses/${businessB.id}/staff`)
+      .set('Authorization', `Bearer ${ownerB.accessToken}`)
+      .set('Content-Type', 'application/json')
+      .send({ displayName: 'Foreign' });
+    expect(staffB.status).toBe(201);
+
+    const admin = await createUser(app, tracker, 'ten-adm');
+    await addMember(app, businessA.id, admin.id, 'ADMIN');
+    const adminMembers = await request(app.getHttpServer())
+      .get(`/api/v1/businesses/${businessA.id}/members`)
+      .set('Authorization', `Bearer ${ownerA.accessToken}`);
+    const adminMembership = adminMembers.body.find(
+      (m: { userId: string }) => m.userId === admin.id,
+    );
+
+    const crossTenant = await request(app.getHttpServer())
+      .patch(`/api/v1/businesses/${businessA.id}/members/${adminMembership.id}`)
+      .set('Authorization', `Bearer ${ownerA.accessToken}`)
+      .set('Content-Type', 'application/json')
+      .send({ staffMemberId: staffB.body.id });
+    expect(crossTenant.status).toBe(422);
+    expect(crossTenant.body.error.code).toBe('VALIDATION_FAILED');
+  });
+
+  it('serializes concurrent OWNER demotions so one remains', async () => {
+    const owner1 = await createUser(app, tracker, 'race-o1');
+    const owner2 = await createUser(app, tracker, 'race-o2');
+    const business = await createBusiness(app, tracker, owner1);
+    await addMember(app, business.id, owner2.id, 'OWNER');
+
+    const members = await request(app.getHttpServer())
+      .get(`/api/v1/businesses/${business.id}/members`)
+      .set('Authorization', `Bearer ${owner1.accessToken}`);
+    const m1 = members.body.find((m: { userId: string }) => m.userId === owner1.id);
+    const m2 = members.body.find((m: { userId: string }) => m.userId === owner2.id);
+
+    const [r1, r2] = await Promise.all([
+      request(app.getHttpServer())
+        .patch(`/api/v1/businesses/${business.id}/members/${m1.id}`)
+        .set('Authorization', `Bearer ${owner1.accessToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ role: 'ADMIN' }),
+      request(app.getHttpServer())
+        .patch(`/api/v1/businesses/${business.id}/members/${m2.id}`)
+        .set('Authorization', `Bearer ${owner2.accessToken}`)
+        .set('Content-Type', 'application/json')
+        .send({ role: 'ADMIN' }),
+    ]);
+
+    const statuses = [r1.status, r2.status].sort();
+    expect(statuses).toEqual([200, 422]);
+    const loser = r1.status === 422 ? r1 : r2;
+    expect(loser.body.error.code).toBe('LAST_OWNER');
+
+    const after = await request(app.getHttpServer())
+      .get(`/api/v1/businesses/${business.id}/members`)
+      .set('Authorization', `Bearer ${owner1.accessToken}`);
+    const ownersLeft = after.body.filter((m: { role: string }) => m.role === 'OWNER');
+    expect(ownersLeft).toHaveLength(1);
+  });
+
+  it('expires invitations via the clock, resends stale PENDING, and preserves locale', async () => {
+    const owner = await createUser(app, tracker, 'ttl-own');
+    const invitee = await createUser(app, tracker, 'ttl-guest');
+    const business = await createBusiness(app, tracker, owner);
+
+    const created = await request(app.getHttpServer())
+      .post(`/api/v1/businesses/${business.id}/invitations`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .set('Content-Type', 'application/json')
+      .send({ email: invitee.email, role: 'ADMIN', locale: 'ru' });
+    expect(created.status).toBe(201);
+    await mail.idle();
+    const first = mailer.to(invitee.email)[0]!;
+    expect(first.subject).toMatch(/Вас пригласили|Najme/);
+    expect(first.text).toContain('/ru/invitations/accept?token=');
+    const oldToken = tokenFromEmail(first.text);
+
+    clock.set(new Date(FIXED_NOW.getTime() + 8 * 24 * 60 * 60 * 1000));
+
+    const previewExpired = await request(app.getHttpServer()).get(
+      `/api/v1/invitations/preview?token=${encodeURIComponent(oldToken)}`,
+    );
+    expect(previewExpired.status).toBe(400);
+    expect(previewExpired.body.error.code).toBe('TOKEN_EXPIRED');
+
+    const listed = await request(app.getHttpServer())
+      .get(`/api/v1/businesses/${business.id}/invitations`)
+      .set('Authorization', `Bearer ${owner.accessToken}`);
+    expect(listed.status).toBe(200);
+    expect(listed.body[0].status).toBe('EXPIRED');
+
+    // Flip back to PENDING with a past expiry to exercise stale-PENDING resend.
+    await prisma.invitation.update({
+      where: { id: created.body.id },
+      data: {
+        status: 'PENDING',
+        expiresAt: new Date(FIXED_NOW.getTime() - 60_000),
+      },
+    });
+
+    const resent = await request(app.getHttpServer())
+      .post(`/api/v1/businesses/${business.id}/invitations/${created.body.id}/resend`)
+      .set('Authorization', `Bearer ${owner.accessToken}`);
+    expect(resent.status).toBe(200);
+    expect(resent.body.status).toBe('PENDING');
+    await mail.idle();
+    const second = mailer.to(invitee.email)[1]!;
+    expect(second.text).toContain('/ru/invitations/accept?token=');
+    const newToken = tokenFromEmail(second.text);
+    expect(newToken).not.toBe(oldToken);
+
+    const accept = await request(app.getHttpServer())
+      .post('/api/v1/invitations/accept')
+      .set('Authorization', `Bearer ${invitee.accessToken}`)
+      .set('Content-Type', 'application/json')
+      .send({ token: newToken });
+    expect(accept.status).toBe(200);
+  });
+
+  it('rejects STAFF invite with a foreign or already-linked staff member', async () => {
+    const owner = await createUser(app, tracker, 'stf-own');
+    const other = await createUser(app, tracker, 'stf-oth');
+    const business = await createBusiness(app, tracker, owner);
+    const otherBiz = await createBusiness(app, tracker, other);
+    const foreign = await request(app.getHttpServer())
+      .post(`/api/v1/businesses/${otherBiz.id}/staff`)
+      .set('Authorization', `Bearer ${other.accessToken}`)
+      .set('Content-Type', 'application/json')
+      .send({ displayName: 'Elsewhere' });
+    expect(foreign.status).toBe(201);
+
+    const badForeign = await request(app.getHttpServer())
+      .post(`/api/v1/businesses/${business.id}/invitations`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .set('Content-Type', 'application/json')
+      .send({
+        email: 'x@example.com',
+        role: 'STAFF',
+        staffMemberId: foreign.body.id,
+      });
+    expect(badForeign.status).toBe(422);
+
+    const staff = await request(app.getHttpServer())
+      .post(`/api/v1/businesses/${business.id}/staff`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .set('Content-Type', 'application/json')
+      .send({ displayName: 'Taken' });
+    const linkedUser = await createUser(app, tracker, 'stf-link');
+    await addMember(app, business.id, linkedUser.id, 'STAFF');
+    await prisma.membership.updateMany({
+      where: { businessId: business.id, userId: linkedUser.id },
+      data: { staffMemberId: staff.body.id },
+    });
+
+    const badLinked = await request(app.getHttpServer())
+      .post(`/api/v1/businesses/${business.id}/invitations`)
+      .set('Authorization', `Bearer ${owner.accessToken}`)
+      .set('Content-Type', 'application/json')
+      .send({
+        email: 'y@example.com',
+        role: 'STAFF',
+        staffMemberId: staff.body.id,
+      });
+    expect(badLinked.status).toBe(422);
   });
 });

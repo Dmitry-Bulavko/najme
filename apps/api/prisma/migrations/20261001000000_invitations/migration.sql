@@ -11,6 +11,7 @@ CREATE TABLE "invitations" (
     "invited_by_user_id" UUID NOT NULL,
     "token_hash" TEXT NOT NULL,
     "status" "invitation_status" NOT NULL DEFAULT 'PENDING',
+    "locale" TEXT NOT NULL DEFAULT 'en',
     "expires_at" TIMESTAMPTZ(3) NOT NULL,
     "accepted_at" TIMESTAMPTZ(3),
     "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

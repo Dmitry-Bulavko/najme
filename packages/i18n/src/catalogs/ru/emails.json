@@ -23,7 +23,7 @@
   "businessInvitation": {
     "subject": "Вас пригласили в {businessName} на Najme",
     "heading": "Присоединиться к {businessName}",
-    "intro": "{inviterName} приглашает вас в {businessName} как {role}.",
+    "intro": "{inviterName} приглашает вас в {businessName} в качестве {role}.",
     "action": "Принять приглашение",
     "expiry": "Ссылка действительна {days, plural, one {# день} few {# дня} many {# дней} other {# дня}}.",
     "ignore": "Если вы не ждали это приглашение, просто проигнорируйте письмо.",
