@@ -25,6 +25,7 @@ import { errorMessage } from '@/lib/i18n/error-message';
 
 import { TimeOffSection } from './time-off-section';
 import { WorkingHoursEditor } from './working-hours-editor';
+import { isValidationFailedError } from './map-schedule-validation';
 
 type StaffScheduleViewProps = {
   staffId: string;
@@ -39,7 +40,12 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps) {
   const tErrors = useTranslations('errors');
   const locale = useLocale();
   const { business } = useBusinessContext();
-  const { data: myBusinesses, isLoading: membershipsLoading } = useMyBusinesses();
+  const {
+    data: myBusinesses,
+    isLoading: membershipsLoading,
+    isError: membershipsError,
+    refetch: refetchMemberships,
+  } = useMyBusinesses();
 
   const myStaffMemberId = useMemo(() => {
     const row = myBusinesses?.find((b) => b.businessId === business.id);
@@ -49,7 +55,12 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps) {
   const isStaff = business.myRole === 'STAFF';
   const forbidden =
     isStaff && !membershipsLoading && myStaffMemberId !== null && myStaffMemberId !== staffId;
-  const staffUnlinked = isStaff && !membershipsLoading && myStaffMemberId === null;
+  const staffUnlinked =
+    isStaff &&
+    !membershipsLoading &&
+    !membershipsError &&
+    myBusinesses !== undefined &&
+    myStaffMemberId === null;
 
   const [member, setMember] = useState<StaffMember | null>(null);
   const [intervals, setIntervals] = useState<WorkingHoursInterval[] | null>(null);
@@ -69,7 +80,7 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps) {
   }, []);
 
   useEffect(() => {
-    if (forbidden || staffUnlinked || membershipsLoading) {
+    if (forbidden || staffUnlinked || membershipsLoading || membershipsError) {
       return;
     }
 
@@ -79,21 +90,23 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps) {
       setError(null);
       setForbiddenFromApi(false);
       try {
-        const [staffRaw, hoursRaw, upcomingRaw, pastRaw] = await Promise.all([
+        const [staffRaw, hoursRaw, timeOffRaw] = await Promise.all([
           apiRequest<unknown>(apiBase),
           apiRequest<unknown>(`${apiBase}/working-hours`),
-          apiRequest<unknown>(`${apiBase}/time-off`),
           apiRequest<unknown>(`${apiBase}/time-off?from=${pastFromIso()}`),
         ]);
         if (cancelled) return;
         setMember(staffMemberSchema.parse(staffRaw));
         setIntervals(workingHoursResponseSchema.parse(hoursRaw).intervals);
-        const upcomingList = timeOffListResponseSchema.parse(upcomingRaw);
-        const broadList = timeOffListResponseSchema.parse(pastRaw);
+        const list = timeOffListResponseSchema.parse(timeOffRaw);
         const nowMs = Date.now();
-        setUpcoming(upcomingList);
+        setUpcoming(
+          list
+            .filter((row) => new Date(row.endsAt).getTime() > nowMs)
+            .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+        );
         setPast(
-          broadList
+          list
             .filter((row) => new Date(row.endsAt).getTime() <= nowMs)
             .sort((a, b) => new Date(b.endsAt).getTime() - new Date(a.endsAt).getTime()),
         );
@@ -115,7 +128,7 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [apiBase, forbidden, membershipsLoading, staffUnlinked, tErrors, loadNonce]);
+  }, [apiBase, forbidden, membershipsError, membershipsLoading, staffUnlinked, tErrors, loadNonce]);
 
   async function saveHours(next: WorkingHoursInterval[]): Promise<void> {
     setSavingHours(true);
@@ -128,9 +141,12 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps) {
       setIntervals(workingHoursResponseSchema.parse(raw).intervals);
       toast.success(t('schedule.hours.savedToast'));
     } catch (err) {
+      if (isValidationFailedError(err)) {
+        // Editor maps field-level issues; rethrow so it can attach row errors.
+        throw err;
+      }
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
       toast.error(errorMessage(tErrors, code));
-      throw err;
     } finally {
       setSavingHours(false);
     }
@@ -141,13 +157,25 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps) {
       const raw = await apiRequest<unknown>(`${apiBase}/time-off`, { method: 'POST', body });
       const created = timeOffSchema.parse(raw);
       toast.success(t('schedule.timeOff.createdToast'));
-      setUpcoming((prev) =>
-        [...prev, created].sort(
-          (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
-        ),
-      );
+      const nowMs = Date.now();
+      if (new Date(created.endsAt).getTime() <= nowMs) {
+        setPast((prev) =>
+          [...prev, created].sort(
+            (a, b) => new Date(b.endsAt).getTime() - new Date(a.endsAt).getTime(),
+          ),
+        );
+      } else {
+        setUpcoming((prev) =>
+          [...prev, created].sort(
+            (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+          ),
+        );
+      }
       return created;
     } catch (err) {
+      if (isValidationFailedError(err)) {
+        throw err;
+      }
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
       toast.error(errorMessage(tErrors, code));
       throw err;
@@ -177,7 +205,38 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps) {
     );
   }
 
-  if (forbidden || forbiddenFromApi || staffUnlinked) {
+  if (isStaff && membershipsError) {
+    return (
+      <div className="rounded-md border border-border p-4 text-center">
+        <p className="text-sm text-destructive" role="alert">
+          {t('schedule.error')}
+        </p>
+        <Button
+          type="button"
+          variant="secondary"
+          className="mt-3"
+          onClick={() => void refetchMemberships()}
+        >
+          {t('schedule.retry')}
+        </Button>
+      </div>
+    );
+  }
+
+  if (staffUnlinked) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground" role="status">
+          {t('schedule.noLinkedStaff')}
+        </p>
+        <Button asChild variant="secondary">
+          <Link href={`/${locale}/business/${business.id}`}>{t('schedule.backToOverview')}</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  if (forbidden || forbiddenFromApi) {
     return (
       <div className="space-y-4">
         <p className="text-sm text-destructive" role="alert">

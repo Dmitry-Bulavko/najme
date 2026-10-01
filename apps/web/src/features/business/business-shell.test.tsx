@@ -26,20 +26,36 @@ vi.mock('sonner', () => ({
 
 vi.mock('./use-my-businesses', () => ({
   useMyBusinesses: () => ({
-    data: [
-      {
-        businessId: '11111111-1111-4111-8111-111111111111',
-        name: 'Salon Ada',
-        slug: 'salon-ada',
-        status: 'APPROVED',
-        role: 'STAFF',
-        staffMemberId: '33333333-3333-4333-8333-333333333333',
-        logoUrl: null,
-      },
-    ],
+    data: mockStaffMemberId
+      ? [
+          {
+            businessId: '11111111-1111-4111-8111-111111111111',
+            name: 'Salon Ada',
+            slug: 'salon-ada',
+            status: 'APPROVED',
+            role: 'STAFF',
+            staffMemberId: mockStaffMemberId,
+            logoUrl: null,
+          },
+        ]
+      : [
+          {
+            businessId: '11111111-1111-4111-8111-111111111111',
+            name: 'Salon Ada',
+            slug: 'salon-ada',
+            status: 'APPROVED',
+            role: 'STAFF',
+            staffMemberId: null,
+            logoUrl: null,
+          },
+        ],
     isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
   }),
 }));
+
+let mockStaffMemberId: string | null = '33333333-3333-4333-8333-333333333333';
 
 function makeJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -112,6 +128,7 @@ beforeEach(() => {
   replace.mockReset();
   notFoundMock.mockReset();
   pathname = `/en/business/${businessId}`;
+  mockStaffMemberId = '33333333-3333-4333-8333-333333333333';
   vi.stubGlobal('fetch', vi.fn());
   vi.stubGlobal('localStorage', {
     getItem: () => null,
@@ -226,5 +243,58 @@ describe('BusinessShell', () => {
     expect(
       screen.getAllByRole('link', { name: catalogs.en.business.menu.switchBusiness })[0],
     ).toHaveAttribute('href', '/en/business?pick=1');
+  });
+
+  it('labels schedule as My schedule for linked STAFF', async () => {
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/refresh')) {
+        return makeJsonResponse({
+          accessToken: 'tok',
+          accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+          user: fakeUser,
+        });
+      }
+      if (url.includes('/me') && !url.includes('/businesses')) {
+        return makeJsonResponse(fakeUser);
+      }
+      if (url.includes(`/businesses/${businessId}`)) {
+        return makeJsonResponse(business('STAFF'));
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+    renderShell();
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole('link', { name: catalogs.en.business.shell.mySchedule }).length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  it('hides My schedule when STAFF is unlinked', async () => {
+    mockStaffMemberId = null;
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/refresh')) {
+        return makeJsonResponse({
+          accessToken: 'tok',
+          accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+          user: fakeUser,
+        });
+      }
+      if (url.includes('/me') && !url.includes('/businesses')) {
+        return makeJsonResponse(fakeUser);
+      }
+      if (url.includes(`/businesses/${businessId}`)) {
+        return makeJsonResponse(business('STAFF'));
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+    renderShell();
+    await waitFor(() => {
+      expect(screen.getAllByText('Salon Ada').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByRole('link', { name: catalogs.en.business.shell.mySchedule })).toBeNull();
+    expect(screen.queryByRole('link', { name: catalogs.en.business.shell.schedule })).toBeNull();
   });
 });

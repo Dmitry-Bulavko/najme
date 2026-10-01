@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
+import { intervalIndexToRow, mapWorkingHoursIssues } from './map-schedule-validation';
+import { addCalendarDays, formatLocalHhMm, toBusinessLocalDateTime } from './schedule-format';
 import { isSchedulePathActive, resolveScheduleHref, staffScheduleHref } from './schedule-href';
-import { addCalendarDays, toBusinessLocalDateTime } from './schedule-format';
 import { buildCreateBody } from './time-off-section';
 import {
   copyDayToTargets,
   draftToIntervals,
   emptyWeekDraft,
+  intervalAfter,
   intervalsToDraft,
   validateWorkingHoursDraft,
 } from './working-hours-draft';
@@ -33,6 +35,29 @@ describe('resolveScheduleHref', () => {
       isSchedulePathActive('/en/business/b1/staff/s1/schedule', 'en', 'b1', 'OWNER', null),
     ).toBe(true);
     expect(isSchedulePathActive('/en/business/b1/schedule', 'en', 'b1', 'OWNER', null)).toBe(true);
+  });
+});
+
+describe('formatLocalHhMm', () => {
+  it('uses 12-hour clock for en and 24-hour for me', () => {
+    expect(formatLocalHhMm('09:00', 'en')).toMatch(/9:00/);
+    expect(formatLocalHhMm('09:00', 'en').toLowerCase()).toMatch(/am|a\.m\./);
+    // Intl may omit the leading zero; hour cycle for me is 24h.
+    expect(formatLocalHhMm('09:00', 'me')).toMatch(/9:00/);
+    expect(formatLocalHhMm('09:00', 'me').toLowerCase()).not.toMatch(/am|pm|a\.m\.|p\.m\./);
+    expect(formatLocalHhMm('17:00', 'me')).toMatch(/17:00/);
+    expect(formatLocalHhMm('24:00', 'en')).toBe('24:00');
+  });
+});
+
+describe('addCalendarDays', () => {
+  it('returns null for empty or invalid dates', () => {
+    expect(addCalendarDays('', 1)).toBeNull();
+    expect(addCalendarDays('not-a-date', 1)).toBeNull();
+  });
+
+  it('rolls across year end', () => {
+    expect(addCalendarDays('2026-12-31', 1)).toBe('2027-01-01');
   });
 });
 
@@ -77,6 +102,33 @@ describe('working-hours-draft', () => {
       { weekday: 'FRIDAY', start: '10:00', end: '18:00' },
     ]);
   });
+
+  it('seeds a new interval from the previous end', () => {
+    const next = intervalAfter({
+      key: 'a',
+      start: '09:00',
+      end: '13:00',
+      untilEndOfDay: false,
+    });
+    expect(next.start).toBe('13:00');
+    expect(next.end).toBe('14:00');
+  });
+
+  it('maps flat interval indexes back to draft rows', () => {
+    const days = intervalsToDraft([
+      { weekday: 'MONDAY', start: '09:00', end: '12:00' },
+      { weekday: 'WEDNESDAY', start: '10:00', end: '11:00' },
+    ]);
+    expect(intervalIndexToRow(days, 0)?.weekday).toBe('MONDAY');
+    expect(intervalIndexToRow(days, 1)?.weekday).toBe('WEDNESDAY');
+    const mapped = mapWorkingHoursIssues(
+      days,
+      [{ path: ['intervals', 1], message: 'overlap' }],
+      'bad',
+    );
+    const wed = days.find((d) => d.weekday === 'WEDNESDAY')?.intervals[0];
+    expect(wed && mapped[wed.key]).toBe('bad');
+  });
 });
 
 describe('time-off body builder', () => {
@@ -113,5 +165,67 @@ describe('time-off body builder', () => {
       start: '2026-07-01T00:00',
       end: '2026-07-04T00:00',
     });
+  });
+
+  it('maps all-day across Europe/Podgorica DST start (2026-10-25)', () => {
+    expect(
+      buildCreateBody({
+        allDay: true,
+        startDate: '2026-10-25',
+        endDate: '2026-10-25',
+        startTime: '09:00',
+        endTime: '17:00',
+        reason: '',
+      }),
+    ).toEqual({
+      start: '2026-10-25T00:00',
+      end: '2026-10-26T00:00',
+    });
+  });
+
+  it('maps all-day across year end (2026-12-31)', () => {
+    expect(
+      buildCreateBody({
+        allDay: true,
+        startDate: '2026-12-31',
+        endDate: '2026-12-31',
+        startTime: '09:00',
+        endTime: '17:00',
+        reason: '',
+      }),
+    ).toEqual({
+      start: '2026-12-31T00:00',
+      end: '2027-01-01T00:00',
+    });
+  });
+
+  it('maps timed time-off body', () => {
+    expect(
+      buildCreateBody({
+        allDay: false,
+        startDate: '2026-09-10',
+        endDate: '2026-09-10',
+        startTime: '10:00',
+        endTime: '12:30',
+        reason: 'Dr',
+      }),
+    ).toEqual({
+      start: '2026-09-10T10:00',
+      end: '2026-09-10T12:30',
+      reason: 'Dr',
+    });
+  });
+
+  it('returns null when all-day end date is empty', () => {
+    expect(
+      buildCreateBody({
+        allDay: true,
+        startDate: '',
+        endDate: '',
+        startTime: '09:00',
+        endTime: '17:00',
+        reason: '',
+      }),
+    ).toBeNull();
   });
 });

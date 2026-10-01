@@ -1,28 +1,29 @@
 'use client';
 
 import { weekdaySchemaValues, type Weekday, type WorkingHoursInterval } from '@najme/contracts';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useId, useMemo, useState } from 'react';
 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { TimeInput } from '@/components/ui/time-input';
 import { cn } from '@/lib/utils';
 
 import {
+  mapWorkingHoursApiErrors,
+  mapWorkingHoursIssues,
+  type RowErrorMap,
+} from './map-schedule-validation';
+import { formatLocalHhMm } from './schedule-format';
+import {
   copyDayToTargets,
-  defaultOpenInterval,
-  draftToIntervals,
   emptyWeekDraft,
+  intervalAfter,
   intervalsToDraft,
-  nextDraftKey,
   validateWorkingHoursDraft,
   type DayDraft,
   type IntervalDraft,
@@ -42,10 +43,12 @@ export function WorkingHoursEditor({
   onSave,
 }: WorkingHoursEditorProps) {
   const t = useTranslations('business');
+  const locale = useLocale();
   const [days, setDays] = useState<DayDraft[]>(() =>
     initialIntervals.length === 0 ? emptyWeekDraft() : intervalsToDraft(initialIntervals),
   );
   const [formError, setFormError] = useState<string | null>(null);
+  const [rowErrors, setRowErrors] = useState<RowErrorMap>({});
   const [copyOpenFor, setCopyOpenFor] = useState<Weekday | null>(null);
   const [copyTargets, setCopyTargets] = useState<Weekday[]>([]);
 
@@ -66,22 +69,28 @@ export function WorkingHoursEditor({
   function updateDay(weekday: Weekday, updater: (day: DayDraft) => DayDraft): void {
     setDays((prev) => prev.map((day) => (day.weekday === weekday ? updater(day) : day)));
     setFormError(null);
+    setRowErrors({});
   }
 
   function setClosed(weekday: Weekday, closed: boolean): void {
     updateDay(weekday, (day) => ({
       ...day,
       closed,
-      intervals: closed ? [] : day.intervals.length > 0 ? day.intervals : [defaultOpenInterval()],
+      intervals: closed
+        ? []
+        : day.intervals.length > 0
+          ? day.intervals
+          : [intervalAfter(undefined)],
     }));
   }
 
   function addInterval(weekday: Weekday): void {
     updateDay(weekday, (day) => {
       if (day.closed || day.intervals.length >= 6) return day;
+      const previous = day.intervals[day.intervals.length - 1];
       return {
         ...day,
-        intervals: [...day.intervals, { ...defaultOpenInterval(), key: nextDraftKey() }],
+        intervals: [...day.intervals, intervalAfter(previous)],
       };
     });
   }
@@ -113,10 +122,24 @@ export function WorkingHoursEditor({
     const parsed = validateWorkingHoursDraft(days);
     if (!parsed.success) {
       setFormError(t('schedule.hours.validationError'));
+      setRowErrors(
+        mapWorkingHoursIssues(days, parsed.error.issues, t('schedule.hours.rowValidationError')),
+      );
       return;
     }
     setFormError(null);
-    await onSave(parsed.data.intervals);
+    setRowErrors({});
+    try {
+      await onSave(parsed.data.intervals);
+    } catch (err) {
+      const apiRows = mapWorkingHoursApiErrors(err, days, t('schedule.hours.rowValidationError'));
+      if (apiRows) {
+        setFormError(t('schedule.hours.validationError'));
+        setRowErrors(apiRows);
+        return;
+      }
+      // Non-validation failures are toasted by the parent; do not rethrow.
+    }
   }
 
   function openCopy(weekday: Weekday): void {
@@ -133,6 +156,19 @@ export function WorkingHoursEditor({
     setCopyOpenFor(null);
     setCopyTargets([]);
     setFormError(null);
+    setRowErrors({});
+  }
+
+  function daySummary(day: DayDraft): string {
+    if (day.closed || day.intervals.length === 0) {
+      return t('schedule.hours.closed');
+    }
+    return day.intervals
+      .map((interval) => {
+        const end = interval.untilEndOfDay ? '24:00' : interval.end;
+        return `${formatLocalHhMm(interval.start, locale)}–${formatLocalHhMm(end, locale)}`;
+      })
+      .join(', ');
   }
 
   return (
@@ -150,7 +186,15 @@ export function WorkingHoursEditor({
             data-weekday={day.weekday}
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm font-bold text-foreground">{weekdayLabel[day.weekday]}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground">{weekdayLabel[day.weekday]}</p>
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid={`day-summary-${day.weekday}`}
+                >
+                  {daySummary(day)}
+                </p>
+              </div>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
                   <Switch
@@ -164,14 +208,14 @@ export function WorkingHoursEditor({
                   </Label>
                 </div>
                 {!day.closed ? (
-                  <DropdownMenu
+                  <Popover
                     open={copyOpenFor === day.weekday}
                     onOpenChange={(open) => {
                       if (open) openCopy(day.weekday);
                       else setCopyOpenFor(null);
                     }}
                   >
-                    <DropdownMenuTrigger asChild>
+                    <PopoverTrigger asChild>
                       <Button
                         type="button"
                         variant="outline"
@@ -180,22 +224,29 @@ export function WorkingHoursEditor({
                       >
                         {t('schedule.hours.copyTo')}
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 p-2">
-                      <p className="mb-2 px-1 text-xs text-muted-foreground">
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-56 p-3">
+                      <p className="mb-2 text-xs text-muted-foreground">
                         {t('schedule.hours.copyHint')}
                       </p>
-                      <div className="grid gap-1">
+                      <div
+                        role="group"
+                        aria-label={t('schedule.hours.copyGroupLabel')}
+                        className="grid gap-1"
+                      >
                         {weekdaySchemaValues
                           .filter((w) => w !== day.weekday)
                           .map((target) => {
                             const checked = copyTargets.includes(target);
+                            const id = `copy-${day.weekday}-${target}`;
                             return (
                               <label
                                 key={target}
+                                htmlFor={id}
                                 className="flex cursor-pointer items-center gap-2 rounded-sm px-1 py-1.5 text-sm hover:bg-secondary"
                               >
                                 <Checkbox
+                                  id={id}
                                   checked={checked}
                                   onCheckedChange={(value) => {
                                     setCopyTargets((prev) =>
@@ -217,18 +268,21 @@ export function WorkingHoursEditor({
                       >
                         {t('schedule.hours.copyApply')}
                       </Button>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    </PopoverContent>
+                  </Popover>
                 ) : null}
               </div>
             </div>
 
             {!day.closed ? (
               <div className="mt-3 space-y-3">
-                {day.intervals.map((interval) => (
+                {day.intervals.map((interval, index) => (
                   <IntervalRow
                     key={interval.key}
+                    weekdayLabel={weekdayLabel[day.weekday]}
+                    intervalIndex={index + 1}
                     interval={interval}
+                    error={rowErrors[interval.key]}
                     disabled={disabled || saving}
                     onChange={(patch) => patchInterval(day.weekday, interval.key, patch)}
                     onRemove={() => removeInterval(day.weekday, interval.key)}
@@ -252,9 +306,10 @@ export function WorkingHoursEditor({
       </ul>
 
       {formError ? (
-        <p className="text-sm text-destructive" role="alert">
-          {formError}
-        </p>
+        <Alert variant="destructive">
+          <AlertTitle>{t('schedule.hours.validationTitle')}</AlertTitle>
+          <AlertDescription>{formError}</AlertDescription>
+        </Alert>
       ) : null}
 
       <Button
@@ -265,47 +320,96 @@ export function WorkingHoursEditor({
       >
         {saving ? t('schedule.hours.saving') : t('schedule.hours.save')}
       </Button>
-
-      {/* Expose draft intervals for tests without coupling to internals */}
-      <span className="sr-only" data-testid="hours-draft-count">
-        {draftToIntervals(days).length}
-      </span>
     </section>
   );
 }
 
 type IntervalRowProps = {
+  weekdayLabel: string;
+  intervalIndex: number;
   interval: IntervalDraft;
+  error?: string | undefined;
   disabled: boolean;
   onChange: (patch: Partial<Pick<IntervalDraft, 'start' | 'end' | 'untilEndOfDay'>>) => void;
   onRemove: () => void;
 };
 
-function IntervalRow({ interval, disabled, onChange, onRemove }: IntervalRowProps) {
+function IntervalRow({
+  weekdayLabel,
+  intervalIndex,
+  interval,
+  error,
+  disabled,
+  onChange,
+  onRemove,
+}: IntervalRowProps) {
   const t = useTranslations('business');
+  const locale = useLocale();
+  const startId = useId();
+  const endId = useId();
   const endOfDayId = useId();
+  const errorId = useId();
+
+  const endDisplay = interval.untilEndOfDay ? '24:00' : interval.end;
+  const rangeLabel = `${formatLocalHhMm(interval.start, locale)}–${formatLocalHhMm(endDisplay, locale)}`;
+  const removeLabel = t('schedule.hours.removeIntervalNamed', {
+    day: weekdayLabel,
+    range: rangeLabel,
+  });
 
   return (
     <div
       className={cn(
         'flex flex-col gap-3 rounded-md bg-secondary/40 p-3 sm:flex-row sm:flex-wrap sm:items-end',
+        error && 'ring-1 ring-destructive',
       )}
     >
       <div className="grid gap-1">
-        <Label className="text-xs text-muted-foreground">{t('schedule.hours.start')}</Label>
+        <Label htmlFor={startId} className="text-xs text-muted-foreground">
+          {t('schedule.hours.start')}
+        </Label>
         <TimeInput
+          id={startId}
           value={interval.start}
           onChange={(value) => onChange({ start: value })}
           disabled={disabled}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          aria-label={t('schedule.hours.startNamed', {
+            day: weekdayLabel,
+            n: intervalIndex,
+          })}
         />
       </div>
       <div className="grid gap-1">
-        <Label className="text-xs text-muted-foreground">{t('schedule.hours.end')}</Label>
-        <TimeInput
-          value={interval.untilEndOfDay ? '23:55' : interval.end}
-          onChange={(value) => onChange({ end: value, untilEndOfDay: false })}
-          disabled={disabled || interval.untilEndOfDay}
-        />
+        <Label htmlFor={endId} className="text-xs text-muted-foreground">
+          {t('schedule.hours.end')}
+        </Label>
+        {interval.untilEndOfDay ? (
+          <p
+            id={endId}
+            className="flex h-9 items-center text-sm tabular-nums text-foreground"
+            aria-label={t('schedule.hours.endNamed', {
+              day: weekdayLabel,
+              n: intervalIndex,
+            })}
+          >
+            {formatLocalHhMm('24:00', locale)}
+          </p>
+        ) : (
+          <TimeInput
+            id={endId}
+            value={interval.end}
+            onChange={(value) => onChange({ end: value, untilEndOfDay: false })}
+            disabled={disabled}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            aria-label={t('schedule.hours.endNamed', {
+              day: weekdayLabel,
+              n: intervalIndex,
+            })}
+          />
+        )}
       </div>
       <div className="flex items-center gap-2 pb-1">
         <Checkbox
@@ -318,9 +422,21 @@ function IntervalRow({ interval, disabled, onChange, onRemove }: IntervalRowProp
           {t('schedule.hours.untilEndOfDay')}
         </Label>
       </div>
-      <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={onRemove}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled={disabled}
+        aria-label={removeLabel}
+        onClick={onRemove}
+      >
         {t('schedule.hours.removeInterval')}
       </Button>
+      {error ? (
+        <p id={errorId} role="alert" className="basis-full text-xs font-medium text-destructive">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

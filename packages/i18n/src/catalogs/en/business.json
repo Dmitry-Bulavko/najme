@@ -358,16 +358,22 @@
       "closedHint": "This day has no working hours.",
       "start": "Start",
       "end": "End",
+      "startNamed": "{day}, interval {n}, start",
+      "endNamed": "{day}, interval {n}, end",
       "untilEndOfDay": "Until end of day (24:00)",
       "addInterval": "Add interval",
       "removeInterval": "Remove",
+      "removeIntervalNamed": "Remove — {day} {range}",
       "copyTo": "Copy to…",
       "copyHint": "Replace hours on the selected days.",
+      "copyGroupLabel": "Days to copy to",
       "copyApply": "Copy",
       "save": "Save hours",
       "saving": "Saving…",
       "savedToast": "Working hours saved.",
-      "validationError": "Fix overlapping or invalid intervals (5-minute steps, no overnight, at most 6 per day)."
+      "validationTitle": "Invalid working hours",
+      "validationError": "Fix overlapping or invalid intervals (5-minute steps, no overnight, at most 6 per day).",
+      "rowValidationError": "This interval is invalid or overlaps another on the same day."
     },
     "timeOff": {
       "heading": "Time off",
@@ -403,7 +409,9 @@
       "conflictsCount": "{count, plural, one {# conflicting booking} other {# conflicting bookings}}",
       "errors": {
         "date": "Enter a valid date.",
-        "range": "End must be after start."
+        "range": "End must be after start.",
+        "reasonMax": "Reason must be at most 500 characters.",
+        "invalid": "Check this field and try again."
       }
     }
   }

@@ -84,7 +84,11 @@ function BusinessNavLinks({
               ? isSchedulePathActive(pathname, locale, businessId, role, staffMemberId)
               : item.segment === ''
                 ? pathname === href
-                : pathname === href || pathname.startsWith(`${href}/`);
+                : item.key === 'staff'
+                  ? // Staff schedule lives under `/staff/[id]/schedule` — keep only one nav item active.
+                    (pathname === href || pathname.startsWith(`${href}/`)) &&
+                    !pathname.includes('/schedule')
+                  : pathname === href || pathname.startsWith(`${href}/`);
           const label =
             item.key === 'schedule' && role === 'STAFF'
               ? t('shell.mySchedule')

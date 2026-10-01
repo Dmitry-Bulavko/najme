@@ -92,6 +92,45 @@ export function defaultOpenInterval(): IntervalDraft {
   };
 }
 
+/** Seed a new interval from the previous row's end (fallback to the default open window). */
+export function intervalAfter(previous: IntervalDraft | undefined): IntervalDraft {
+  if (!previous || previous.untilEndOfDay) {
+    return defaultOpenInterval();
+  }
+  const start = previous.end;
+  const startMins = hhMmToMinutes(start);
+  if (startMins === null) {
+    return defaultOpenInterval();
+  }
+  const endMins = startMins + 60;
+  if (endMins >= 24 * 60) {
+    return {
+      key: nextDraftKey(),
+      start,
+      end: '23:55',
+      untilEndOfDay: true,
+    };
+  }
+  return {
+    key: nextDraftKey(),
+    start,
+    end: minutesToHhMm(endMins),
+    untilEndOfDay: false,
+  };
+}
+
+function hhMmToMinutes(hhMm: string): number | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hhMm);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function minutesToHhMm(total: number): string {
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
 export function copyDayToTargets(
   days: DayDraft[],
   sourceWeekday: Weekday,

@@ -7,7 +7,7 @@ import {
 } from '@najme/contracts';
 import { useLocale, useTranslations } from 'next-intl';
 import { useId, useMemo, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 
@@ -38,6 +38,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { TimeInput } from '@/components/ui/time-input';
 
+import { mapTimeOffValidationErrors } from './map-schedule-validation';
 import {
   addCalendarDays,
   formatBusinessDateTime,
@@ -61,6 +62,8 @@ type TimeOffFormValues = {
   endTime: string;
   reason: string;
 };
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function TimeOffSection({
   upcoming,
@@ -93,6 +96,8 @@ export function TimeOffSection({
     try {
       await onDelete(id);
       setConflictWarning((prev) => (prev?.id === id ? null : prev));
+    } catch {
+      // Parent toasts; avoid unhandled rejection from the confirm click.
     } finally {
       setDeletingId(null);
     }
@@ -272,14 +277,23 @@ function TimeOffDialog({ open, onOpenChange, submitting, onSubmit }: TimeOffDial
       z
         .object({
           allDay: z.boolean(),
-          startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, t('schedule.timeOff.errors.date')),
-          endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, t('schedule.timeOff.errors.date')),
+          startDate: z.string().regex(ISO_DATE_RE, t('schedule.timeOff.errors.date')),
+          endDate: z.string().regex(ISO_DATE_RE, t('schedule.timeOff.errors.date')),
           startTime: z.string().min(1),
           endTime: z.string().min(1),
-          reason: z.string().max(500),
+          reason: z.string().max(500, t('schedule.timeOff.errors.reasonMax')),
         })
         .superRefine((values, ctx) => {
+          // Skip body build when dates are incomplete — field regex already reported errors.
+          if (!ISO_DATE_RE.test(values.startDate) || !ISO_DATE_RE.test(values.endDate)) {
+            return;
+          }
+          if (values.allDay) {
+            const nextDay = addCalendarDays(values.endDate, 1);
+            if (!nextDay) return;
+          }
           const body = buildCreateBody(values);
+          if (!body) return;
           const parsed = createTimeOffRequestSchema.safeParse(body);
           if (!parsed.success) {
             ctx.addIssue({
@@ -304,19 +318,33 @@ function TimeOffDialog({ open, onOpenChange, submitting, onSubmit }: TimeOffDial
     },
   });
 
-  const allDay = form.watch('allDay');
+  const allDay = useWatch({ control: form.control, name: 'allDay' });
 
   async function submit(values: TimeOffFormValues): Promise<void> {
-    const body = createTimeOffRequestSchema.parse(buildCreateBody(values));
-    await onSubmit(body);
-    form.reset({
-      allDay: true,
-      startDate: '',
-      endDate: '',
-      startTime: '09:00',
-      endTime: '17:00',
-      reason: '',
-    });
+    const body = buildCreateBody(values);
+    if (!body) {
+      form.setError('endDate', { message: t('schedule.timeOff.errors.date') });
+      return;
+    }
+    const parsed = createTimeOffRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      form.setError('endDate', { message: t('schedule.timeOff.errors.range') });
+      return;
+    }
+    try {
+      await onSubmit(parsed.data);
+      form.reset({
+        allDay: true,
+        startDate: '',
+        endDate: '',
+        startTime: '09:00',
+        endTime: '17:00',
+        reason: '',
+      });
+    } catch (err) {
+      mapTimeOffValidationErrors(err, form.setError, t('schedule.timeOff.errors.invalid'));
+      // Parent toasts non-validation failures; do not rethrow.
+    }
   }
 
   return (
@@ -402,7 +430,12 @@ function TimeOffDialog({ open, onOpenChange, submitting, onSubmit }: TimeOffDial
             error={form.formState.errors.reason?.message}
             description={t('schedule.timeOff.reasonHint')}
           >
-            <Input {...form.register('reason')} disabled={submitting} autoComplete="off" />
+            <Input
+              {...form.register('reason')}
+              disabled={submitting}
+              autoComplete="off"
+              maxLength={500}
+            />
           </FormField>
 
           <DialogFooter>
@@ -425,12 +458,14 @@ function TimeOffDialog({ open, onOpenChange, submitting, onSubmit }: TimeOffDial
 }
 
 /** Map form values to the API body (all-day → next-day 00:00, never T24:00). */
-export function buildCreateBody(values: TimeOffFormValues): CreateTimeOffRequest {
+export function buildCreateBody(values: TimeOffFormValues): CreateTimeOffRequest | null {
   const reason = values.reason.trim();
   if (values.allDay) {
+    const endDate = addCalendarDays(values.endDate, 1);
+    if (!endDate) return null;
     return {
       start: toBusinessLocalDateTime(values.startDate, '00:00'),
-      end: toBusinessLocalDateTime(addCalendarDays(values.endDate, 1), '00:00'),
+      end: toBusinessLocalDateTime(endDate, '00:00'),
       ...(reason ? { reason } : {}),
     };
   }

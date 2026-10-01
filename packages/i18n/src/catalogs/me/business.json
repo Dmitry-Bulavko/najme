@@ -358,16 +358,22 @@
       "closedHint": "Ovaj dan nema radnih sati.",
       "start": "Početak",
       "end": "Kraj",
+      "startNamed": "{day}, interval {n}, početak",
+      "endNamed": "{day}, interval {n}, kraj",
       "untilEndOfDay": "Do kraja dana (24:00)",
       "addInterval": "Dodaj interval",
       "removeInterval": "Ukloni",
+      "removeIntervalNamed": "Ukloni — {day} {range}",
       "copyTo": "Kopiraj na…",
       "copyHint": "Zamijeni sate na izabranim danima.",
+      "copyGroupLabel": "Dani na koje se kopira",
       "copyApply": "Kopiraj",
       "save": "Sačuvaj sate",
       "saving": "Čuvanje…",
       "savedToast": "Radni sati sačuvani.",
-      "validationError": "Ispravite preklapajuće ili nevažeće intervale (koraci od 5 minuta, bez noćnih smjena, najviše 6 po danu)."
+      "validationTitle": "Nevažeći radni sati",
+      "validationError": "Ispravite preklapajuće ili nevažeće intervale (koraci od 5 minuta, bez noćnih smjena, najviše 6 po danu).",
+      "rowValidationError": "Ovaj interval je nevažeći ili se preklapa s drugim istog dana."
     },
     "timeOff": {
       "heading": "Odsustva",
@@ -403,7 +409,9 @@
       "conflictsCount": "{count, plural, one {# konfliktna rezervacija} few {# konfliktne rezervacije} other {# konfliktnih rezervacija}}",
       "errors": {
         "date": "Unesite važeći datum.",
-        "range": "Kraj mora biti poslije početka."
+        "range": "Kraj mora biti poslije početka.",
+        "reasonMax": "Razlog može imati najviše 500 karaktera.",
+        "invalid": "Provjerite ovo polje i pokušajte ponovo."
       }
     }
   }

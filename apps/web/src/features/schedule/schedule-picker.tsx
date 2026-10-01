@@ -25,7 +25,12 @@ export function SchedulePicker() {
   const locale = useLocale();
   const router = useRouter();
   const { business } = useBusinessContext();
-  const { data: myBusinesses, isLoading: membershipsLoading } = useMyBusinesses();
+  const {
+    data: myBusinesses,
+    isLoading: membershipsLoading,
+    isError: membershipsError,
+    refetch: refetchMemberships,
+  } = useMyBusinesses();
   const isStaff = business.myRole === 'STAFF';
 
   const myStaffMemberId = useMemo(() => {
@@ -38,12 +43,12 @@ export function SchedulePicker() {
   const [loading, setLoading] = useState(!isStaff);
 
   useEffect(() => {
-    if (!isStaff || membershipsLoading) return;
+    if (!isStaff || membershipsLoading || membershipsError) return;
     const href = resolveScheduleHref(locale, business.id, 'STAFF', myStaffMemberId);
     if (href) {
       router.replace(href);
     }
-  }, [business.id, isStaff, locale, membershipsLoading, myStaffMemberId, router]);
+  }, [business.id, isStaff, locale, membershipsError, membershipsLoading, myStaffMemberId, router]);
 
   const load = useCallback(async () => {
     if (isStaff) return;
@@ -67,7 +72,32 @@ export function SchedulePicker() {
   }, [load]);
 
   if (isStaff) {
-    if (membershipsLoading || myStaffMemberId) {
+    if (membershipsLoading) {
+      return (
+        <div className="space-y-4" aria-busy="true" aria-label={t('schedule.loading')}>
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      );
+    }
+    if (membershipsError) {
+      return (
+        <div className="rounded-md border border-border p-4 text-center">
+          <p className="text-sm text-destructive" role="alert">
+            {t('schedule.error')}
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            className="mt-3"
+            onClick={() => void refetchMemberships()}
+          >
+            {t('schedule.retry')}
+          </Button>
+        </div>
+      );
+    }
+    if (myStaffMemberId) {
       return (
         <div className="space-y-4" aria-busy="true" aria-label={t('schedule.loading')}>
           <Skeleton className="h-8 w-48" />

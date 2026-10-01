@@ -34,8 +34,13 @@ export function formatBusinessDateTime(isoUtc: string, locale: string, timeZone:
   }).format(new Date(isoUtc));
 }
 
-/** Add calendar days to a `YYYY-MM-DD` string (UTC calendar arithmetic). */
-export function addCalendarDays(isoDate: string, days: number): string {
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Add calendar days to a `YYYY-MM-DD` string (UTC calendar arithmetic). Returns null if invalid. */
+export function addCalendarDays(isoDate: string, days: number): string | null {
+  if (!ISO_DATE_RE.test(isoDate)) {
+    return null;
+  }
   const parts = isoDate.split('-').map(Number);
   const year = parts[0];
   const month = parts[1];
@@ -48,7 +53,7 @@ export function addCalendarDays(isoDate: string, days: number): string {
     !Number.isInteger(month) ||
     !Number.isInteger(day)
   ) {
-    throw new Error(`Invalid ISO date: ${isoDate}`);
+    return null;
   }
   const utc = new Date(Date.UTC(year, month - 1, day + days));
   const y = utc.getUTCFullYear();
