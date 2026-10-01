@@ -1,0 +1,80 @@
+{
+  "menu": {
+    "businessMode": "İşletme modu",
+    "createBusiness": "İşletme oluştur",
+    "clientMode": "Müşteri modu",
+    "switchBusiness": "İşletme değiştir"
+  },
+  "list": {
+    "pageTitle": "İşletmeleriniz",
+    "heading": "İşletmeleriniz",
+    "subtitle": "Yönetmek için bir işletme seçin veya yeni bir tane oluşturun.",
+    "empty": "Henüz hiçbir işletmenin üyesi değilsiniz.",
+    "emptyCta": "İşletme oluştur",
+    "loading": "İşletmeler yükleniyor…",
+    "error": "İşletmeler yüklenemedi.",
+    "retry": "Yeniden dene",
+    "role": "{role, select, OWNER {Sahip} ADMIN {Yönetici} STAFF {Personel} other {{role}}}",
+    "open": "Aç"
+  },
+  "create": {
+    "pageTitle": "İşletme oluştur",
+    "heading": "İşletme oluştur",
+    "subtitle": "Müşterilere kim olduğunuzu anlatın. Personel, hizmet ve saatleri sonra ekleyebilirsiniz.",
+    "name": "İşletme adı",
+    "category": "Kategori",
+    "categoryPlaceholder": "Kategori seçin",
+    "city": "Şehir",
+    "cityPlaceholder": "Şehir seçin",
+    "address": "Adres",
+    "phone": "Telefon",
+    "email": "Herkese açık e-posta",
+    "ownerIsStaff": "Ben de hizmet veriyorum",
+    "ownerIsStaffHint": "Randevu alabilmeniz için size bağlı bir personel profili oluşturur.",
+    "submit": "İşletme oluştur",
+    "submitting": "Oluşturuluyor…",
+    "successToast": "İşletme oluşturuldu."
+  },
+  "shell": {
+    "navLabel": "İşletme",
+    "openMenu": "İşletme menüsünü aç",
+    "menuTitle": "İşletme menüsü",
+    "overview": "Genel bakış",
+    "staff": "Personel",
+    "services": "Hizmetler",
+    "schedule": "Program",
+    "team": "Ekip",
+    "profile": "Profil",
+    "settings": "Ayarlar",
+    "clientMode": "Müşteri modu",
+    "loading": "İşletme yükleniyor…"
+  },
+  "status": {
+    "pendingTitle": "Onay bekleniyor",
+    "pendingBody": "İşletmeniz henüz herkese açık değil — müşteriler randevu alamaz.",
+    "rejectedTitle": "Düzeltme gerekli",
+    "rejectedBody": "Aşağıdaki sorunları giderip yeniden incelemeye gönderin.",
+    "approvedTitle": "Herkese açık",
+    "approvedBody": "İşletmeniz yayında; müşteriler randevu alabilir.",
+    "suspendedTitle": "Askıya alındı",
+    "suspendedBody": "Bu işletme geçici olarak kullanılamıyor.",
+    "resubmit": "Yeniden gönder",
+    "resubmitting": "Gönderiliyor…",
+    "resubmitToast": "Yeniden incelemeye gönderildi."
+  },
+  "overview": {
+    "pageTitle": "Genel bakış",
+    "heading": "Genel bakış",
+    "checklistHeading": "Kurulum listesi",
+    "checklistSubtitle": "Müşterilerin sizi bulup randevu alması için bunları tamamlayın.",
+    "itemLogo": "Logo ekleyin",
+    "itemStaff": "En az bir personel ekleyin",
+    "itemService": "Personeli atanmış bir hizmet ekleyin",
+    "itemHours": "Her aktif personel için çalışma saatlerini ayarlayın",
+    "done": "Tamam",
+    "todo": "Yapılacak",
+    "loading": "Genel bakış yükleniyor…",
+    "error": "Genel bakış yüklenemedi.",
+    "retry": "Yeniden dene"
+  }
+}

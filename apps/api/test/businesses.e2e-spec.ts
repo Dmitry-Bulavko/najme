@@ -84,6 +84,7 @@ describe('Businesses (e2e)', () => {
       myRole: 'OWNER',
       timezone: 'Europe/Podgorica',
       status: 'PENDING_APPROVAL',
+      rejectionReason: null,
       confirmationMode: 'AUTO',
       cancellationWindowMinutes: 120,
       minBookingNoticeMinutes: 60,
@@ -239,6 +240,23 @@ describe('Businesses (e2e)', () => {
       .set('Content-Type', 'application/json')
       .send({ slug: second.slug, description: 'still ok' });
     expect(sameSlug.status).toBe(200);
+  });
+
+  it('exposes rejectionReason on member GET for REJECTED businesses', async () => {
+    const owner = await createUser(app, tracker, 'rej-reason');
+    const business = await createBusiness(app, tracker, owner);
+    await prisma.business.update({
+      where: { id: business.id },
+      data: { status: 'REJECTED', rejectionReason: 'Add a clearer address and phone.' },
+    });
+
+    const got = await request(app.getHttpServer())
+      .get(`/api/v1/businesses/${business.id}`)
+      .set('Authorization', `Bearer ${owner.accessToken}`);
+    expect(got.status).toBe(200);
+    const body = businessSchema.parse(got.body);
+    expect(body.status).toBe('REJECTED');
+    expect(body.rejectionReason).toBe('Add a clearer address and phone.');
   });
 
   it('route-walker: every :businessId route returns 404 for non-member, random id, and malformed id', async () => {

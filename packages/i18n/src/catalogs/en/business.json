@@ -1,0 +1,80 @@
+{
+  "menu": {
+    "businessMode": "Business mode",
+    "createBusiness": "Create a business",
+    "clientMode": "Client mode",
+    "switchBusiness": "Switch business"
+  },
+  "list": {
+    "pageTitle": "Your businesses",
+    "heading": "Your businesses",
+    "subtitle": "Pick a business to manage, or create a new one.",
+    "empty": "You do not belong to any business yet.",
+    "emptyCta": "Create a business",
+    "loading": "Loading businesses…",
+    "error": "Could not load businesses.",
+    "retry": "Retry",
+    "role": "{role, select, OWNER {Owner} ADMIN {Admin} STAFF {Staff} other {{role}}}",
+    "open": "Open"
+  },
+  "create": {
+    "pageTitle": "Create a business",
+    "heading": "Create a business",
+    "subtitle": "Tell clients who you are. You can add staff, services and hours next.",
+    "name": "Business name",
+    "category": "Category",
+    "categoryPlaceholder": "Select a category",
+    "city": "City",
+    "cityPlaceholder": "Select a city",
+    "address": "Address",
+    "phone": "Phone",
+    "email": "Public email",
+    "ownerIsStaff": "I also provide services",
+    "ownerIsStaffHint": "Creates a staff profile linked to you so you can take bookings.",
+    "submit": "Create business",
+    "submitting": "Creating…",
+    "successToast": "Business created."
+  },
+  "shell": {
+    "navLabel": "Business",
+    "openMenu": "Open business menu",
+    "menuTitle": "Business menu",
+    "overview": "Overview",
+    "staff": "Staff",
+    "services": "Services",
+    "schedule": "Schedule",
+    "team": "Team",
+    "profile": "Profile",
+    "settings": "Settings",
+    "clientMode": "Client mode",
+    "loading": "Loading business…"
+  },
+  "status": {
+    "pendingTitle": "Waiting for approval",
+    "pendingBody": "Your business is not public yet — clients cannot book.",
+    "rejectedTitle": "Needs changes",
+    "rejectedBody": "Fix the issues below and resubmit for review.",
+    "approvedTitle": "Public",
+    "approvedBody": "Your business is live and clients can book.",
+    "suspendedTitle": "Suspended",
+    "suspendedBody": "This business is temporarily unavailable.",
+    "resubmit": "Resubmit",
+    "resubmitting": "Resubmitting…",
+    "resubmitToast": "Submitted for review again."
+  },
+  "overview": {
+    "pageTitle": "Overview",
+    "heading": "Overview",
+    "checklistHeading": "Setup checklist",
+    "checklistSubtitle": "Finish these so clients can find and book you.",
+    "itemLogo": "Add a logo",
+    "itemStaff": "Add at least one staff member",
+    "itemService": "Add a service with assigned staff",
+    "itemHours": "Set hours for every active staff member",
+    "done": "Done",
+    "todo": "To do",
+    "loading": "Loading overview…",
+    "error": "Could not load the overview.",
+    "retry": "Retry"
+  }
+}

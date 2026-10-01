@@ -26,6 +26,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
       auth: catalogs[locale].auth,
       account: catalogs[locale].account,
       admin: catalogs[locale].admin,
+      business: catalogs[locale].business,
     },
   };
 });

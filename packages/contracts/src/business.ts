@@ -102,6 +102,8 @@ export const businessSchema = z.object({
   minBookingNoticeMinutes: z.number().int(),
   bookingHorizonDays: z.number().int(),
   status: businessStatusSchema,
+  /** Present for members so REJECTED businesses can show the admin reason on the dashboard. */
+  rejectionReason: z.string().nullable(),
   myRole: membershipRoleSchema,
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

@@ -8,6 +8,7 @@ describe.each([
   'account',
   'admin',
   'auth',
+  'business',
   'common',
   'errors',
   'shell',
