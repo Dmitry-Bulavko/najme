@@ -14,8 +14,8 @@ Decision record: ADR-0008. This document is the operating manual.
 | Human (owner) | GitHub + chat                            | —                     | Product decisions, secrets, approving releases, unblocking      |
 | `/manager`    | skill, main session                      | session model         | Roadmap, epics, creating/grooming issues, releases              |
 | `/implement`  | skill, main session (orchestrator)       | session model         | Pick task, claim, delegate, PR, CI, merge, status updates       |
-| `implementer` | subagent `.claude/agents/implementer.md` | sonnet, effort medium | Spec (M), code, tests, local checks, commits on the task branch |
-| `reviewer`    | subagent `.claude/agents/reviewer.md`    | sonnet, effort medium | Independent read-only review → `APPROVE` / `CHANGES_REQUESTED`  |
+| `implementer` | subagent `.claude/agents/implementer.md` | inherits (not pinned) | Spec (M), code, tests, local checks, commits on the task branch |
+| `reviewer`    | subagent `.claude/agents/reviewer.md`    | inherits (not pinned) | Independent read-only review → `APPROVE` / `CHANGES_REQUESTED`  |
 
 Subagents have no GitHub access; the orchestrator is the only one that talks to GitHub during a
 task. This keeps subagent context small and the audit trail in one place.
