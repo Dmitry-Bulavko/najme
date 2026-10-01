@@ -47,6 +47,40 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number)
   });
 }
 
+/** JPEG has no alpha — composite onto white so transparent PNG/WebP pixels are not black. */
+function paintWhiteUnder(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): void {
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-over';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+}
+
+async function canvasToJpeg(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  quality: number,
+): Promise<Blob> {
+  paintWhiteUnder(canvas, ctx);
+  return canvasToBlob(canvas, 'image/jpeg', quality);
+}
+
+async function decodeBitmap(file: File): Promise<ImageBitmap> {
+  try {
+    return await createImageBitmap(file, { imageOrientation: 'from-image' });
+  } catch (err) {
+    // Older engines reject the options bag with TypeError; retry without it.
+    if (err instanceof TypeError) {
+      try {
+        return await createImageBitmap(file);
+      } catch (retryErr) {
+        throw new Error('UPLOAD_TYPE', { cause: retryErr });
+      }
+    }
+    throw new Error('UPLOAD_TYPE', { cause: err });
+  }
+}
+
 /**
  * Loads `file` into a canvas, scales so the longest edge is ≤ `maxEdge` (never upscales),
  * and returns a blob. Applies `UPLOAD_MAX_BYTES` to the **output**; oversized PNG photos are
@@ -57,13 +91,7 @@ export async function downscaleImageFile(
   maxEdge: number = IMAGE_MAX_EDGE_PX,
 ): Promise<PreparedUpload> {
   const requestedType = assertUploadableImage(file);
-
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  } catch {
-    throw new Error('UPLOAD_TYPE');
-  }
+  const bitmap = await decodeBitmap(file);
 
   try {
     const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
@@ -79,26 +107,25 @@ export async function downscaleImageFile(
     ctx.drawImage(bitmap, 0, 0, width, height);
 
     let contentType: UploadContentType = requestedType;
-    let blob = await canvasToBlob(
-      canvas,
-      contentType,
-      contentType === 'image/jpeg' ? 0.9 : undefined,
-    );
+    let blob =
+      contentType === 'image/jpeg'
+        ? await canvasToJpeg(canvas, ctx, 0.9)
+        : await canvasToBlob(canvas, contentType);
 
     // Older Safari may silently fall back to PNG when asked for WebP.
     if (contentType === 'image/webp' && blob.type && blob.type !== 'image/webp') {
       contentType = 'image/jpeg';
-      blob = await canvasToBlob(canvas, 'image/jpeg', 0.9);
+      blob = await canvasToJpeg(canvas, ctx, 0.9);
     }
 
     // Photos saved as PNG often grow on re-encode; switch to JPEG when still too large.
     if (blob.size > UPLOAD_MAX_BYTES && contentType === 'image/png') {
       contentType = 'image/jpeg';
-      blob = await canvasToBlob(canvas, 'image/jpeg', 0.85);
+      blob = await canvasToJpeg(canvas, ctx, 0.85);
     }
 
     if (blob.size > UPLOAD_MAX_BYTES && contentType === 'image/jpeg') {
-      blob = await canvasToBlob(canvas, 'image/jpeg', 0.7);
+      blob = await canvasToJpeg(canvas, ctx, 0.7);
     }
 
     if (blob.size < 1 || blob.size > UPLOAD_MAX_BYTES) {

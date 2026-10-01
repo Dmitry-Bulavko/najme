@@ -81,3 +81,10 @@ All stay within CHECKs: window/notice 0…525 600 minutes; horizon 1…365 day
 
 Addressed CR round 1: non-preset policy options + dirty PATCH; 25 MB input / 5 MB output with
 PNG recompress; upload/profile/settings tests for the paths above.
+
+## Review notes (round 3)
+
+Addressed CR round 2: after a successful PATCH, `resetField` clears dirty state for sent fields
+so later saves omit them; merge logo/cover from `prev` on setBusiness; white JPEG background;
+TypeError retry for `createImageBitmap`; WCAG label-in-name; categories skeleton in place with
+`role="status"`; XHR timeout + `UPLOAD_NETWORK`; two-save dirty tests and upload test gaps.

@@ -239,4 +239,59 @@ describe('ImageUpload', () => {
       expect(toast.error).toHaveBeenCalledWith(catalogs.en.errors.UPLOAD_INVALID);
     });
   });
+
+  it('toasts invalidSize with 25 MB for UPLOAD_INPUT_SIZE', async () => {
+    const user = userEvent.setup();
+    downscaleImageFile.mockRejectedValue(new Error('UPLOAD_INPUT_SIZE'));
+    renderUpload();
+    await user.upload(
+      document.querySelector('input[type="file"]') as HTMLInputElement,
+      new File([new Uint8Array([1])], 'x.jpg', { type: 'image/jpeg' }),
+    );
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        catalogs.en.business.upload.invalidSize.replace('{maxMb}', '25'),
+      );
+    });
+  });
+
+  it('does not toast when the upload is aborted', async () => {
+    const user = userEvent.setup();
+    let rejectUpload: ((err: Error) => void) | undefined;
+    uploadPresignedPost.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectUpload = reject;
+        }),
+    );
+    apiRequest.mockResolvedValueOnce({
+      key: 'businesses/x/logo/y.jpg',
+      url: 'https://storage.example/upload',
+      fields: { key: 'businesses/x/logo/y.jpg' },
+      expiresAt: '2026-10-01T12:00:00.000Z',
+    });
+    const { unmount } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <ImageUpload
+          businessId={businessId}
+          kind="LOGO"
+          currentUrl={null}
+          frame="square"
+          onChanged={vi.fn()}
+        />
+      </NextIntlClientProvider>,
+    );
+    await user.upload(
+      document.querySelector('input[type="file"]') as HTMLInputElement,
+      new File([new Uint8Array([1])], 'x.jpg', { type: 'image/jpeg' }),
+    );
+    await waitFor(() => {
+      expect(uploadPresignedPost).toHaveBeenCalled();
+    });
+    unmount();
+    rejectUpload?.(new Error('UPLOAD_ABORTED'));
+    await waitFor(() => {
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+  });
 });

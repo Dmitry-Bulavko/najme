@@ -95,7 +95,7 @@
     "photo": "Фото",
     "empty": "Пока нет изображения",
     "choose": "Выбрать изображение",
-    "chooseNamed": "Выбрать — {label}",
+    "chooseNamed": "Выбрать изображение — {label}",
     "replace": "Заменить",
     "replaceNamed": "Заменить — {label}",
     "remove": "Удалить",

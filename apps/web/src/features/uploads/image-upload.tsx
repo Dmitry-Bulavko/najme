@@ -77,6 +77,10 @@ function mapUploadError(
     toast.error(errorMessage(tErrors, 'UPLOAD_INVALID'));
     return;
   }
+  if (err instanceof Error && err.message === 'UPLOAD_NETWORK') {
+    toast.error(errorMessage(tErrors, 'INTERNAL_ERROR'));
+    return;
+  }
   if (err instanceof Error && err.message === 'UPLOAD_CANVAS') {
     toast.error(t('upload.invalidType'));
     return;

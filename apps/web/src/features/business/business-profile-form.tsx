@@ -133,6 +133,19 @@ function slugEditable(status: Business['status']): boolean {
   return status === 'PENDING_APPROVAL' || status === 'REJECTED';
 }
 
+function toProfileFormValues(business: Business): ProfileFormValues {
+  return {
+    name: business.name,
+    categoryId: business.categoryId,
+    city: business.city,
+    slug: business.slug,
+    description: business.description ?? '',
+    address: business.address ?? '',
+    contactPhone: business.contactPhone ?? '',
+    contactEmail: business.contactEmail ?? '',
+  };
+}
+
 /** Business profile editor: public fields, slug (until approved), logo and cover. */
 export function BusinessProfileForm() {
   const t = useTranslations('business');
@@ -182,18 +195,11 @@ export function BusinessProfileForm() {
     return [...featured, ...rest];
   }, []);
 
+  const formValues = useMemo(() => toProfileFormValues(business), [business]);
+
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(formSchema),
-    values: {
-      name: business.name,
-      categoryId: business.categoryId,
-      city: business.city,
-      slug: business.slug,
-      description: business.description ?? '',
-      address: business.address ?? '',
-      contactPhone: business.contactPhone ?? '',
-      contactEmail: business.contactEmail ?? '',
-    },
+    values: formValues,
     // Keep in-progress edits when categories load (setState re-render) or shell context updates.
     resetOptions: { keepDirtyValues: true },
   });
@@ -234,7 +240,39 @@ export function BusinessProfileForm() {
         method: 'PATCH',
         body: parsedBody.data,
       });
-      setBusiness(businessSchema.parse(raw));
+      const updated = businessSchema.parse(raw);
+      const nextValues = toProfileFormValues(updated);
+      // Clear dirtyFlags for fields we just saved so later saves omit them.
+      if (parsedBody.data.name !== undefined) {
+        form.resetField('name', { defaultValue: nextValues.name });
+      }
+      if (parsedBody.data.categoryId !== undefined) {
+        form.resetField('categoryId', { defaultValue: nextValues.categoryId });
+      }
+      if (parsedBody.data.city !== undefined) {
+        form.resetField('city', { defaultValue: nextValues.city });
+      }
+      if (parsedBody.data.slug !== undefined) {
+        form.resetField('slug', { defaultValue: nextValues.slug });
+      }
+      if (parsedBody.data.description !== undefined) {
+        form.resetField('description', { defaultValue: nextValues.description });
+      }
+      if (parsedBody.data.address !== undefined) {
+        form.resetField('address', { defaultValue: nextValues.address });
+      }
+      if (parsedBody.data.contactPhone !== undefined) {
+        form.resetField('contactPhone', { defaultValue: nextValues.contactPhone });
+      }
+      if (parsedBody.data.contactEmail !== undefined) {
+        form.resetField('contactEmail', { defaultValue: nextValues.contactEmail });
+      }
+      setBusiness((prev) => ({
+        ...updated,
+        // Keep URLs that may have been attached while this PATCH was in flight.
+        logoUrl: prev.logoUrl,
+        coverUrl: prev.coverUrl,
+      }));
       toast.success(t('profile.saved'));
     } catch (err) {
       if (err instanceof ApiError && err.code === 'SLUG_TAKEN') {
@@ -325,7 +363,12 @@ export function BusinessProfileForm() {
 
         <div className="grid gap-2">
           <Label htmlFor={categoryFieldId}>{t('profile.category')}</Label>
-          {canEdit ? (
+          {canEdit && !categories && !categoriesError ? (
+            <div role="status" className="space-y-2">
+              <span className="sr-only">{t('profile.loadingCategories')}</span>
+              <Skeleton id={categoryFieldId} className="h-10 w-full" />
+            </div>
+          ) : canEdit ? (
             <Controller
               control={form.control}
               name="categoryId"
@@ -456,13 +499,6 @@ export function BusinessProfileForm() {
           </Button>
         ) : null}
       </form>
-
-      {canEdit && !categories && !categoriesError ? (
-        <div className="space-y-2" aria-busy="true" aria-label={t('profile.loadingCategories')}>
-          <Skeleton className="h-10 w-full max-w-md" />
-          <Skeleton className="h-10 w-full max-w-md" />
-        </div>
-      ) : null}
     </div>
   );
 }

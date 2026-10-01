@@ -3,12 +3,12 @@ import userEvent from '@testing-library/user-event';
 import type { Business } from '@najme/contracts';
 import { catalogs } from '@najme/i18n';
 import { NextIntlClientProvider } from 'next-intl';
+import { useSyncExternalStore } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BusinessProfileForm } from './business-profile-form';
 
 const apiRequest = vi.fn();
-const setBusiness = vi.fn();
 const toast = { success: vi.fn(), error: vi.fn() };
 
 vi.mock('sonner', () => ({
@@ -41,13 +41,35 @@ vi.mock('@/features/uploads/image-upload', () => ({
 }));
 
 let profileBusiness: Business;
+const businessListeners = new Set<() => void>();
+
+function emitBusiness() {
+  for (const listener of businessListeners) listener();
+}
+
+function setBusinessImpl(update: Business | ((prev: Business) => Business)): void {
+  profileBusiness = typeof update === 'function' ? update(profileBusiness) : update;
+  emitBusiness();
+}
+
+const setBusiness = vi.fn(setBusinessImpl);
 
 vi.mock('./business-shell', () => ({
-  useBusinessContext: () => ({
-    business: profileBusiness,
-    setBusiness,
-    reload: async () => undefined,
-  }),
+  useBusinessContext: () => {
+    const business = useSyncExternalStore(
+      (onStoreChange) => {
+        businessListeners.add(onStoreChange);
+        return () => businessListeners.delete(onStoreChange);
+      },
+      () => profileBusiness,
+      () => profileBusiness,
+    );
+    return {
+      business,
+      setBusiness,
+      reload: async () => undefined,
+    };
+  },
 }));
 
 function makeBusiness(overrides: Partial<Business> = {}): Business {
@@ -103,6 +125,7 @@ function renderProfile() {
 beforeEach(() => {
   apiRequest.mockReset();
   setBusiness.mockReset();
+  setBusiness.mockImplementation(setBusinessImpl);
   toast.success.mockReset();
   toast.error.mockReset();
   profileBusiness = makeBusiness();
@@ -142,6 +165,53 @@ describe('BusinessProfileForm', () => {
       );
     });
     expect(setBusiness).toHaveBeenCalled();
+  });
+
+  it('clears dirty state after save so a second PATCH sends only the new change', async () => {
+    const user = userEvent.setup({ delay: null });
+    apiRequest.mockImplementation(
+      async (path: string, init?: { method?: string; body?: unknown }) => {
+        if (String(path).includes('/categories')) return [category];
+        if (init?.method === 'PATCH') {
+          return { ...profileBusiness, ...(init.body as object) };
+        }
+        throw new Error(`unexpected ${path}`);
+      },
+    );
+    renderProfile();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: catalogs.en.business.profile.save })).toBeEnabled();
+    });
+
+    fireEvent.change(screen.getByLabelText(catalogs.en.business.profile.name), {
+      target: { value: 'Salon Novo' },
+    });
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.profile.save }));
+    await waitFor(() => {
+      expect(apiRequest).toHaveBeenCalledWith(
+        `/businesses/${profileBusiness.id}`,
+        expect.objectContaining({
+          method: 'PATCH',
+          body: { name: 'Salon Novo' },
+        }),
+      );
+    });
+
+    apiRequest.mockClear();
+    fireEvent.change(screen.getByLabelText(catalogs.en.business.profile.description), {
+      target: { value: 'Updated description' },
+    });
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.profile.save }));
+    await waitFor(() => {
+      expect(apiRequest).toHaveBeenCalledWith(
+        `/businesses/${profileBusiness.id}`,
+        expect.objectContaining({
+          method: 'PATCH',
+          body: { description: 'Updated description' },
+        }),
+      );
+    });
+    expect(apiRequest).toHaveBeenCalledTimes(1);
   });
 
   it('sends null when clearing an optional field', async () => {

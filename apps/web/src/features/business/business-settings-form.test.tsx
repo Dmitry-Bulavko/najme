@@ -4,12 +4,12 @@ import userEvent from '@testing-library/user-event';
 import type { Business } from '@najme/contracts';
 import { catalogs } from '@najme/i18n';
 import { NextIntlClientProvider } from 'next-intl';
+import { useSyncExternalStore } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BusinessSettingsForm } from './business-settings-form';
 
 const apiRequest = vi.fn();
-const setBusiness = vi.fn();
 const replace = vi.fn();
 const clearLastBusinessId = vi.fn();
 const invalidateMyBusinesses = vi.fn(async () => undefined);
@@ -36,13 +36,35 @@ vi.mock('@/lib/api/client', () => ({
 }));
 
 let settingsBusiness: Business;
+const businessListeners = new Set<() => void>();
+
+function emitBusiness() {
+  for (const listener of businessListeners) listener();
+}
+
+function setBusinessImpl(update: Business | ((prev: Business) => Business)): void {
+  settingsBusiness = typeof update === 'function' ? update(settingsBusiness) : update;
+  emitBusiness();
+}
+
+const setBusiness = vi.fn(setBusinessImpl);
 
 vi.mock('./business-shell', () => ({
-  useBusinessContext: () => ({
-    business: settingsBusiness,
-    setBusiness,
-    reload: async () => undefined,
-  }),
+  useBusinessContext: () => {
+    const business = useSyncExternalStore(
+      (onStoreChange) => {
+        businessListeners.add(onStoreChange);
+        return () => businessListeners.delete(onStoreChange);
+      },
+      () => settingsBusiness,
+      () => settingsBusiness,
+    );
+    return {
+      business,
+      setBusiness,
+      reload: async () => undefined,
+    };
+  },
 }));
 
 vi.mock('./last-business', () => ({
@@ -101,6 +123,7 @@ function renderSettings() {
 beforeEach(() => {
   apiRequest.mockReset();
   setBusiness.mockReset();
+  setBusiness.mockImplementation(setBusinessImpl);
   replace.mockReset();
   clearLastBusinessId.mockReset();
   invalidateMyBusinesses.mockReset();
@@ -141,6 +164,44 @@ describe('BusinessSettingsForm', () => {
       (call) => (call[1] as { method?: string } | undefined)?.method === 'PATCH',
     )?.[1] as { body: Record<string, unknown> };
     expect(patchBody.body).not.toHaveProperty('minBookingNoticeMinutes');
+  });
+
+  it('clears dirty state after save so a second PATCH sends only the new change', async () => {
+    const user = userEvent.setup();
+    apiRequest.mockImplementation(async (_path, init?: { method?: string; body?: unknown }) => {
+      if (init?.method === 'PATCH') {
+        return { ...settingsBusiness, ...(init.body as object) };
+      }
+      throw new Error('unexpected');
+    });
+    renderSettings();
+
+    await user.click(screen.getByRole('radio', { name: /Manual/i }));
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.settings.save }));
+    await waitFor(() => {
+      expect(apiRequest).toHaveBeenCalledWith(
+        `/businesses/${settingsBusiness.id}`,
+        expect.objectContaining({
+          method: 'PATCH',
+          body: { confirmationMode: 'MANUAL' },
+        }),
+      );
+    });
+
+    apiRequest.mockClear();
+    await user.click(screen.getByLabelText(catalogs.en.business.settings.minNotice));
+    await user.click(await screen.findByRole('option', { name: /2 hours/i }));
+    await user.click(screen.getByRole('button', { name: catalogs.en.business.settings.save }));
+    await waitFor(() => {
+      expect(apiRequest).toHaveBeenCalledWith(
+        `/businesses/${settingsBusiness.id}`,
+        expect.objectContaining({
+          method: 'PATCH',
+          body: { minBookingNoticeMinutes: 120 },
+        }),
+      );
+    });
+    expect(apiRequest).toHaveBeenCalledTimes(1);
   });
 
   it('shows forbidden for STAFF', () => {

@@ -28,10 +28,21 @@ function mockBitmap(width: number, height: number) {
 
 function stubCanvas(blobs: Blob[]) {
   const drawImage = vi.fn();
+  const fillRect = vi.fn();
+  const save = vi.fn();
+  const restore = vi.fn();
+  const ctx = {
+    drawImage,
+    fillRect,
+    save,
+    restore,
+    globalCompositeOperation: 'source-over' as GlobalCompositeOperation,
+    fillStyle: '' as string | CanvasGradient | CanvasPattern,
+  };
   const canvas = {
     width: 0,
     height: 0,
-    getContext: vi.fn(() => ({ drawImage })),
+    getContext: vi.fn(() => ctx),
     toBlob: vi.fn((cb: BlobCallback) => {
       const next = blobs.shift();
       if (!next) {
@@ -47,7 +58,7 @@ function stubCanvas(blobs: Blob[]) {
     }
     return original(tag, options as ElementCreationOptions);
   });
-  return { drawImage, canvas };
+  return { drawImage, fillRect, canvas, ctx };
 }
 
 describe('assertUploadableImage', () => {
@@ -156,5 +167,34 @@ describe('downscaleImageFile', () => {
     await expect(downscaleImageFile(fileWithSize(10, 'bad.jpg', 'image/jpeg'))).rejects.toThrow(
       'UPLOAD_TYPE',
     );
+  });
+
+  it('retries createImageBitmap without options on TypeError', async () => {
+    const create = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('unknown option'))
+      .mockResolvedValueOnce(mockBitmap(100, 100));
+    vi.stubGlobal('createImageBitmap', create);
+    const { fillRect } = stubCanvas([new Blob([new Uint8Array(8)], { type: 'image/jpeg' })]);
+    await downscaleImageFile(fileWithSize(10, 'a.jpg', 'image/jpeg'));
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls[0]?.[1]).toEqual({ imageOrientation: 'from-image' });
+    expect(create.mock.calls[1]?.[1]).toBeUndefined();
+    expect(fillRect).toHaveBeenCalled();
+  });
+
+  it('throws UPLOAD_SIZE when JPEG stays oversized after quality retry and closes the bitmap', async () => {
+    const bitmap = mockBitmap(800, 600);
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => bitmap),
+    );
+    const oversized = new Blob([new Uint8Array(16)], { type: 'image/jpeg' });
+    Object.defineProperty(oversized, 'size', { value: UPLOAD_MAX_BYTES + 1 });
+    stubCanvas([oversized, oversized]);
+    await expect(downscaleImageFile(fileWithSize(20, 'huge.jpg', 'image/jpeg'))).rejects.toThrow(
+      'UPLOAD_SIZE',
+    );
+    expect(bitmap.close).toHaveBeenCalled();
   });
 });

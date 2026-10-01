@@ -95,7 +95,7 @@
     "photo": "Fotografija",
     "empty": "Još nema slike",
     "choose": "Izaberi sliku",
-    "chooseNamed": "Izaberi — {label}",
+    "chooseNamed": "Izaberi sliku — {label}",
     "replace": "Zamijeni",
     "replaceNamed": "Zamijeni — {label}",
     "remove": "Ukloni",

@@ -57,6 +57,20 @@ type SettingsFormValues = {
   bookingHorizonDays: string;
 };
 
+function toSettingsFormValues(business: {
+  confirmationMode: ConfirmationMode;
+  cancellationWindowMinutes: number;
+  minBookingNoticeMinutes: number;
+  bookingHorizonDays: number;
+}): SettingsFormValues {
+  return {
+    confirmationMode: business.confirmationMode,
+    cancellationWindowMinutes: String(business.cancellationWindowMinutes),
+    minBookingNoticeMinutes: String(business.minBookingNoticeMinutes),
+    bookingHorizonDays: String(business.bookingHorizonDays),
+  };
+}
+
 function formatMinutesLabel(
   minutes: number,
   t: ReturnType<typeof useTranslations<'business'>>,
@@ -127,14 +141,11 @@ export function BusinessSettingsForm() {
     [cancellationOptions, horizonOptions, noticeOptions],
   );
 
+  const formValues = useMemo(() => toSettingsFormValues(business), [business]);
+
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(formSchema),
-    values: {
-      confirmationMode: business.confirmationMode,
-      cancellationWindowMinutes: String(business.cancellationWindowMinutes),
-      minBookingNoticeMinutes: String(business.minBookingNoticeMinutes),
-      bookingHorizonDays: String(business.bookingHorizonDays),
-    },
+    values: formValues,
     resetOptions: { keepDirtyValues: true },
   });
 
@@ -168,7 +179,31 @@ export function BusinessSettingsForm() {
         method: 'PATCH',
         body: parsed.data,
       });
-      setBusiness(businessSchema.parse(raw));
+      const updated = businessSchema.parse(raw);
+      const nextValues = toSettingsFormValues(updated);
+      // Clear dirtyFlags for fields we just saved so later saves omit them.
+      if (parsed.data.confirmationMode !== undefined) {
+        form.resetField('confirmationMode', { defaultValue: nextValues.confirmationMode });
+      }
+      if (parsed.data.cancellationWindowMinutes !== undefined) {
+        form.resetField('cancellationWindowMinutes', {
+          defaultValue: nextValues.cancellationWindowMinutes,
+        });
+      }
+      if (parsed.data.minBookingNoticeMinutes !== undefined) {
+        form.resetField('minBookingNoticeMinutes', {
+          defaultValue: nextValues.minBookingNoticeMinutes,
+        });
+      }
+      if (parsed.data.bookingHorizonDays !== undefined) {
+        form.resetField('bookingHorizonDays', { defaultValue: nextValues.bookingHorizonDays });
+      }
+      setBusiness((prev) => ({
+        ...updated,
+        // Keep URLs that may have been attached while this PATCH was in flight.
+        logoUrl: prev.logoUrl,
+        coverUrl: prev.coverUrl,
+      }));
       toast.success(t('settings.saved'));
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
