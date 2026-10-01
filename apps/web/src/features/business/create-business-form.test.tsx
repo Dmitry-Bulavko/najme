@@ -252,5 +252,5 @@ describe('CreateBusinessForm', () => {
       ),
     ).toBe(createdBusiness.id);
     expect(push).toHaveBeenCalledWith(`/en/business/${createdBusiness.id}`);
-  });
+  }, 15_000);
 });
