@@ -43,5 +43,6 @@ describe('last-business storage', () => {
     expect(readLastBusinessId()).toBeNull();
     expect(() => writeLastBusinessId('x')).not.toThrow();
     expect(() => clearLastBusinessId()).not.toThrow();
+    vi.unstubAllGlobals();
   });
 });

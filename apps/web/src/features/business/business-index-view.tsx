@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -13,12 +13,14 @@ import { readLastBusinessId, writeLastBusinessId } from './last-business';
 import { useMyBusinesses } from './use-my-businesses';
 
 /**
- * `/business` index: redirect to last/only membership, or list when several.
+ * `/business` index: redirect to last/only/first membership, or list when `?pick=1`.
  */
 export function BusinessIndexView() {
   const t = useTranslations('business');
   const locale = useLocale();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const forcePick = searchParams.get('pick') === '1';
   const session = useSession();
   const { data, isLoading, isError, refetch } = useMyBusinesses();
 
@@ -29,24 +31,30 @@ export function BusinessIndexView() {
   }, [locale, router, session.state]);
 
   useEffect(() => {
-    if (!data) return;
+    if (!data || forcePick || data.length === 0) return;
+
     if (data.length === 1) {
       writeLastBusinessId(data[0]!.businessId);
       router.replace(`/${locale}/business/${data[0]!.businessId}`);
       return;
     }
-    if (data.length > 1) {
-      const last = readLastBusinessId();
-      const match = last ? data.find((b) => b.businessId === last) : undefined;
-      if (match) {
-        router.replace(`/${locale}/business/${match.businessId}`);
-      }
-    }
-  }, [data, locale, router]);
 
-  if (session.state === 'loading' || session.state === 'anonymous' || isLoading) {
+    const last = readLastBusinessId();
+    const match = last ? data.find((b) => b.businessId === last) : undefined;
+    const target = match ?? data[0]!;
+    writeLastBusinessId(target.businessId);
+    router.replace(`/${locale}/business/${target.businessId}`);
+  }, [data, forcePick, locale, router]);
+
+  const redirecting = Boolean(data && data.length > 0 && !forcePick);
+
+  if (session.state === 'loading' || session.state === 'anonymous' || isLoading || redirecting) {
     return (
-      <div className="mx-auto w-full max-w-2xl space-y-4 px-4 py-10" aria-busy="true">
+      <div
+        className="mx-auto w-full max-w-2xl space-y-4 px-4 py-10"
+        aria-busy="true"
+        aria-label={t('list.loading')}
+      >
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-24 w-full" />
       </div>
@@ -75,7 +83,7 @@ export function BusinessIndexView() {
     );
   }
 
-  // Multiple memberships and no remembered id (or remembered id invalid) — show picker.
+  // `?pick=1` — explicit switcher list.
   return (
     <div className="mx-auto w-full max-w-2xl px-4 sm:px-6">
       <div className="mt-10 mb-16 space-y-6">

@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  businessSchema,
-  staffMembersResponseSchema,
-  servicesResponseSchema,
-  workingHoursResponseSchema,
-  type Business,
-  type MembershipRole,
-} from '@najme/contracts';
+import { businessSchema, type Business, type MembershipRole } from '@najme/contracts';
 import { Menu } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -31,7 +24,7 @@ import { errorMessage } from '@/lib/i18n/error-message';
 import { cn } from '@/lib/utils';
 
 import { businessHref, navItemsForRole } from './business-nav';
-import { clearLastBusinessId, writeLastBusinessId } from './last-business';
+import { writeLastBusinessId } from './last-business';
 
 type BusinessContextValue = {
   business: Business;
@@ -55,7 +48,6 @@ type BusinessNavLinksProps = {
   locale: string;
   pathname: string;
   onNavigate?: () => void;
-  onClientMode: () => void;
 };
 
 function BusinessNavLinks({
@@ -64,7 +56,6 @@ function BusinessNavLinks({
   locale,
   pathname,
   onNavigate,
-  onClientMode,
 }: BusinessNavLinksProps) {
   const t = useTranslations('business');
   const items = navItemsForRole(role);
@@ -97,11 +88,17 @@ function BusinessNavLinks({
         })}
         <li>
           <Link
+            href={`/${locale}/business?pick=1`}
+            onClick={onNavigate}
+            className="flex items-center rounded-md px-3 py-2 text-sm font-bold text-muted-foreground transition-colors outline-none hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {t('menu.switchBusiness')}
+          </Link>
+        </li>
+        <li>
+          <Link
             href={`/${locale}`}
-            onClick={() => {
-              onClientMode();
-              onNavigate?.();
-            }}
+            onClick={onNavigate}
             className="flex items-center rounded-md px-3 py-2 text-sm font-bold text-muted-foreground transition-colors outline-none hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             {t('shell.clientMode')}
@@ -119,6 +116,7 @@ type BusinessShellProps = {
 
 /**
  * Role-aware business dashboard chrome: sidebar on wide screens, Sheet on narrow.
+ * Client mode keeps the remembered business id; Switch business opens the picker.
  */
 export function BusinessShell({ businessId, children }: BusinessShellProps) {
   const t = useTranslations('business');
@@ -152,11 +150,10 @@ export function BusinessShell({ businessId, children }: BusinessShellProps) {
 
   useEffect(() => {
     if (session.state === 'anonymous') {
-      router.replace(
-        `/${locale}/sign-in?next=${encodeURIComponent(`/${locale}/business/${businessId}`)}`,
-      );
+      // Preserve the full path (incl. nested segments) for post-sign-in return.
+      router.replace(`/${locale}/sign-in?next=${encodeURIComponent(pathname)}`);
     }
-  }, [businessId, locale, router, session.state]);
+  }, [locale, pathname, router, session.state]);
 
   useEffect(() => {
     if (session.state !== 'authenticated') return;
@@ -185,7 +182,7 @@ export function BusinessShell({ businessId, children }: BusinessShellProps) {
   if (error || !business || !ctxValue) {
     return (
       <div className="mx-auto w-full max-w-6xl px-4 py-10 text-center">
-        <p className="text-sm text-destructive">{error ?? t('shell.loading')}</p>
+        <p className="text-sm text-destructive">{error ?? t('overview.error')}</p>
         <Button className="mt-3" variant="outline" onClick={() => void load()}>
           {t('overview.retry')}
         </Button>
@@ -206,7 +203,6 @@ export function BusinessShell({ businessId, children }: BusinessShellProps) {
               role={current.myRole}
               locale={locale}
               pathname={pathname}
-              onClientMode={clearLastBusinessId}
             />
           </aside>
 
@@ -230,7 +226,6 @@ export function BusinessShell({ businessId, children }: BusinessShellProps) {
                       locale={locale}
                       pathname={pathname}
                       onNavigate={() => setNavOpen(false)}
-                      onClientMode={clearLastBusinessId}
                     />
                   </div>
                 </SheetContent>
@@ -243,42 +238,4 @@ export function BusinessShell({ businessId, children }: BusinessShellProps) {
       </div>
     </BusinessContext.Provider>
   );
-}
-
-/** Setup checklist: logo, staff, service-with-staff, hours for every active staff. */
-export async function loadChecklist(businessId: string): Promise<{
-  hasLogo: boolean;
-  hasStaff: boolean;
-  hasServiceWithStaff: boolean;
-  allActiveHaveHours: boolean;
-}> {
-  const [businessRaw, staffRaw, servicesRaw] = await Promise.all([
-    apiRequest<unknown>(`/businesses/${businessId}`),
-    apiRequest<unknown>(`/businesses/${businessId}/staff`),
-    apiRequest<unknown>(`/businesses/${businessId}/services`),
-  ]);
-  const business = businessSchema.parse(businessRaw);
-  const staff = staffMembersResponseSchema.parse(staffRaw);
-  const services = servicesResponseSchema.parse(servicesRaw);
-  const activeStaff = staff.filter((s) => s.active);
-
-  const hours = await Promise.all(
-    activeStaff.map(async (member) => {
-      const raw = await apiRequest<unknown>(
-        `/businesses/${businessId}/staff/${member.id}/working-hours`,
-      );
-      return workingHoursResponseSchema.parse(raw);
-    }),
-  );
-
-  return {
-    hasLogo: business.logoUrl !== null,
-    hasStaff: staff.length > 0,
-    hasServiceWithStaff: services.some((s) => s.active && s.staffMemberIds.length > 0),
-    allActiveHaveHours: activeStaff.length > 0 && hours.every((h) => h.intervals.length > 0),
-  };
-}
-
-export function roleSeesTeam(role: MembershipRole): boolean {
-  return role === 'OWNER' || role === 'ADMIN';
 }

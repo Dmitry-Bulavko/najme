@@ -59,7 +59,9 @@ Namespace `business`. City labels via `common.cities.<CODE>`. Categories from
 
 - Member `businessSchema` gained `rejectionReason` so the REJECTED banner can show the admin
   note; API `toBusiness` maps it.
-- Account menu: empty memberships → Create; one → Business mode + Create + Client mode; many →
-  `/business` list + Create + Client mode (no submenu component in the UI kit).
+- Account menu lists memberships as a picker (plus Create / Client mode). Client mode keeps the
+  remembered `najme.lastBusinessId`. Shell "Switch business" opens `/business?pick=1`.
+- Setup checklist is OWNER/ADMIN only (STAFF would 403 on other staff hours). Hours GETs are
+  concurrency-bounded (`CHECKLIST_HOURS_CONCURRENCY`).
 - Checklist links to profile/staff/services/schedule paths owned by #81–#83 (404 until those land).
-- `localStorage` key `najme.lastBusinessId` with try/catch; Client mode clears it.
+- `localStorage` key `najme.lastBusinessId` with try/catch.

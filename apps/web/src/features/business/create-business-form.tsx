@@ -7,13 +7,14 @@ import {
   businessSchema,
   categoriesResponseSchema,
   createBusinessRequestSchema,
+  emailSchema,
   type Category,
   type City,
   type CreateBusinessRequest,
 } from '@najme/contracts';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -36,19 +37,80 @@ import { ApiError, apiRequest } from '@/lib/api/client';
 import { errorMessage } from '@/lib/i18n/error-message';
 
 import { writeLastBusinessId } from './last-business';
+import { useInvalidateMyBusinesses } from './use-my-businesses';
 
-/** Form-local schema: required selects as non-empty strings before mapping to the contract. */
-const createBusinessFormSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  categoryId: z.string().uuid(),
-  city: createBusinessRequestSchema.shape.city,
-  address: z.string(),
-  contactPhone: z.string(),
-  contactEmail: z.string(),
-  ownerIsStaff: z.boolean(),
-});
+type CreateFormValues = {
+  name: string;
+  categoryId: string;
+  city: string;
+  address: string;
+  contactPhone: string;
+  contactEmail: string;
+  ownerIsStaff: boolean;
+};
 
-type CreateFormValues = z.infer<typeof createBusinessFormSchema>;
+const FORM_FIELDS = [
+  'name',
+  'categoryId',
+  'city',
+  'address',
+  'contactPhone',
+  'contactEmail',
+  'ownerIsStaff',
+] as const;
+
+type FormFieldName = (typeof FORM_FIELDS)[number];
+
+function isFormFieldName(value: unknown): value is FormFieldName {
+  return typeof value === 'string' && (FORM_FIELDS as readonly string[]).includes(value);
+}
+
+/**
+ * Form schema derived from `createBusinessRequestSchema`: required fields get localized
+ * messages (no enum dumps); optional strings stay as '' in the form and map to omitted body
+ * fields on submit, with contract-aligned length/format checks when non-empty.
+ */
+function buildCreateBusinessFormSchema(t: ReturnType<typeof useTranslations<'business'>>) {
+  return z.object({
+    name: z
+      .string()
+      .trim()
+      .min(1, { error: t('create.errors.nameRequired') })
+      .max(120, { error: t('create.errors.nameTooLong') }),
+    categoryId: z
+      .string()
+      .min(1, { error: t('create.errors.categoryRequired') })
+      .uuid({ error: t('create.errors.categoryRequired') }),
+    city: z
+      .string()
+      .min(1, { error: t('create.errors.cityRequired') })
+      .refine((value): value is City => (CITY_CODES as readonly string[]).includes(value), {
+        error: t('create.errors.cityRequired'),
+      }),
+    address: z.string().superRefine((value, ctx) => {
+      const trimmed = value.trim();
+      if (trimmed === '') return;
+      if (trimmed.length > 300) {
+        ctx.addIssue({ code: 'custom', message: t('create.errors.addressTooLong') });
+      }
+    }),
+    contactPhone: z.string().superRefine((value, ctx) => {
+      const trimmed = value.trim();
+      if (trimmed === '') return;
+      if (trimmed.length < 3 || trimmed.length > 40) {
+        ctx.addIssue({ code: 'custom', message: t('create.errors.phoneInvalid') });
+      }
+    }),
+    contactEmail: z.string().superRefine((value, ctx) => {
+      const trimmed = value.trim();
+      if (trimmed === '') return;
+      if (!emailSchema.safeParse(trimmed).success) {
+        ctx.addIssue({ code: 'custom', message: t('create.errors.emailInvalid') });
+      }
+    }),
+    ownerIsStaff: z.boolean(),
+  });
+}
 
 /**
  * Create-business form: name, category, city (featured first), optional contacts, ownerIsStaff.
@@ -60,8 +122,14 @@ export function CreateBusinessForm() {
   const locale = useLocale();
   const router = useRouter();
   const session = useSession();
+  const invalidateMyBusinesses = useInvalidateMyBusinesses();
+  const categoryFieldId = useId();
+  const cityFieldId = useId();
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [categoriesNonce, setCategoriesNonce] = useState(0);
+
+  const formSchema = useMemo(() => buildCreateBusinessFormSchema(t), [t]);
 
   useEffect(() => {
     if (session.state === 'anonymous') {
@@ -83,13 +151,14 @@ export function CreateBusinessForm() {
         if (!cancelled) {
           const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
           setCategoriesError(errorMessage(tErrors, code));
+          setCategories(null);
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [locale, tErrors]);
+  }, [locale, tErrors, categoriesNonce]);
 
   const cityOptions = useMemo(() => {
     const featured = FEATURED_CITIES as readonly City[];
@@ -98,11 +167,11 @@ export function CreateBusinessForm() {
   }, []);
 
   const form = useForm<CreateFormValues>({
-    resolver: zodResolver(createBusinessFormSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
       categoryId: '',
-      city: undefined as unknown as City,
+      city: '',
       address: '',
       contactPhone: '',
       contactEmail: '',
@@ -114,7 +183,7 @@ export function CreateBusinessForm() {
     const body: CreateBusinessRequest = {
       name: values.name,
       categoryId: values.categoryId,
-      city: values.city,
+      city: values.city as City,
       ...(values.ownerIsStaff ? { ownerIsStaff: true } : {}),
       ...(values.address.trim() ? { address: values.address.trim() } : {}),
       ...(values.contactPhone.trim() ? { contactPhone: values.contactPhone.trim() } : {}),
@@ -132,13 +201,20 @@ export function CreateBusinessForm() {
       });
       const created = businessSchema.parse(raw);
       writeLastBusinessId(created.id);
+      await invalidateMyBusinesses();
       toast.success(t('create.successToast'));
       router.push(`/${locale}/business/${created.id}`);
     } catch (err) {
       if (err instanceof ApiError && err.code === 'VALIDATION_FAILED' && err.details) {
-        for (const [field, message] of Object.entries(err.details)) {
-          if (typeof message === 'string' && field in values) {
-            form.setError(field as keyof CreateFormValues, { message });
+        const issues = err.details.issues;
+        if (Array.isArray(issues)) {
+          for (const issue of issues) {
+            if (!issue || typeof issue !== 'object') continue;
+            const path = 'path' in issue ? issue.path : undefined;
+            const field = Array.isArray(path) ? path[0] : undefined;
+            if (isFormFieldName(field)) {
+              form.setError(field, { message: t('create.errors.invalid') });
+            }
           }
         }
       }
@@ -156,6 +232,9 @@ export function CreateBusinessForm() {
     );
   }
 
+  const categoryError = form.formState.errors.categoryId?.message;
+  const cityError = form.formState.errors.city?.message;
+
   return (
     <div className="mx-auto w-full max-w-lg px-4 sm:px-6">
       <div className="mt-10 mb-16 space-y-6">
@@ -165,9 +244,19 @@ export function CreateBusinessForm() {
         </div>
 
         {categoriesError ? (
-          <p className="text-sm text-destructive" role="alert">
-            {categoriesError}
-          </p>
+          <div className="rounded-md border border-border p-4 text-center">
+            <p className="text-sm text-destructive" role="alert">
+              {categoriesError}
+            </p>
+            <Button
+              className="mt-3"
+              variant="outline"
+              type="button"
+              onClick={() => setCategoriesNonce((n) => n + 1)}
+            >
+              {t('create.retryCategories')}
+            </Button>
+          </div>
         ) : null}
 
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
@@ -175,7 +264,8 @@ export function CreateBusinessForm() {
             <Input {...form.register('name')} autoComplete="organization" />
           </FormField>
 
-          <FormField label={t('create.category')} error={form.formState.errors.categoryId?.message}>
+          <div className="grid gap-2">
+            <Label htmlFor={categoryFieldId}>{t('create.category')}</Label>
             <Controller
               control={form.control}
               name="categoryId"
@@ -185,7 +275,11 @@ export function CreateBusinessForm() {
                   onValueChange={field.onChange}
                   disabled={!categories}
                 >
-                  <SelectTrigger aria-label={t('create.category')}>
+                  <SelectTrigger
+                    id={categoryFieldId}
+                    aria-invalid={categoryError ? true : undefined}
+                    aria-describedby={categoryError ? `${categoryFieldId}-error` : undefined}
+                  >
                     <SelectValue placeholder={t('create.categoryPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
@@ -198,15 +292,29 @@ export function CreateBusinessForm() {
                 </Select>
               )}
             />
-          </FormField>
+            {categoryError ? (
+              <p
+                id={`${categoryFieldId}-error`}
+                role="alert"
+                className="text-xs font-medium text-destructive"
+              >
+                {categoryError}
+              </p>
+            ) : null}
+          </div>
 
-          <FormField label={t('create.city')} error={form.formState.errors.city?.message}>
+          <div className="grid gap-2">
+            <Label htmlFor={cityFieldId}>{t('create.city')}</Label>
             <Controller
               control={form.control}
               name="city"
               render={({ field }) => (
                 <Select value={field.value || undefined} onValueChange={field.onChange}>
-                  <SelectTrigger aria-label={t('create.city')}>
+                  <SelectTrigger
+                    id={cityFieldId}
+                    aria-invalid={cityError ? true : undefined}
+                    aria-describedby={cityError ? `${cityFieldId}-error` : undefined}
+                  >
                     <SelectValue placeholder={t('create.cityPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
@@ -219,7 +327,16 @@ export function CreateBusinessForm() {
                 </Select>
               )}
             />
-          </FormField>
+            {cityError ? (
+              <p
+                id={`${cityFieldId}-error`}
+                role="alert"
+                className="text-xs font-medium text-destructive"
+              >
+                {cityError}
+              </p>
+            ) : null}
+          </div>
 
           <FormField label={t('create.address')} error={form.formState.errors.address?.message}>
             <Input {...form.register('address')} autoComplete="street-address" />

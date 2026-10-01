@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   myBusinessesResponseSchema,
   type MyBusiness,
@@ -15,16 +15,22 @@ async function fetchMyBusinesses(): Promise<MyBusinessesResponse> {
   return myBusinessesResponseSchema.parse(raw);
 }
 
-/** Memberships for the signed-in user (`GET /me/businesses`). */
+/** Memberships for the signed-in user (`GET /me/businesses`), keyed by user id. */
 export function useMyBusinesses() {
   const session = useSession();
-  const enabled = session.state === 'authenticated';
+  const userId = session.state === 'authenticated' ? session.me.id : null;
 
   return useQuery({
-    queryKey: MY_BUSINESSES_QUERY_KEY,
+    queryKey: [...MY_BUSINESSES_QUERY_KEY, userId],
     queryFn: fetchMyBusinesses,
-    enabled,
+    enabled: userId !== null,
   });
+}
+
+/** Drop cached memberships (call after create and on sign-out). */
+export function useInvalidateMyBusinesses() {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: MY_BUSINESSES_QUERY_KEY });
 }
 
 export type { MyBusiness };

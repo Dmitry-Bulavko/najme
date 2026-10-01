@@ -4,13 +4,18 @@ import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { clearLastBusinessId, writeLastBusinessId } from './last-business';
+import { writeLastBusinessId } from './last-business';
 import { useMyBusinesses } from './use-my-businesses';
 
 /**
- * Account-menu entries for business mode: create, open the only membership, or the list page.
+ * Account-menu business entries: list memberships as a picker, create, and client mode.
+ * Client mode does not clear the remembered business id.
  */
 export function AccountBusinessMenu() {
   const t = useTranslations('business');
@@ -26,52 +31,45 @@ export function AccountBusinessMenu() {
     );
   }
 
-  if (isError || !data || data.length === 0) {
-    return (
-      <DropdownMenuItem asChild>
-        <Link href={`/${locale}/business/new`}>{t('menu.createBusiness')}</Link>
-      </DropdownMenuItem>
-    );
-  }
-
-  if (data.length === 1) {
-    const only = data[0]!;
+  if (isError) {
     return (
       <>
-        <DropdownMenuItem
-          onSelect={() => {
-            writeLastBusinessId(only.businessId);
-            router.push(`/${locale}/business/${only.businessId}`);
-          }}
-        >
-          {t('menu.businessMode')}
-        </DropdownMenuItem>
+        <DropdownMenuItem disabled>{t('list.error')}</DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href={`/${locale}/business/new`}>{t('menu.createBusiness')}</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => {
-            clearLastBusinessId();
-            router.push(`/${locale}`);
-          }}
-        >
-          {t('menu.clientMode')}
         </DropdownMenuItem>
       </>
     );
   }
 
+  if (!data || data.length === 0) {
+    return (
+      <DropdownMenuItem asChild>
+        <Link href={`/${locale}/business/new`}>{t('menu.createBusiness')}</Link>
+      </DropdownMenuItem>
+    );
+  }
+
   return (
     <>
-      <DropdownMenuItem asChild>
-        <Link href={`/${locale}/business`}>{t('menu.businessMode')}</Link>
-      </DropdownMenuItem>
+      <DropdownMenuLabel>{t('menu.switchBusiness')}</DropdownMenuLabel>
+      {data.map((biz) => (
+        <DropdownMenuItem
+          key={biz.businessId}
+          onSelect={() => {
+            writeLastBusinessId(biz.businessId);
+            router.push(`/${locale}/business/${biz.businessId}`);
+          }}
+        >
+          <span className="truncate">{biz.name}</span>
+        </DropdownMenuItem>
+      ))}
+      <DropdownMenuSeparator />
       <DropdownMenuItem asChild>
         <Link href={`/${locale}/business/new`}>{t('menu.createBusiness')}</Link>
       </DropdownMenuItem>
       <DropdownMenuItem
         onSelect={() => {
-          clearLastBusinessId();
           router.push(`/${locale}`);
         }}
       >

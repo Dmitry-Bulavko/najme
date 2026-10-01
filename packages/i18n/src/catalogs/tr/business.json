@@ -33,7 +33,18 @@
     "ownerIsStaffHint": "Randevu alabilmeniz için size bağlı bir personel profili oluşturur.",
     "submit": "İşletme oluştur",
     "submitting": "Oluşturuluyor…",
-    "successToast": "İşletme oluşturuldu."
+    "successToast": "İşletme oluşturuldu.",
+    "retryCategories": "Yeniden dene",
+    "errors": {
+      "nameRequired": "İşletme adı girin.",
+      "nameTooLong": "Ad en fazla 120 karakter olabilir.",
+      "categoryRequired": "Bir kategori seçin.",
+      "cityRequired": "Bir şehir seçin.",
+      "addressTooLong": "Adres en fazla 300 karakter olabilir.",
+      "phoneInvalid": "Geçerli bir telefon girin (3–40 karakter).",
+      "emailInvalid": "Geçerli bir e-posta girin.",
+      "invalid": "Bu alanı kontrol edip tekrar deneyin."
+    }
   },
   "shell": {
     "navLabel": "İşletme",
@@ -54,6 +65,7 @@
     "pendingBody": "İşletmeniz henüz herkese açık değil — müşteriler randevu alamaz.",
     "rejectedTitle": "Düzeltme gerekli",
     "rejectedBody": "Aşağıdaki sorunları giderip yeniden incelemeye gönderin.",
+    "rejectedBodyNoReason": "İşletmeyi güncelleyip yeniden incelemeye gönderin.",
     "approvedTitle": "Herkese açık",
     "approvedBody": "İşletmeniz yayında; müşteriler randevu alabilir.",
     "suspendedTitle": "Askıya alındı",

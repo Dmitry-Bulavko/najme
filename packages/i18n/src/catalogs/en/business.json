@@ -33,7 +33,18 @@
     "ownerIsStaffHint": "Creates a staff profile linked to you so you can take bookings.",
     "submit": "Create business",
     "submitting": "Creating…",
-    "successToast": "Business created."
+    "successToast": "Business created.",
+    "retryCategories": "Retry",
+    "errors": {
+      "nameRequired": "Enter a business name.",
+      "nameTooLong": "Name must be at most 120 characters.",
+      "categoryRequired": "Select a category.",
+      "cityRequired": "Select a city.",
+      "addressTooLong": "Address must be at most 300 characters.",
+      "phoneInvalid": "Enter a valid phone number (3–40 characters).",
+      "emailInvalid": "Enter a valid email address.",
+      "invalid": "Check this field and try again."
+    }
   },
   "shell": {
     "navLabel": "Business",
@@ -54,6 +65,7 @@
     "pendingBody": "Your business is not public yet — clients cannot book.",
     "rejectedTitle": "Needs changes",
     "rejectedBody": "Fix the issues below and resubmit for review.",
+    "rejectedBodyNoReason": "Update the business and resubmit for review.",
     "approvedTitle": "Public",
     "approvedBody": "Your business is live and clients can book.",
     "suspendedTitle": "Suspended",

@@ -33,7 +33,18 @@
     "ownerIsStaffHint": "Kreira profil osoblja povezan sa vama da biste mogli primati rezervacije.",
     "submit": "Kreiraj biznis",
     "submitting": "Kreiranje…",
-    "successToast": "Biznis je kreiran."
+    "successToast": "Biznis je kreiran.",
+    "retryCategories": "Pokušaj ponovo",
+    "errors": {
+      "nameRequired": "Unesite naziv biznisa.",
+      "nameTooLong": "Naziv može imati najviše 120 karaktera.",
+      "categoryRequired": "Izaberite kategoriju.",
+      "cityRequired": "Izaberite grad.",
+      "addressTooLong": "Adresa može imati najviše 300 karaktera.",
+      "phoneInvalid": "Unesite ispravan telefon (3–40 karaktera).",
+      "emailInvalid": "Unesite ispravan email.",
+      "invalid": "Provjerite ovo polje i pokušajte ponovo."
+    }
   },
   "shell": {
     "navLabel": "Biznis",
@@ -54,6 +65,7 @@
     "pendingBody": "Vaš biznis još nije javan — klijenti ne mogu rezervisati.",
     "rejectedTitle": "Potrebne izmjene",
     "rejectedBody": "Ispravite navedeno i ponovo pošaljite na pregled.",
+    "rejectedBodyNoReason": "Ažurirajte biznis i ponovo pošaljite na pregled.",
     "approvedTitle": "Javan",
     "approvedBody": "Biznis je aktivan i klijenti mogu rezervisati.",
     "suspendedTitle": "Suspendovan",

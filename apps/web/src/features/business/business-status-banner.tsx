@@ -59,16 +59,24 @@ export function BusinessStatusBanner({ business, onUpdated }: StatusBannerProps)
     | 'status.approvedTitle'
     | 'status.suspendedTitle';
 
-  const bodyKey = {
-    PENDING_APPROVAL: 'status.pendingBody',
-    REJECTED: 'status.rejectedBody',
-    APPROVED: 'status.approvedBody',
-    SUSPENDED: 'status.suspendedBody',
-  }[business.status] as
-    'status.pendingBody' | 'status.rejectedBody' | 'status.approvedBody' | 'status.suspendedBody';
+  const bodyKey = (
+    business.status === 'REJECTED' && !business.rejectionReason
+      ? 'status.rejectedBodyNoReason'
+      : {
+          PENDING_APPROVAL: 'status.pendingBody',
+          REJECTED: 'status.rejectedBody',
+          APPROVED: 'status.approvedBody',
+          SUSPENDED: 'status.suspendedBody',
+        }[business.status]
+  ) as
+    | 'status.pendingBody'
+    | 'status.rejectedBody'
+    | 'status.rejectedBodyNoReason'
+    | 'status.approvedBody'
+    | 'status.suspendedBody';
 
   return (
-    <div className={cn('rounded-md border p-4', TONE[business.status])}>
+    <div role="status" className={cn('rounded-md border p-4', TONE[business.status])}>
       <p className="font-bold text-foreground">{t(titleKey)}</p>
       <p className="mt-1 text-sm text-muted-foreground">{t(bodyKey)}</p>
       {business.status === 'REJECTED' && business.rejectionReason ? (
