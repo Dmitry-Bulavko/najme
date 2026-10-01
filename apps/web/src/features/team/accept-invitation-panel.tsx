@@ -3,7 +3,6 @@
 import {
   businessMemberSchema,
   invitationPreviewResponseSchema,
-  myBusinessesResponseSchema,
   type InvitationPreviewResponse,
   type MembershipRole,
 } from '@najme/contracts';
@@ -45,19 +44,6 @@ function roleLabel(
   return t('team.role', { role });
 }
 
-/** Resolve the joined business id — accept response has no businessId (#77). */
-async function resolveAcceptedBusinessId(
-  businessName: string,
-  role: MembershipRole,
-): Promise<string | null> {
-  const raw = await apiRequest<unknown>('/me/businesses');
-  const list = myBusinessesResponseSchema.parse(raw);
-  const exact = list.find((b) => b.name === businessName && b.role === role);
-  if (exact) return exact.businessId;
-  const byName = list.find((b) => b.name === businessName);
-  return byName?.businessId ?? null;
-}
-
 /**
  * Invitation accept flow: strip token from URL, persist across auth, preview, accept.
  * Terminal errors and success clear sessionStorage.
@@ -78,7 +64,6 @@ export function AcceptInvitationPanel() {
   const [preview, setPreview] = useState<InvitationPreviewResponse | null>(null);
   const [status, setStatus] = useState<AcceptStatus>('loading');
   const [errorText, setErrorText] = useState<string | null>(null);
-  const [acceptedBusinessId, setAcceptedBusinessId] = useState<string | null>(null);
   const previewStarted = useRef(false);
 
   // Prefer the URL token (first visit); fall back to sessionStorage after auth redirect.
@@ -152,19 +137,13 @@ export function AcceptInvitationPanel() {
         method: 'POST',
         body: { token },
       });
-      businessMemberSchema.parse(raw);
-      const businessId = await resolveAcceptedBusinessId(preview.businessName, preview.role);
+      // Clear before navigation so a half-finished redirect cannot reuse the token.
       clearInviteToken();
+      const accepted = businessMemberSchema.parse(raw);
       invalidateMyBusinesses();
-      if (businessId) {
-        writeLastBusinessId(businessId);
-        setAcceptedBusinessId(businessId);
-        setStatus('success');
-        router.replace(`/${safeLocale}/business/${businessId}`);
-        return;
-      }
+      writeLastBusinessId(accepted.businessId);
       setStatus('success');
-      router.replace(`/${safeLocale}/business`);
+      router.replace(`/${safeLocale}/business/${accepted.businessId}`);
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
       if (code === 'INVITATION_EMAIL_MISMATCH') {
@@ -197,6 +176,8 @@ export function AcceptInvitationPanel() {
 
   async function onSignOut(): Promise<void> {
     await session.signOut();
+    // Return to the anonymous preview so Sign in / Create account with `next` are usable again.
+    setStatus('ready');
   }
 
   if (status === 'missing') {
@@ -291,17 +272,9 @@ export function AcceptInvitationPanel() {
             {t('inviteAccept.alreadyMemberBody')}
           </span>
         </p>
-        {acceptedBusinessId ? (
-          <Button asChild className="w-full">
-            <Link href={`/${safeLocale}/business/${acceptedBusinessId}`}>
-              {t('inviteAccept.goToBusiness')}
-            </Link>
-          </Button>
-        ) : (
-          <Button asChild variant="secondary" className="w-full">
-            <Link href={`/${safeLocale}/business`}>{t('inviteAccept.goToBusiness')}</Link>
-          </Button>
-        )}
+        <Button asChild variant="secondary" className="w-full">
+          <Link href={`/${safeLocale}/business`}>{t('inviteAccept.goToBusiness')}</Link>
+        </Button>
       </div>
     );
   }

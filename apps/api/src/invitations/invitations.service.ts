@@ -557,6 +557,7 @@ export class InvitationsService {
 
   private toMember(row: {
     id: string;
+    businessId: string;
     userId: string;
     role: MembershipRole;
     staffMemberId: string | null;
@@ -566,6 +567,7 @@ export class InvitationsService {
   }): BusinessMember {
     return {
       id: row.id,
+      businessId: row.businessId,
       userId: row.userId,
       email: row.user.email,
       displayName: row.user.displayName,

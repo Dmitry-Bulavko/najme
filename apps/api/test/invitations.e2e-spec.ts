@@ -93,6 +93,7 @@ describe('Invitations and members (e2e)', () => {
     expect(accepted.status).toBe(200);
     expect(accepted.body.role).toBe('ADMIN');
     expect(accepted.body.userId).toBe(invitee.id);
+    expect(accepted.body.businessId).toBe(business.id);
 
     const members = await request(app.getHttpServer())
       .get(`/api/v1/businesses/${business.id}/members`)

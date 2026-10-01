@@ -64,6 +64,7 @@ export type AcceptInvitationRequest = z.infer<typeof acceptInvitationRequestSche
 
 export const businessMemberSchema = z.object({
   id: z.string().uuid(),
+  businessId: z.string().uuid(),
   userId: z.string().uuid(),
   email: z.string().email(),
   displayName: z.string().nullable(),

@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
+  INVITATION_TTL_DAYS,
   createInvitationRequestSchema,
   invitationSchema,
   type CreateInvitationRequest,
@@ -11,7 +12,7 @@ import {
 } from '@najme/contracts';
 import { isLocale } from '@najme/i18n';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useId, useMemo } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -27,6 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -48,13 +50,14 @@ type InviteDialogProps = {
   onOpenChange: (open: boolean) => void;
   businessId: string;
   myRole: MembershipRole;
+  /** Staff not already linked to a member. */
   staff: StaffMember[];
   onCreated: (invitation: Invitation) => void;
 };
 
 const NONE_VALUE = '__none__';
 
-/** Create-invitation dialog: email, role, optional/required staff link for STAFF. */
+/** Create-invitation dialog: email, role, required staff link for STAFF. */
 export function InviteDialog({
   open,
   onOpenChange,
@@ -68,6 +71,8 @@ export function InviteDialog({
   const tShell = useTranslations('shell');
   const locale = useLocale();
   const canInviteOwner = myRole === 'OWNER';
+  const roleFieldId = useId();
+  const staffFieldId = useId();
 
   const formSchema = useMemo(
     () =>
@@ -118,14 +123,21 @@ export function InviteDialog({
     }
   }, [form, open]);
 
+  // Drop a leftover staff pick when switching away from STAFF (field is hidden).
+  useEffect(() => {
+    if (role !== 'STAFF') {
+      form.setValue('staffMemberId', NONE_VALUE);
+    }
+  }, [form, role]);
+
   async function onSubmit(values: InviteFormValues): Promise<void> {
     const body: CreateInvitationRequest = {
       email: values.email.trim().toLowerCase(),
       role: values.role,
       locale: isLocale(locale) ? locale : 'en',
     };
-    if (values.role === 'STAFF' || (values.staffMemberId && values.staffMemberId !== NONE_VALUE)) {
-      body.staffMemberId = values.staffMemberId === NONE_VALUE ? undefined : values.staffMemberId;
+    if (values.role === 'STAFF' && values.staffMemberId !== NONE_VALUE) {
+      body.staffMemberId = values.staffMemberId;
     }
     try {
       const parsedBody = createInvitationRequestSchema.parse(body);
@@ -138,6 +150,14 @@ export function InviteDialog({
       onCreated(created);
       onOpenChange(false);
     } catch (err) {
+      if (err instanceof ApiError && err.code === 'ALREADY_MEMBER') {
+        form.setError('email', { message: t('team.errors.alreadyMember') });
+        return;
+      }
+      if (err instanceof ApiError && err.code === 'INVITATION_EXISTS') {
+        form.setError('email', { message: t('team.errors.invitationExists') });
+        return;
+      }
       if (err instanceof ApiError && err.code === 'VALIDATION_FAILED' && err.details) {
         const issues = err.details.issues;
         if (Array.isArray(issues)) {
@@ -160,12 +180,17 @@ export function InviteDialog({
     ? ['OWNER', 'ADMIN', 'STAFF']
     : ['ADMIN', 'STAFF'];
 
+  const roleError = form.formState.errors.role?.message;
+  const staffError = form.formState.errors.staffMemberId?.message;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent closeLabel={tShell('close')}>
         <DialogHeader>
           <DialogTitle>{t('team.inviteDialogTitle')}</DialogTitle>
-          <DialogDescription>{t('team.inviteDialogSubtitle')}</DialogDescription>
+          <DialogDescription>
+            {t('team.inviteDialogSubtitle', { days: INVITATION_TTL_DAYS })}
+          </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
           <FormField label={t('team.inviteEmail')} error={form.formState.errors.email?.message}>
@@ -178,17 +203,22 @@ export function InviteDialog({
             />
           </FormField>
 
-          <Controller
-            control={form.control}
-            name="role"
-            render={({ field }) => (
-              <FormField label={t('team.inviteRole')} error={form.formState.errors.role?.message}>
+          <div className="grid gap-2">
+            <Label htmlFor={roleFieldId}>{t('team.inviteRole')}</Label>
+            <Controller
+              control={form.control}
+              name="role"
+              render={({ field }) => (
                 <Select
                   value={field.value}
                   onValueChange={(value) => field.onChange(value as MembershipRole)}
                   disabled={form.formState.isSubmitting}
                 >
-                  <SelectTrigger aria-invalid={Boolean(form.formState.errors.role)}>
+                  <SelectTrigger
+                    id={roleFieldId}
+                    aria-invalid={roleError ? true : undefined}
+                    aria-describedby={roleError ? `${roleFieldId}-error` : undefined}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -199,41 +229,65 @@ export function InviteDialog({
                     ))}
                   </SelectContent>
                 </Select>
-              </FormField>
-            )}
-          />
-
-          <Controller
-            control={form.control}
-            name="staffMemberId"
-            render={({ field }) => (
-              <FormField
-                label={t('team.inviteStaff')}
-                error={form.formState.errors.staffMemberId?.message}
-                description={role === 'STAFF' ? t('team.inviteStaffHint') : undefined}
+              )}
+            />
+            {roleError ? (
+              <p
+                id={`${roleFieldId}-error`}
+                role="alert"
+                className="text-xs font-medium text-destructive"
               >
-                <Select
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  disabled={form.formState.isSubmitting}
+                {roleError}
+              </p>
+            ) : null}
+          </div>
+
+          {role === 'STAFF' ? (
+            <div className="grid gap-2">
+              <Label htmlFor={staffFieldId}>{t('team.inviteStaff')}</Label>
+              <Controller
+                control={form.control}
+                name="staffMemberId"
+                render={({ field }) => (
+                  <Select
+                    value={field.value === NONE_VALUE ? undefined : field.value}
+                    onValueChange={field.onChange}
+                    disabled={form.formState.isSubmitting}
+                  >
+                    <SelectTrigger
+                      id={staffFieldId}
+                      aria-invalid={staffError ? true : undefined}
+                      aria-describedby={
+                        staffError ? `${staffFieldId}-error` : `${staffFieldId}-description`
+                      }
+                    >
+                      <SelectValue placeholder={t('team.linkStaffPlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {staff.map((member) => (
+                        <SelectItem key={member.id} value={member.id}>
+                          {member.displayName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {staffError ? (
+                <p
+                  id={`${staffFieldId}-error`}
+                  role="alert"
+                  className="text-xs font-medium text-destructive"
                 >
-                  <SelectTrigger aria-invalid={Boolean(form.formState.errors.staffMemberId)}>
-                    <SelectValue placeholder={t('team.linkStaffPlaceholder')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {role !== 'STAFF' ? (
-                      <SelectItem value={NONE_VALUE}>{t('team.linkStaffNone')}</SelectItem>
-                    ) : null}
-                    {staff.map((member) => (
-                      <SelectItem key={member.id} value={member.id}>
-                        {member.displayName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormField>
-            )}
-          />
+                  {staffError}
+                </p>
+              ) : (
+                <p id={`${staffFieldId}-description`} className="text-xs text-muted-foreground">
+                  {t('team.inviteStaffHint')}
+                </p>
+              )}
+            </div>
+          ) : null}
 
           <DialogFooter>
             <Button

@@ -3,6 +3,7 @@
 import {
   businessMemberListResponseSchema,
   businessMemberSchema,
+  createInvitationRequestSchema,
   invitationListResponseSchema,
   invitationSchema,
   staffMembersResponseSchema,
@@ -12,10 +13,18 @@ import {
   type MembershipRole,
   type StaffMember,
 } from '@najme/contracts';
+import { isLocale } from '@najme/i18n';
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -80,6 +89,17 @@ function availableStaffForMember(
   return staff.filter((s) => s.id === member.staffMemberId || !linkedElsewhere.has(s.id));
 }
 
+function withBusy(setBusyIds: Dispatch<SetStateAction<Set<string>>>, id: string) {
+  setBusyIds((prev) => new Set(prev).add(id));
+  return () => {
+    setBusyIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+}
+
 /** Team management: members, invitations, leave (OWNER/ADMIN). */
 export function TeamView() {
   const t = useTranslations('business');
@@ -87,7 +107,7 @@ export function TeamView() {
   const locale = useLocale();
   const router = useRouter();
   const session = useSession();
-  const { business } = useBusinessContext();
+  const { business, reload: reloadBusiness } = useBusinessContext();
   const invalidateMyBusinesses = useInvalidateMyBusinesses();
   const canManage = business.myRole === 'OWNER' || business.myRole === 'ADMIN';
   const isOwner = business.myRole === 'OWNER';
@@ -99,7 +119,7 @@ export function TeamView() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set());
   const [drafts, setDrafts] = useState<
     Record<string, { role: MembershipRole; staffMemberId: string }>
   >({});
@@ -147,14 +167,32 @@ export function TeamView() {
     () => invitations?.filter((i) => i.status === 'PENDING') ?? [],
     [invitations],
   );
-  const expired = useMemo(
-    () => invitations?.filter((i) => i.status === 'EXPIRED') ?? [],
-    [invitations],
-  );
+  const expired = useMemo(() => {
+    const pendingEmails = new Set(
+      (invitations ?? []).filter((i) => i.status === 'PENDING').map((i) => i.email.toLowerCase()),
+    );
+    return (
+      invitations?.filter(
+        (i) => i.status === 'EXPIRED' && !pendingEmails.has(i.email.toLowerCase()),
+      ) ?? []
+    );
+  }, [invitations]);
+
+  const unlinkedStaff = useMemo(() => {
+    const linked = new Set(
+      (members ?? []).filter((m) => m.staffMemberId).map((m) => m.staffMemberId as string),
+    );
+    return staff.filter((s) => !linked.has(s.id));
+  }, [members, staff]);
+
+  function isBusy(id: string): boolean {
+    return busyIds.has(id);
+  }
 
   async function saveMember(member: BusinessMember): Promise<void> {
     const draft = drafts[member.id];
     if (!draft) return;
+    if (draft.role === 'STAFF' && draft.staffMemberId === NONE_VALUE) return;
     const nextStaff = draft.staffMemberId === NONE_VALUE ? null : draft.staffMemberId;
     const payload =
       draft.role !== member.role || nextStaff !== member.staffMemberId
@@ -165,7 +203,7 @@ export function TeamView() {
         : null;
     if (!payload || Object.keys(payload).length === 0) return;
 
-    setBusyId(member.id);
+    const done = withBusy(setBusyIds, member.id);
     try {
       const parsed = updateMemberRequestSchema.parse(payload);
       const raw = await apiRequest<unknown>(`/businesses/${business.id}/members/${member.id}`, {
@@ -182,16 +220,38 @@ export function TeamView() {
         },
       }));
       toast.success(t('team.memberSavedToast'));
+      const isSelf = myUserId !== null && member.userId === myUserId;
+      if (isSelf) {
+        await reloadBusiness();
+        invalidateMyBusinesses();
+      }
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
-      toast.error(errorMessage(tErrors, code));
+      if (code === 'LAST_OWNER') {
+        setDrafts((prev) => ({
+          ...prev,
+          [member.id]: {
+            role: member.role,
+            staffMemberId: member.staffMemberId ?? NONE_VALUE,
+          },
+        }));
+      }
+      if (
+        err instanceof ApiError &&
+        err.code === 'VALIDATION_FAILED' &&
+        !(Array.isArray(err.details?.issues) && err.details.issues.length > 0)
+      ) {
+        toast.error(t('team.saveFailedToast'));
+      } else {
+        toast.error(errorMessage(tErrors, code));
+      }
     } finally {
-      setBusyId(null);
+      done();
     }
   }
 
   async function removeMember(member: BusinessMember): Promise<void> {
-    setBusyId(member.id);
+    const done = withBusy(setBusyIds, member.id);
     try {
       await apiRequest(`/businesses/${business.id}/members/${member.id}`, { method: 'DELETE' });
       setMembers((prev) => prev?.filter((m) => m.id !== member.id) ?? null);
@@ -200,12 +260,12 @@ export function TeamView() {
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
       toast.error(errorMessage(tErrors, code));
     } finally {
-      setBusyId(null);
+      done();
     }
   }
 
   async function leaveBusiness(): Promise<void> {
-    setBusyId('leave');
+    const done = withBusy(setBusyIds, 'leave');
     try {
       await apiRequest(`/businesses/${business.id}/leave`, { method: 'POST', body: {} });
       toast.success(t('team.leftToast'));
@@ -216,12 +276,12 @@ export function TeamView() {
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
       toast.error(errorMessage(tErrors, code));
     } finally {
-      setBusyId(null);
+      done();
     }
   }
 
   async function resendInvitation(invitation: Invitation): Promise<void> {
-    setBusyId(invitation.id);
+    const done = withBusy(setBusyIds, invitation.id);
     try {
       const raw = await apiRequest<unknown>(
         `/businesses/${business.id}/invitations/${invitation.id}/resend`,
@@ -234,12 +294,12 @@ export function TeamView() {
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
       toast.error(errorMessage(tErrors, code));
     } finally {
-      setBusyId(null);
+      done();
     }
   }
 
   async function revokeInvitation(invitation: Invitation): Promise<void> {
-    setBusyId(invitation.id);
+    const done = withBusy(setBusyIds, invitation.id);
     try {
       await apiRequest(`/businesses/${business.id}/invitations/${invitation.id}`, {
         method: 'DELETE',
@@ -254,30 +314,36 @@ export function TeamView() {
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
       toast.error(errorMessage(tErrors, code));
     } finally {
-      setBusyId(null);
+      done();
     }
   }
 
   async function inviteAgain(invitation: Invitation): Promise<void> {
-    setBusyId(invitation.id);
+    const done = withBusy(setBusyIds, invitation.id);
     try {
-      const body = {
+      const body = createInvitationRequestSchema.parse({
         email: invitation.email,
         role: invitation.role,
-        ...(invitation.staffMemberId ? { staffMemberId: invitation.staffMemberId } : {}),
-      };
+        locale: isLocale(locale) ? locale : 'en',
+        ...(invitation.role === 'STAFF' && invitation.staffMemberId
+          ? { staffMemberId: invitation.staffMemberId }
+          : {}),
+      });
       const raw = await apiRequest<unknown>(`/businesses/${business.id}/invitations`, {
         method: 'POST',
         body,
       });
       const created = invitationSchema.parse(raw);
-      setInvitations((prev) => [created, ...(prev ?? [])]);
+      setInvitations((prev) => {
+        const withoutExpired = (prev ?? []).filter((i) => i.id !== invitation.id);
+        return [created, ...withoutExpired];
+      });
       toast.success(t('team.inviteAgainToast'));
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
       toast.error(errorMessage(tErrors, code));
     } finally {
-      setBusyId(null);
+      done();
     }
   }
 
@@ -348,7 +414,10 @@ export function TeamView() {
                     (draft.staffMemberId === NONE_VALUE
                       ? member.staffMemberId !== null
                       : draft.staffMemberId !== member.staffMemberId);
+                  const staffRequiredMissing =
+                    draft.role === 'STAFF' && draft.staffMemberId === NONE_VALUE;
                   const displayName = member.displayName?.trim() || member.email;
+                  const busy = isBusy(member.id);
 
                   return (
                     <li key={member.id} className="space-y-3 px-4 py-4">
@@ -384,9 +453,11 @@ export function TeamView() {
                                   },
                                 }))
                               }
-                              disabled={busyId === member.id}
+                              disabled={busy}
                             >
-                              <SelectTrigger>
+                              <SelectTrigger
+                                aria-label={t('team.roleSelectNamed', { name: displayName })}
+                              >
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -403,22 +474,28 @@ export function TeamView() {
                               {t('team.linkStaff')}
                             </label>
                             <Select
-                              value={draft.staffMemberId}
+                              value={
+                                draft.staffMemberId === NONE_VALUE ? undefined : draft.staffMemberId
+                              }
                               onValueChange={(value) =>
                                 setDrafts((prev) => ({
                                   ...prev,
                                   [member.id]: { ...draft, staffMemberId: value },
                                 }))
                               }
-                              disabled={busyId === member.id}
+                              disabled={busy}
                             >
-                              <SelectTrigger>
+                              <SelectTrigger
+                                aria-label={t('team.linkStaffNamed', { name: displayName })}
+                              >
                                 <SelectValue placeholder={t('team.linkStaffPlaceholder')} />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value={NONE_VALUE}>
-                                  {t('team.linkStaffNone')}
-                                </SelectItem>
+                                {draft.role !== 'STAFF' ? (
+                                  <SelectItem value={NONE_VALUE}>
+                                    {t('team.linkStaffNone')}
+                                  </SelectItem>
+                                ) : null}
                                 {staffOptions.map((s) => (
                                   <SelectItem key={s.id} value={s.id}>
                                     {s.displayName}
@@ -426,15 +503,20 @@ export function TeamView() {
                                 ))}
                               </SelectContent>
                             </Select>
+                            {staffRequiredMissing ? (
+                              <p className="text-xs text-muted-foreground">
+                                {t('team.staffRequiredHint')}
+                              </p>
+                            ) : null}
                           </div>
                           <Button
                             type="button"
                             size="sm"
-                            disabled={!dirty || busyId === member.id}
-                            loading={busyId === member.id}
+                            disabled={!dirty || busy || staffRequiredMissing}
+                            loading={busy}
                             onClick={() => void saveMember(member)}
                           >
-                            {busyId === member.id ? t('team.savingMember') : t('team.saveMember')}
+                            {busy ? t('team.savingMember') : t('team.saveMember')}
                           </Button>
                         </div>
                       ) : null}
@@ -447,7 +529,7 @@ export function TeamView() {
                                 type="button"
                                 variant="secondary"
                                 size="sm"
-                                disabled={busyId === 'leave'}
+                                disabled={isBusy('leave')}
                               >
                                 {t('team.leave')}
                               </Button>
@@ -462,13 +544,13 @@ export function TeamView() {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>{t('team.leaveCancel')}</AlertDialogCancel>
                                 <AlertDialogAction
-                                  disabled={busyId === 'leave'}
+                                  disabled={isBusy('leave')}
                                   onClick={(event) => {
                                     event.preventDefault();
                                     void leaveBusiness();
                                   }}
                                 >
-                                  {busyId === 'leave' ? t('team.leaving') : t('team.leaveConfirm')}
+                                  {isBusy('leave') ? t('team.leaving') : t('team.leaveConfirm')}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -480,7 +562,8 @@ export function TeamView() {
                                 type="button"
                                 variant="destructive"
                                 size="sm"
-                                disabled={busyId === member.id}
+                                disabled={busy}
+                                aria-label={t('team.removeNamed', { name: displayName })}
                               >
                                 {t('team.remove')}
                               </Button>
@@ -495,15 +578,13 @@ export function TeamView() {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>{t('team.removeCancel')}</AlertDialogCancel>
                                 <AlertDialogAction
-                                  disabled={busyId === member.id}
+                                  disabled={busy}
                                   onClick={(event) => {
                                     event.preventDefault();
                                     void removeMember(member);
                                   }}
                                 >
-                                  {busyId === member.id
-                                    ? t('team.removing')
-                                    : t('team.removeConfirm')}
+                                  {busy ? t('team.removing') : t('team.removeConfirm')}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -549,11 +630,12 @@ export function TeamView() {
                         type="button"
                         variant="secondary"
                         size="sm"
-                        disabled={busyId === invitation.id}
-                        loading={busyId === invitation.id}
+                        disabled={isBusy(invitation.id)}
+                        loading={isBusy(invitation.id)}
+                        aria-label={t('team.resendNamed', { email: invitation.email })}
                         onClick={() => void resendInvitation(invitation)}
                       >
-                        {busyId === invitation.id ? t('team.resending') : t('team.resend')}
+                        {isBusy(invitation.id) ? t('team.resending') : t('team.resend')}
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -561,7 +643,8 @@ export function TeamView() {
                             type="button"
                             variant="destructive"
                             size="sm"
-                            disabled={busyId === invitation.id}
+                            disabled={isBusy(invitation.id)}
+                            aria-label={t('team.revokeNamed', { email: invitation.email })}
                           >
                             {t('team.revoke')}
                           </Button>
@@ -576,15 +659,13 @@ export function TeamView() {
                           <AlertDialogFooter>
                             <AlertDialogCancel>{t('team.revokeCancel')}</AlertDialogCancel>
                             <AlertDialogAction
-                              disabled={busyId === invitation.id}
+                              disabled={isBusy(invitation.id)}
                               onClick={(event) => {
                                 event.preventDefault();
                                 void revokeInvitation(invitation);
                               }}
                             >
-                              {busyId === invitation.id
-                                ? t('team.revoking')
-                                : t('team.revokeConfirm')}
+                              {isBusy(invitation.id) ? t('team.revoking') : t('team.revokeConfirm')}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -622,11 +703,12 @@ export function TeamView() {
                         type="button"
                         variant="secondary"
                         size="sm"
-                        disabled={busyId === invitation.id}
-                        loading={busyId === invitation.id}
+                        disabled={isBusy(invitation.id)}
+                        loading={isBusy(invitation.id)}
+                        aria-label={t('team.inviteAgainNamed', { email: invitation.email })}
                         onClick={() => void inviteAgain(invitation)}
                       >
-                        {busyId === invitation.id ? t('team.invitingAgain') : t('team.inviteAgain')}
+                        {isBusy(invitation.id) ? t('team.invitingAgain') : t('team.inviteAgain')}
                       </Button>
                     </li>
                   ))}
@@ -642,7 +724,7 @@ export function TeamView() {
         onOpenChange={setInviteOpen}
         businessId={business.id}
         myRole={business.myRole}
-        staff={staff}
+        staff={unlinkedStaff}
         onCreated={(created) => {
           setInvitations((prev) => [created, ...(prev ?? [])]);
         }}

@@ -30,7 +30,7 @@ business mode for that business.
 
 ### Contracts / API
 
-No contract changes — consume existing invitation/member schemas from `@najme/contracts`.
+- `businessMemberSchema` includes `businessId` (returned from accept and member list/update).
 
 ### Data model
 
@@ -54,14 +54,12 @@ None.
 
 ## Implementation notes
 
-- Accept response (`BusinessMember`) has no `businessId`; after POST accept the panel loads
-  `GET /me/businesses` and matches by preview `businessName` + role, then
-  `writeLastBusinessId` + navigates to `/business/[id]`.
+- `BusinessMember` includes `businessId`; accept uses it directly (no `/me/businesses` lookup).
 - Invite token lives in `sessionStorage` (`najme.invitation.token`) across the auth round-trip;
-  cleared on success and terminal errors (invalid/expired/already member).
-- Resend/Revoke only for PENDING; Invite again = new POST with the expired row’s email/role/staff.
+  cleared right after a successful accept POST and on terminal errors (invalid/expired/already member).
+- After email-mismatch Sign out, status returns to `ready` so anonymous Sign in / Create account with
+  `next` are shown again.
+- Resend/Revoke only for PENDING; Invite again = new POST (locale + schema) and drops the expired row.
 - OWNER role in invite/change-role selects is gated to actors with `myRole === 'OWNER'`.
+- Invite dialog shows the staff field only for STAFF and never sends `staffMemberId` for other roles.
 - `TOKEN_LINK_PATH` includes `invitations/accept`; page metadata also sets `referrer: 'no-referrer'`.
-
-Follow-ups: consider adding `businessId` to `BusinessMember` / accept response so clients need not
-re-list memberships after accept.

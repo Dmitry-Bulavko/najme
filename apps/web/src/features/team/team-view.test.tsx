@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Business, BusinessMember, Invitation, StaffMember } from '@najme/contracts';
 import { catalogs } from '@najme/i18n';
@@ -13,6 +13,7 @@ const toast = { success: vi.fn(), error: vi.fn() };
 const replace = vi.fn();
 const invalidateMyBusinesses = vi.fn();
 const clearLastBusinessId = vi.fn();
+const reloadBusiness = vi.fn(async () => undefined);
 
 vi.mock('sonner', () => ({
   toast: {
@@ -69,7 +70,7 @@ vi.mock('@/features/business/business-shell', () => ({
       () => listBusiness,
       () => listBusiness,
     );
-    return { business, setBusiness: vi.fn(), reload: async () => undefined };
+    return { business, setBusiness: vi.fn(), reload: reloadBusiness };
   },
 }));
 
@@ -124,6 +125,7 @@ function makeBusiness(overrides: Partial<Business> = {}): Business {
 function makeMember(overrides: Partial<BusinessMember> = {}): BusinessMember {
   return {
     id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    businessId: '11111111-1111-4111-8111-111111111111',
     userId: me.id,
     email: 'owner@example.com',
     displayName: 'Owner',
@@ -204,6 +206,7 @@ describe('TeamView', () => {
     replace.mockReset();
     invalidateMyBusinesses.mockReset();
     clearLastBusinessId.mockReset();
+    reloadBusiness.mockReset();
     listBusiness = makeBusiness();
     emitBusiness();
   });
@@ -254,12 +257,46 @@ describe('TeamView', () => {
     });
     renderTeam();
     expect(await screen.findByText('Me Admin')).toBeTruthy();
-    // Self row has role select; OWNER option must not appear for ADMIN actor.
-    const roleTriggers = screen.getAllByRole('combobox');
-    expect(roleTriggers.length).toBeGreaterThan(0);
-    await userEvent.click(roleTriggers[0]!);
+    const roleTrigger = screen.getByRole('combobox', {
+      name: catalogs.en.business.team.roleSelectNamed.replace('{name}', 'Me Admin'),
+    });
+    await userEvent.click(roleTrigger);
     expect(screen.queryByRole('option', { name: 'Owner' })).toBeNull();
     expect(screen.getByRole('option', { name: 'Admin' })).toBeTruthy();
+  });
+
+  it('ADMIN actor sees no role combobox or Remove on an OWNER row', async () => {
+    listBusiness = makeBusiness({ myRole: 'ADMIN' });
+    emitBusiness();
+    mockTeamData({
+      members: [
+        makeMember({
+          userId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          email: 'other-owner@example.com',
+          displayName: 'Sara Staff',
+          role: 'OWNER',
+        }),
+        makeMember({
+          id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          userId: me.id,
+          email: 'admin@example.com',
+          displayName: 'Me Admin',
+          role: 'ADMIN',
+        }),
+      ],
+    });
+    renderTeam();
+    expect(await screen.findByText('Sara Staff')).toBeTruthy();
+    expect(
+      screen.queryByRole('combobox', {
+        name: catalogs.en.business.team.roleSelectNamed.replace('{name}', 'Sara Staff'),
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', {
+        name: catalogs.en.business.team.removeNamed.replace('{name}', 'Sara Staff'),
+      }),
+    ).toBeNull();
   });
 
   it('maps LAST_OWNER on leave', async () => {
@@ -289,8 +326,9 @@ describe('TeamView', () => {
     });
   });
 
-  it('opens invite dialog and creates an invitation', async () => {
+  it('opens invite dialog and creates an invitation without staffMemberId for ADMIN', async () => {
     const created = makeInvitation();
+    let postedBody: unknown;
     mockTeamData();
     apiRequest.mockImplementation(
       async (path: string, init?: { method?: string; body?: unknown }) => {
@@ -300,6 +338,7 @@ describe('TeamView', () => {
           if (path.endsWith('/staff')) return [makeStaff()];
         }
         if (path.endsWith('/invitations') && init?.method === 'POST') {
+          postedBody = init.body;
           return created;
         }
         throw new Error(`unexpected ${init?.method} ${path}`);
@@ -310,6 +349,7 @@ describe('TeamView', () => {
       await screen.findByRole('button', { name: catalogs.en.business.team.invite }),
     );
     expect(screen.getByText(catalogs.en.business.team.inviteDialogTitle)).toBeTruthy();
+    expect(screen.queryByLabelText(catalogs.en.business.team.inviteStaff)).toBeNull();
     await userEvent.type(
       screen.getByLabelText(catalogs.en.business.team.inviteEmail),
       'new@example.com',
@@ -320,10 +360,12 @@ describe('TeamView', () => {
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(catalogs.en.business.team.invitedToast);
     });
+    expect(postedBody).toMatchObject({ email: 'new@example.com', role: 'ADMIN', locale: 'en' });
+    expect(postedBody).not.toHaveProperty('staffMemberId');
     expect(await screen.findByText('new@example.com')).toBeTruthy();
   });
 
-  it('resends and revokes pending invitations', async () => {
+  it('resends and revokes pending invitations with named buttons', async () => {
     const pending = makeInvitation();
     mockTeamData({ invitations: [pending] });
     apiRequest.mockImplementation(async (path: string, init?: { method?: string }) => {
@@ -342,11 +384,19 @@ describe('TeamView', () => {
     });
     renderTeam();
     expect(await screen.findByText(pending.email)).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: catalogs.en.business.team.resend }));
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: catalogs.en.business.team.resendNamed.replace('{email}', pending.email),
+      }),
+    );
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(catalogs.en.business.team.resentToast);
     });
-    await userEvent.click(screen.getByRole('button', { name: catalogs.en.business.team.revoke }));
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: catalogs.en.business.team.revokeNamed.replace('{email}', pending.email),
+      }),
+    );
     await userEvent.click(
       screen.getByRole('button', { name: catalogs.en.business.team.revokeConfirm }),
     );
@@ -355,7 +405,7 @@ describe('TeamView', () => {
     });
   });
 
-  it('invite again posts a new invitation for expired rows', async () => {
+  it('invite again posts locale and drops the expired row', async () => {
     const expired = makeInvitation({
       id: '55555555-5555-4555-8555-555555555555',
       status: 'EXPIRED',
@@ -375,7 +425,11 @@ describe('TeamView', () => {
           if (path.endsWith('/staff')) return [];
         }
         if (path.endsWith('/invitations') && init?.method === 'POST') {
-          expect(init.body).toMatchObject({ email: 'expired@example.com', role: 'ADMIN' });
+          expect(init.body).toMatchObject({
+            email: 'expired@example.com',
+            role: 'ADMIN',
+            locale: 'en',
+          });
           return created;
         }
         throw new Error(`unexpected ${init?.method} ${path}`);
@@ -384,11 +438,18 @@ describe('TeamView', () => {
     renderTeam();
     expect(await screen.findByText('expired@example.com')).toBeTruthy();
     await userEvent.click(
-      screen.getByRole('button', { name: catalogs.en.business.team.inviteAgain }),
+      screen.getByRole('button', {
+        name: catalogs.en.business.team.inviteAgainNamed.replace('{email}', 'expired@example.com'),
+      }),
     );
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(catalogs.en.business.team.inviteAgainToast);
     });
+    // Expired section should no longer list that email (pending takes it).
+    const expiredHeading = screen.getByText(catalogs.en.business.team.expiredHeading);
+    const expiredSection = expiredHeading.parentElement;
+    expect(expiredSection).toBeTruthy();
+    expect(within(expiredSection!).queryByText('expired@example.com')).toBeNull();
   });
 
   it('requires staff when inviting as STAFF and does not POST', async () => {
@@ -416,9 +477,9 @@ describe('TeamView', () => {
       screen.getByLabelText(catalogs.en.business.team.inviteEmail),
       'staff@example.com',
     );
-    // Role select is the first combobox in the dialog; pick Staff.
-    const dialogComboboxes = screen.getAllByRole('combobox');
-    await userEvent.click(dialogComboboxes[0]!);
+    await userEvent.click(
+      screen.getByRole('combobox', { name: catalogs.en.business.team.inviteRole }),
+    );
     await userEvent.click(screen.getByRole('option', { name: 'Staff' }));
     await userEvent.click(
       screen.getByRole('button', { name: catalogs.en.business.team.inviteSubmit }),
@@ -459,20 +520,26 @@ describe('TeamView', () => {
     renderTeam();
     expect(await screen.findByText('Admin User')).toBeTruthy();
 
-    // Admin row: role + staff comboboxes — pick staff "Ana" on the second combobox of that row.
-    const comboboxes = screen.getAllByRole('combobox');
-    // Owner row: role + staff; Admin row: role + staff → index 3 is admin staff link.
-    await userEvent.click(comboboxes[3]!);
+    await userEvent.click(
+      screen.getByRole('combobox', {
+        name: catalogs.en.business.team.linkStaffNamed.replace('{name}', 'Admin User'),
+      }),
+    );
     await userEvent.click(screen.getByRole('option', { name: 'Ana' }));
-    const saveButtons = screen.getAllByRole('button', {
-      name: catalogs.en.business.team.saveMember,
-    });
-    await userEvent.click(saveButtons[1]!);
+    await userEvent.click(
+      screen.getAllByRole('button', {
+        name: catalogs.en.business.team.saveMember,
+      })[1]!,
+    );
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith(catalogs.en.business.team.memberSavedToast);
     });
 
-    await userEvent.click(screen.getByRole('button', { name: catalogs.en.business.team.remove }));
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: catalogs.en.business.team.removeNamed.replace('{name}', 'Admin User'),
+      }),
+    );
     await userEvent.click(
       screen.getByRole('button', { name: catalogs.en.business.team.removeConfirm }),
     );
@@ -482,7 +549,7 @@ describe('TeamView', () => {
     expect(screen.queryByText('Admin User')).toBeNull();
   });
 
-  it('maps INVITATION_EXISTS and ALREADY_MEMBER from invite create', async () => {
+  it('maps INVITATION_EXISTS and ALREADY_MEMBER onto the email field', async () => {
     const { ApiError } = await import('@/lib/api/client');
     mockTeamData();
     let invitePosts = 0;
@@ -512,17 +579,12 @@ describe('TeamView', () => {
     await userEvent.click(
       screen.getByRole('button', { name: catalogs.en.business.team.inviteSubmit }),
     );
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith(catalogs.en.errors.INVITATION_EXISTS);
-    });
+    expect(await screen.findByText(catalogs.en.business.team.errors.invitationExists)).toBeTruthy();
 
-    // Dialog stays open after error; submit again for ALREADY_MEMBER.
     await userEvent.click(
       screen.getByRole('button', { name: catalogs.en.business.team.inviteSubmit }),
     );
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith(catalogs.en.errors.ALREADY_MEMBER);
-    });
+    expect(await screen.findByText(catalogs.en.business.team.errors.alreadyMember)).toBeTruthy();
   });
 
   it('shows forbidden for STAFF role', async () => {

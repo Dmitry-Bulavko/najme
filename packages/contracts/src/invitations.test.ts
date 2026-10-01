@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   INVITATION_TTL_DAYS,
   acceptInvitationRequestSchema,
+  businessMemberSchema,
   createInvitationRequestSchema,
   invitationPreviewResponseSchema,
   updateMemberRequestSchema,
@@ -37,6 +38,22 @@ describe('invitations contracts', () => {
       }).emailMasked,
     ).toContain('***');
     expect(acceptInvitationRequestSchema.parse({ token: 'abc' }).token).toBe('abc');
+  });
+
+  it('includes businessId on BusinessMember', () => {
+    expect(
+      businessMemberSchema.parse({
+        id: '11111111-1111-4111-8111-111111111111',
+        businessId: '22222222-2222-4222-8222-222222222222',
+        userId: '33333333-3333-4333-8333-333333333333',
+        email: 'a@example.com',
+        displayName: 'Ada',
+        role: 'ADMIN',
+        staffMemberId: null,
+        createdAt: '2026-10-01T10:00:00.000Z',
+        updatedAt: '2026-10-01T10:00:00.000Z',
+      }).businessId,
+    ).toBe('22222222-2222-4222-8222-222222222222');
   });
 
   it('requires at least one field on member update', () => {

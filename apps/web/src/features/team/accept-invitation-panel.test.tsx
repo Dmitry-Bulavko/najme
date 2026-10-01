@@ -143,12 +143,13 @@ describe('AcceptInvitationPanel', () => {
     );
   });
 
-  it('accepts successfully and navigates to the business dashboard', async () => {
+  it('accepts successfully using businessId from the member response', async () => {
     apiRequest.mockImplementation(async (path: string, init?: { method?: string }) => {
       if (path.startsWith('/invitations/preview')) return preview;
       if (path === '/invitations/accept' && init?.method === 'POST') {
         return {
           id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          businessId: '11111111-1111-4111-8111-111111111111',
           userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           email: 'user@example.com',
           displayName: 'User',
@@ -157,19 +158,6 @@ describe('AcceptInvitationPanel', () => {
           createdAt: '2026-10-01T10:00:00.000Z',
           updatedAt: '2026-10-01T10:00:00.000Z',
         };
-      }
-      if (path === '/me/businesses') {
-        return [
-          {
-            businessId: '11111111-1111-4111-8111-111111111111',
-            name: 'Salon Ada',
-            slug: 'salon-ada',
-            status: 'APPROVED',
-            role: 'ADMIN',
-            staffMemberId: null,
-            logoUrl: null,
-          },
-        ];
       }
       throw new Error(`unexpected ${path}`);
     });
@@ -183,9 +171,10 @@ describe('AcceptInvitationPanel', () => {
       expect(replace).toHaveBeenCalledWith('/en/business/11111111-1111-4111-8111-111111111111');
       expect(sessionStorage.getItem(INVITE_TOKEN_STORAGE_KEY)).toBeNull();
     });
+    expect(apiRequest.mock.calls.some((call) => call[0] === '/me/businesses')).toBe(false);
   });
 
-  it('shows mismatch with masked email and sign-out', async () => {
+  it('after mismatch sign-out shows sign-in with next back to accept', async () => {
     const { ApiError } = await import('@/lib/api/client');
     apiRequest.mockImplementation(async (path: string, init?: { method?: string }) => {
       if (path.startsWith('/invitations/preview')) return preview;
@@ -200,10 +189,19 @@ describe('AcceptInvitationPanel', () => {
     );
     expect(await screen.findByTestId('invite-accept-mismatch')).toBeTruthy();
     expect(screen.getByText(/n\*\*\*@example.com/)).toBeTruthy();
+
+    signOut.mockImplementation(async () => {
+      sessionState = 'anonymous';
+    });
     await userEvent.click(
       screen.getByRole('button', { name: catalogs.en.business.inviteAccept.signOut }),
     );
     expect(signOut).toHaveBeenCalled();
+    expect(await screen.findByTestId('invite-accept-preview')).toBeTruthy();
+    const signIn = screen.getByRole('link', { name: catalogs.en.business.inviteAccept.signIn });
+    expect(signIn.getAttribute('href')).toBe(
+      `/en/sign-in?next=${encodeURIComponent('/en/invitations/accept')}`,
+    );
   });
 
   it('shows already-member state and clears the token', async () => {

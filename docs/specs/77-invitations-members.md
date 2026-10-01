@@ -65,3 +65,5 @@ API only. Email + error strings in four locales.
 - Member demote / remove / leave lock the business row (`FOR UPDATE`) before the LAST_OWNER count.
 - Cross-tenant `staffMemberId` on PATCH is always validated via `requireUnlinkedStaff`. Role changes
   keep the existing staff link unless `staffMemberId` is sent explicitly.
+- `BusinessMember` includes `businessId` (added in #84) so accept clients need not re-list
+  `/me/businesses`.
