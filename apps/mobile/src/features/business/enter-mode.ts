@@ -30,9 +30,10 @@ export async function enterBusinessMode(
   }
 
   if (businesses.length === 1) {
-    const id = businesses[0]!.businessId;
-    await writeLastBusinessId(id);
-    router.replace(`/(business)/${id}`);
+    const only = businesses[0];
+    if (!only) return;
+    await writeLastBusinessId(only.businessId);
+    router.replace(`/(business)/${only.businessId}`);
     return;
   }
 

@@ -34,7 +34,10 @@ export async function mapWithConcurrency<T, R>(
       const i = next;
       next += 1;
       if (i >= items.length) return;
-      results[i] = await mapper(items[i]!);
+      // `i` is always in range: workers stop when `next` past `items.length`.
+      const item = items[i];
+      if (item === undefined) return;
+      results[i] = await mapper(item);
     }
   }
   const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());

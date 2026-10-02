@@ -1,5 +1,6 @@
 import { businessSchema, type Business } from '@najme/contracts';
 import { tokens } from '@najme/ui-tokens';
+import { Redirect } from 'expo-router';
 import {
   createContext,
   useCallback,
@@ -13,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Banner, Button } from '@/components/ui';
+import { useSession } from '@/features/auth/auth-provider';
 import { ApiError, apiRequest } from '@/lib/api/client';
 
 import { writeAppMode, writeLastBusinessId } from './last-business';
@@ -40,9 +42,11 @@ type BusinessProviderProps = {
 
 /**
  * Loads `GET /businesses/:id` for the dashboard shell and remembers the id as last-used.
+ * Redirects anonymous users to sign-in so they never see a raw API error screen.
  */
 export function BusinessProvider({ businessId, children }: BusinessProviderProps) {
   const { t } = useTranslation(['business', 'errors']);
+  const session = useSession();
   const [business, setBusinessState] = useState<Business | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +64,10 @@ export function BusinessProvider({ businessId, children }: BusinessProviderProps
   }, []);
 
   useEffect(() => {
+    // Anonymous/loading are handled in render (Redirect / spinner); skip the fetch.
+    if (session.state !== 'authenticated') {
+      return;
+    }
     let cancelled = false;
     void (async () => {
       setLoading(true);
@@ -85,14 +93,18 @@ export function BusinessProvider({ businessId, children }: BusinessProviderProps
     return () => {
       cancelled = true;
     };
-  }, [businessId, nonce, t]);
+  }, [businessId, nonce, session.state, t]);
 
   const value = useMemo<BusinessContextValue | null>(() => {
     if (!business) return null;
     return { business, setBusiness, reload };
   }, [business, reload, setBusiness]);
 
-  if (loading) {
+  if (session.state === 'anonymous') {
+    return <Redirect href="/sign-in" />;
+  }
+
+  if (session.state === 'loading' || loading) {
     return (
       <View style={styles.center} accessibilityLabel={t('business:shell.loading')}>
         <ActivityIndicator color={tokens.colors.primary} />
