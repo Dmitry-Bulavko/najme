@@ -53,4 +53,14 @@ jest.mock('@react-native-community/datetimepicker', () => {
   return { __esModule: true, default: MockDateTimePicker };
 });
 
+jest.mock('expo-image-picker', () => ({
+  requestMediaLibraryPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: [] })),
+}));
+
+jest.mock('expo-image-manipulator', () => ({
+  SaveFormat: { JPEG: 'jpeg', PNG: 'png' },
+  manipulateAsync: jest.fn(async (uri: string) => ({ uri, width: 800, height: 600 })),
+}));
+
 process.env.EXPO_PUBLIC_API_URL = 'http://localhost:3000/api/v1';

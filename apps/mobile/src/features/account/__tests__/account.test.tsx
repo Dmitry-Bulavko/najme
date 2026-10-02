@@ -86,6 +86,21 @@ jest.mock('@/features/health/use-api-status', () => ({
   useApiStatus: () => 'online' as const,
 }));
 
+jest.mock('@/features/business/use-my-businesses', () => ({
+  useMyBusinesses: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
+  useInvalidateMyBusinesses: () => jest.fn(),
+}));
+
+jest.mock('@/features/business/enter-mode', () => ({
+  enterBusinessMode: jest.fn(async () => undefined),
+  enterClientMode: jest.fn(async () => undefined),
+}));
+
 function makeJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -119,10 +134,12 @@ describe('AccountHome', () => {
     expect(getByText(meWithPassword.email)).toBeTruthy();
     expect(getByText(catalogs.en.account.verified)).toBeTruthy();
 
+    expect(getByTestId('account-row-business-mode')).toBeTruthy();
     expect(getByTestId('account-row-edit-profile')).toBeTruthy();
     expect(getByTestId('account-row-language')).toBeTruthy();
     expect(getByTestId('account-row-change-password')).toBeTruthy();
     expect(getByTestId('account-row-sign-out')).toBeTruthy();
+    expect(getByText(catalogs.en.business.menu.businessMode)).toBeTruthy();
     expect(getByText(catalogs.en.account.settings.editProfile)).toBeTruthy();
     expect(getByText(catalogs.en.common.apiStatus.label)).toBeTruthy();
   });

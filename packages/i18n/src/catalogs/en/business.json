@@ -59,6 +59,8 @@
     "profile": "Profile",
     "settings": "Settings",
     "clientMode": "Client mode",
+    "more": "More",
+    "comingSoon": "Coming soon in a later update.",
     "loading": "Loading business…"
   },
   "status": {

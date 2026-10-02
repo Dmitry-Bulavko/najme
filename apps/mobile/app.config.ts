@@ -53,6 +53,13 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-secure-store',
     [
+      'expo-image-picker',
+      {
+        photosPermission:
+          'Allow Najme to access your photos so you can upload a business logo or cover.',
+      },
+    ],
+    [
       'expo-splash-screen',
       {
         image: './assets/images/splash-icon.png',
