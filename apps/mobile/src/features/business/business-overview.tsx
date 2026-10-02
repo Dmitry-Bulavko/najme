@@ -110,9 +110,8 @@ export function BusinessOverview(): ReactElement {
               {items.map((item) => (
                 <Pressable
                   key={item.key}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: item.done }}
-                  accessibilityLabel={item.label}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.label}, ${item.done ? t('business:overview.done') : t('business:overview.todo')}`}
                   onPress={() => router.push(item.href)}
                   style={({ pressed }) => [
                     styles.item,

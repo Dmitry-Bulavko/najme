@@ -46,7 +46,7 @@ export default function PickBusinessScreen(): ReactElement {
         </Text>
         <Button
           label={t('business:list.emptyCta')}
-          onPress={() => router.replace('/(business)/new')}
+          onPress={() => router.push('/(business)/new')}
         />
       </Screen>
     );
@@ -80,7 +80,7 @@ export default function PickBusinessScreen(): ReactElement {
       <Button
         label={t('business:menu.createBusiness')}
         variant="secondary"
-        onPress={() => router.replace('/(business)/new')}
+        onPress={() => router.push('/(business)/new')}
       />
     </Screen>
   );

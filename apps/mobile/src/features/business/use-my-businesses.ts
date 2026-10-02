@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   myBusinessesResponseSchema,
@@ -27,10 +28,13 @@ export function useMyBusinesses() {
   });
 }
 
-/** Drop cached memberships (call after create). */
+/** Drop cached memberships (call after create). Stable reference — safe in effect deps. */
 export function useInvalidateMyBusinesses() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: MY_BUSINESSES_QUERY_KEY });
+  return useCallback(
+    () => queryClient.invalidateQueries({ queryKey: MY_BUSINESSES_QUERY_KEY }),
+    [queryClient],
+  );
 }
 
 export type { MyBusiness };

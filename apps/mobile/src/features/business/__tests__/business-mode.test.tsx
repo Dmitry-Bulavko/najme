@@ -499,10 +499,11 @@ describe('BusinessStatusBanner', () => {
 });
 
 describe('enterBusinessMode', () => {
-  it('opens create when the user has no businesses without writing appMode', async () => {
+  it('pushes create when the user has no businesses so back returns to account', async () => {
     await enterBusinessMode({ push: mockPush, replace: mockReplace }, []);
     expect(writeAppMode).not.toHaveBeenCalled();
-    expect(mockReplace).toHaveBeenCalledWith('/(business)/new');
+    expect(mockPush).toHaveBeenCalledWith('/(business)/new');
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('opens the only business directly', async () => {
@@ -521,7 +522,7 @@ describe('enterBusinessMode', () => {
     expect(mockReplace).toHaveBeenCalledWith(businessHref(baseBusiness.id));
   });
 
-  it('forces the picker when requested', async () => {
+  it('pushes the picker when requested so back returns to account', async () => {
     await enterBusinessMode(
       { push: mockPush, replace: mockReplace },
       [
@@ -546,7 +547,8 @@ describe('enterBusinessMode', () => {
       ],
       { forcePick: true },
     );
-    expect(mockReplace).toHaveBeenCalledWith('/(business)/pick');
+    expect(mockPush).toHaveBeenCalledWith('/(business)/pick');
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });
 

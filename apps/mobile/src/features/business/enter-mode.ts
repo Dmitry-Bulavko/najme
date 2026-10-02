@@ -14,9 +14,10 @@ type ModeRouter = {
 };
 
 /**
- * Enter business mode: pick last/only/first membership and navigate with `replace`.
- * Does not write `appMode` before a business exists — `BusinessProvider` persists mode after a
- * successful `GET /businesses/:id`. Create path leaves mode unset until that load.
+ * Enter business mode: pick last/only/first membership.
+ * Push create/pick from client mode so header back returns to Account; replace when opening a
+ * dashboard. Does not write `appMode` before a business exists — `BusinessProvider` persists mode
+ * after a successful `GET /businesses/:id`.
  */
 export async function enterBusinessMode(
   router: ModeRouter,
@@ -24,12 +25,12 @@ export async function enterBusinessMode(
   options: { forcePick?: boolean; createPath?: Href } = {},
 ): Promise<void> {
   if (businesses.length === 0) {
-    router.replace(options.createPath ?? '/(business)/new');
+    router.push(options.createPath ?? '/(business)/new');
     return;
   }
 
   if (options.forcePick) {
-    router.replace('/(business)/pick');
+    router.push('/(business)/pick');
     return;
   }
 
@@ -49,7 +50,7 @@ export async function enterBusinessMode(
     return;
   }
 
-  router.replace('/(business)/pick');
+  router.push('/(business)/pick');
 }
 
 /** Leave business mode UI (keeps lastBusinessId, like web client mode). */
