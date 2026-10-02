@@ -8,7 +8,7 @@ import { fontFamilies } from '@/components/ui/theme';
 import { useSession } from '@/features/auth/auth-provider';
 
 /**
- * Stack for create/pick; `[businessId]` hosts its own tab navigator.
+ * Stack for create/pick; `business/[businessId]` hosts its own tab navigator.
  * Anonymous users are redirected to sign-in before any business API call.
  */
 export default function BusinessGroupLayout(): ReactElement {
@@ -46,7 +46,7 @@ export default function BusinessGroupLayout(): ReactElement {
     >
       <Stack.Screen name="new" options={{ title: t('create.pageTitle') }} />
       <Stack.Screen name="pick" options={{ title: t('list.pageTitle') }} />
-      <Stack.Screen name="[businessId]" options={{ headerShown: false }} />
+      <Stack.Screen name="business" options={{ headerShown: false }} />
     </Stack>
   );
 }

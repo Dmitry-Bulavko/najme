@@ -57,6 +57,8 @@ const config: ExpoConfig = {
       {
         photosPermission:
           'Allow Najme to access your photos so you can upload a business logo or cover.',
+        cameraPermission: false,
+        microphonePermission: false,
       },
     ],
     [

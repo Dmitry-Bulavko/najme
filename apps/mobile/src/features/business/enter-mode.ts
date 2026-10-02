@@ -1,6 +1,11 @@
 import type { Href } from 'expo-router';
 
-import { writeAppMode, writeLastBusinessId, readLastBusinessId } from './last-business';
+import {
+  businessHref,
+  writeLastBusinessId,
+  readLastBusinessId,
+  writeAppMode,
+} from './last-business';
 import type { MyBusiness } from './use-my-businesses';
 
 type ModeRouter = {
@@ -9,23 +14,22 @@ type ModeRouter = {
 };
 
 /**
- * Enter business mode: persist mode, pick last/only/first membership, navigate.
- * When `forcePick` is true (or there are multiple and no last match), go to the picker.
+ * Enter business mode: pick last/only/first membership and navigate with `replace`.
+ * Does not write `appMode` before a business exists — `BusinessProvider` persists mode after a
+ * successful `GET /businesses/:id`. Create path leaves mode unset until that load.
  */
 export async function enterBusinessMode(
   router: ModeRouter,
   businesses: readonly MyBusiness[],
   options: { forcePick?: boolean; createPath?: Href } = {},
 ): Promise<void> {
-  await writeAppMode('business');
-
   if (businesses.length === 0) {
-    router.push(options.createPath ?? '/(business)/new');
+    router.replace(options.createPath ?? '/(business)/new');
     return;
   }
 
   if (options.forcePick) {
-    router.push('/(business)/pick');
+    router.replace('/(business)/pick');
     return;
   }
 
@@ -33,7 +37,7 @@ export async function enterBusinessMode(
     const only = businesses[0];
     if (!only) return;
     await writeLastBusinessId(only.businessId);
-    router.replace(`/(business)/${only.businessId}`);
+    router.replace(businessHref(only.businessId));
     return;
   }
 
@@ -41,11 +45,11 @@ export async function enterBusinessMode(
   const match = last ? businesses.find((b) => b.businessId === last) : undefined;
   if (match) {
     await writeLastBusinessId(match.businessId);
-    router.replace(`/(business)/${match.businessId}`);
+    router.replace(businessHref(match.businessId));
     return;
   }
 
-  router.push('/(business)/pick');
+  router.replace('/(business)/pick');
 }
 
 /** Leave business mode UI (keeps lastBusinessId, like web client mode). */

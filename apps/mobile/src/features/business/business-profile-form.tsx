@@ -17,7 +17,6 @@ import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { z } from 'zod';
-import i18next from 'i18next';
 
 import { Banner, Button, FormField, Select, Text, TextField } from '@/components/ui';
 import { ApiError, apiRequest } from '@/lib/api/client';
@@ -111,7 +110,7 @@ function toProfileFormValues(business: Business): ProfileFormValues {
 
 /** Business profile editor (no slug — web-only). STAFF is read-only. */
 export function BusinessProfileForm(): ReactElement {
-  const { t } = useTranslation(['business', 'common', 'errors']);
+  const { t, i18n } = useTranslation(['business', 'common', 'errors']);
   const { business, setBusiness } = useBusinessContext();
   const canEdit = business.myRole === 'OWNER' || business.myRole === 'ADMIN';
   const [categories, setCategories] = useState<Category[] | null>(null);
@@ -119,7 +118,7 @@ export function BusinessProfileForm(): ReactElement {
   const [categoriesNonce, setCategoriesNonce] = useState(0);
   const [apiError, setApiError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const locale = i18next.language;
+  const locale = i18n.language;
 
   const formSchema = useMemo(() => buildProfileSchema((key) => t(`business:${key}`)), [t]);
   const formValues = useMemo(() => toProfileFormValues(business), [business]);

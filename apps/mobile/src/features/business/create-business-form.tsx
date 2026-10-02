@@ -21,9 +21,8 @@ import { z } from 'zod';
 import { Banner, Button, FormField, Select, SwitchRow, Text } from '@/components/ui';
 import { useSession } from '@/features/auth/auth-provider';
 import { ApiError, apiRequest } from '@/lib/api/client';
-import i18next from 'i18next';
 
-import { writeAppMode, writeLastBusinessId } from './last-business';
+import { businessHref, writeLastBusinessId } from './last-business';
 import { useInvalidateMyBusinesses } from './use-my-businesses';
 
 type CreateFormValues = {
@@ -96,7 +95,7 @@ function buildCreateBusinessFormSchema(t: (key: string) => string) {
 
 /** Create-business form: name, category, city, optional contacts, ownerIsStaff. */
 export function CreateBusinessForm(): ReactElement {
-  const { t } = useTranslation(['business', 'common', 'errors']);
+  const { t, i18n } = useTranslation(['business', 'common', 'errors']);
   const router = useRouter();
   const session = useSession();
   const invalidateMyBusinesses = useInvalidateMyBusinesses();
@@ -106,7 +105,7 @@ export function CreateBusinessForm(): ReactElement {
   const [apiError, setApiError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const locale = i18next.language;
+  const locale = i18n.language;
   const formSchema = useMemo(
     () => buildCreateBusinessFormSchema((key) => t(`business:${key}`)),
     [t],
@@ -192,10 +191,10 @@ export function CreateBusinessForm(): ReactElement {
       });
       const created = businessSchema.parse(raw);
       await writeLastBusinessId(created.id);
-      await writeAppMode('business');
       await invalidateMyBusinesses();
       setSaved(true);
-      router.replace(`/(business)/${created.id}`);
+      // Provider writes appMode after successful GET.
+      router.replace(businessHref(created.id));
     } catch (err) {
       if (err instanceof ApiError && err.code === 'VALIDATION_FAILED' && err.details) {
         const issues = err.details.issues;

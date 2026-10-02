@@ -86,18 +86,37 @@ jest.mock('@/features/health/use-api-status', () => ({
   useApiStatus: () => 'online' as const,
 }));
 
+const mockMyBusinessesState: {
+  data: {
+    businessId: string;
+    name: string;
+    slug: string;
+    status: 'APPROVED';
+    role: 'OWNER';
+    staffMemberId: null;
+    logoUrl: null;
+  }[];
+  isLoading: boolean;
+  isError: boolean;
+  isSuccess: boolean;
+  refetch: jest.Mock;
+} = {
+  data: [],
+  isLoading: false,
+  isError: false,
+  isSuccess: true,
+  refetch: jest.fn(),
+};
+
+const mockEnterBusinessMode = jest.fn(async () => undefined);
+
 jest.mock('@/features/business/use-my-businesses', () => ({
-  useMyBusinesses: () => ({
-    data: [],
-    isLoading: false,
-    isError: false,
-    refetch: jest.fn(),
-  }),
+  useMyBusinesses: () => mockMyBusinessesState,
   useInvalidateMyBusinesses: () => jest.fn(),
 }));
 
 jest.mock('@/features/business/enter-mode', () => ({
-  enterBusinessMode: jest.fn(async () => undefined),
+  enterBusinessMode: (...args: unknown[]) => mockEnterBusinessMode(...args),
   enterClientMode: jest.fn(async () => undefined),
 }));
 
@@ -117,6 +136,12 @@ beforeEach(async () => {
   mockRouterPush.mockClear();
   mockUpdateMe.mockClear();
   mockSignOut.mockClear();
+  mockEnterBusinessMode.mockClear();
+  mockMyBusinessesState.data = [];
+  mockMyBusinessesState.isLoading = false;
+  mockMyBusinessesState.isError = false;
+  mockMyBusinessesState.isSuccess = true;
+  mockMyBusinessesState.refetch = jest.fn();
   jest.mocked(setLocale).mockClear();
   await clearSessionTokens();
   setAccessToken(null);
@@ -170,6 +195,38 @@ describe('AccountHome', () => {
       confirm?.onPress?.();
     });
     expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows list error subtitle and refetches on press when /me/businesses fails', async () => {
+    mockMyBusinessesState.isError = true;
+    mockMyBusinessesState.isSuccess = false;
+    mockMyBusinessesState.data = [];
+
+    const { getByTestId, getByText } = await renderWithI18n(<AccountHome />);
+
+    expect(getByText(catalogs.en.business.list.error)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(getByTestId('account-row-business-mode'));
+    });
+
+    expect(mockMyBusinessesState.refetch).toHaveBeenCalled();
+    expect(mockEnterBusinessMode).not.toHaveBeenCalled();
+  });
+
+  it('routes to create only when the membership list is successfully empty', async () => {
+    mockMyBusinessesState.isSuccess = true;
+    mockMyBusinessesState.isError = false;
+    mockMyBusinessesState.data = [];
+
+    const { getByTestId, getByText } = await renderWithI18n(<AccountHome />);
+    expect(getByText(catalogs.en.business.menu.createBusiness)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(getByTestId('account-row-business-mode'));
+    });
+
+    expect(mockEnterBusinessMode).toHaveBeenCalledWith(expect.anything(), []);
   });
 });
 

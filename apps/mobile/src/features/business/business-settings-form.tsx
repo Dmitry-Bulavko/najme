@@ -26,6 +26,7 @@ import {
   optionsWithCurrentValue,
 } from './booking-presets';
 import { useBusinessContext } from './business-provider';
+import { businessHref } from './last-business';
 
 type SettingsFormValues = {
   confirmationMode: ConfirmationMode;
@@ -179,7 +180,7 @@ export function BusinessSettingsForm(): ReactElement {
         <Button
           label={t('business:settings.backToOverview')}
           variant="secondary"
-          onPress={() => router.replace(`/(business)/${business.id}`)}
+          onPress={() => router.replace(businessHref(business.id))}
         />
       </View>
     );

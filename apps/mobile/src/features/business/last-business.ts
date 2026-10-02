@@ -54,3 +54,20 @@ export async function writeAppMode(mode: AppMode): Promise<void> {
     // ignore
   }
 }
+
+/** Clear persisted app mode (sign-out / reset to client default). */
+export async function clearAppMode(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(APP_MODE_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Href for a business dashboard under the fixed `business/` segment.
+ * `/(business)/new` and `/(business)/pick` stay outside this helper.
+ */
+export function businessHref(businessId: string, suffix = ''): `/(business)/business/${string}` {
+  return `/(business)/business/${businessId}${suffix}`;
+}

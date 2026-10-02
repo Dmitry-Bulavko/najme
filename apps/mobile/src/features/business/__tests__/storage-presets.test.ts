@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import {
   APP_MODE_STORAGE_KEY,
   LAST_BUSINESS_STORAGE_KEY,
+  clearAppMode,
   clearLastBusinessId,
   readAppMode,
   readLastBusinessId,
@@ -15,10 +16,20 @@ import {
   formatMinutesLabel,
   optionsWithCurrentValue,
 } from '@/features/business/booking-presets';
-import { mapWithConcurrency } from '@/features/business/load-checklist';
+import { loadChecklist, mapWithConcurrency } from '@/features/business/load-checklist';
+import { apiRequest } from '@/lib/api/client';
+
+jest.mock('@/lib/api/client', () => {
+  const actual = jest.requireActual<typeof import('@/lib/api/client')>('@/lib/api/client');
+  return {
+    ...actual,
+    apiRequest: jest.fn(),
+  };
+});
 
 beforeEach(async () => {
   await AsyncStorage.clear();
+  jest.mocked(apiRequest).mockReset();
 });
 
 describe('last-business / app mode storage', () => {
@@ -37,6 +48,13 @@ describe('last-business / app mode storage', () => {
     expect(await AsyncStorage.getItem(APP_MODE_STORAGE_KEY)).toBe('business');
     expect(await readAppMode()).toBe('business');
     await writeAppMode('client');
+    expect(await readAppMode()).toBe('client');
+  });
+
+  it('clearAppMode removes the key', async () => {
+    await writeAppMode('business');
+    await clearAppMode();
+    expect(await AsyncStorage.getItem(APP_MODE_STORAGE_KEY)).toBeNull();
     expect(await readAppMode()).toBe('client');
   });
 });
@@ -74,5 +92,86 @@ describe('mapWithConcurrency', () => {
     });
     expect(result).toEqual([10, 20, 30, 40]);
     expect(seen.sort()).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe('loadChecklist', () => {
+  it('maps business, staff, services and hours into checklist flags', async () => {
+    const businessId = '11111111-1111-4111-8111-111111111111';
+    const staffId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    jest.mocked(apiRequest).mockImplementation(async (path: string) => {
+      if (path === `/businesses/${businessId}`) {
+        return {
+          id: businessId,
+          name: 'Salon',
+          slug: 'salon',
+          status: 'APPROVED',
+          categoryId: '22222222-2222-4222-8222-222222222222',
+          city: 'PODGORICA',
+          description: null,
+          address: null,
+          contactPhone: null,
+          contactEmail: null,
+          logoUrl: 'https://cdn.example/logo.jpg',
+          coverUrl: null,
+          timezone: 'Europe/Podgorica',
+          confirmationMode: 'AUTO',
+          cancellationWindowMinutes: 0,
+          minBookingNoticeMinutes: 0,
+          bookingHorizonDays: 30,
+          rejectionReason: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          myRole: 'OWNER',
+        };
+      }
+      if (path === `/businesses/${businessId}/staff`) {
+        return [
+          {
+            id: staffId,
+            businessId,
+            displayName: 'Ada',
+            photoUrl: null,
+            active: true,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ];
+      }
+      if (path === `/businesses/${businessId}/services`) {
+        return [
+          {
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            businessId,
+            name: 'Cut',
+            description: null,
+            durationMinutes: 30,
+            bufferBeforeMinutes: 0,
+            bufferAfterMinutes: 0,
+            price: { amount: 1000, currency: 'EUR' },
+            minBookingNoticeMinutes: null,
+            bookingHorizonDays: null,
+            active: true,
+            staffMemberIds: [staffId],
+            customFields: [],
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ];
+      }
+      if (path === `/businesses/${businessId}/staff/${staffId}/working-hours`) {
+        return {
+          intervals: [{ weekday: 'MONDAY', start: '09:00', end: '17:00' }],
+        };
+      }
+      throw new Error(`unexpected ${path}`);
+    });
+
+    await expect(loadChecklist(businessId)).resolves.toEqual({
+      hasLogo: true,
+      hasStaff: true,
+      hasServiceWithStaff: true,
+      allActiveHaveHours: true,
+    });
   });
 });

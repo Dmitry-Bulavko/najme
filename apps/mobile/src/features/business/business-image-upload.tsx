@@ -7,7 +7,7 @@ import {
   type UploadKind,
 } from '@najme/contracts';
 import { tokens } from '@najme/ui-tokens';
-import * as ImageManipulator from 'expo-image-manipulator';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -70,9 +70,28 @@ export function uploadPresignedPost(
   });
 }
 
+type ManipulatedImage = { uri: string; width: number; height: number };
+
+async function compressJpeg(
+  uri: string,
+  needsResize: boolean,
+  width: number,
+  height: number,
+  quality: number,
+): Promise<ManipulatedImage> {
+  let context = ImageManipulator.manipulate(uri);
+  if (needsResize) {
+    context = context.resize(
+      width >= height ? { width: IMAGE_MAX_EDGE_PX } : { height: IMAGE_MAX_EDGE_PX },
+    );
+  }
+  const imageRef = await context.renderAsync();
+  return imageRef.saveAsync({ compress: quality, format: SaveFormat.JPEG });
+}
+
 /**
  * Logo/cover picker: gallery → resize ≤1600 px JPEG → presign → attach.
- * Hidden on Expo web export (no reliable native picker/manipulator path).
+ * On Expo web export, preview stays visible; edit actions are hidden (no reliable native picker).
  */
 export function BusinessImageUpload({
   businessId,
@@ -81,26 +100,17 @@ export function BusinessImageUpload({
   frame,
   readOnly = false,
   onChanged,
-}: BusinessImageUploadProps): ReactElement | null {
+}: BusinessImageUploadProps): ReactElement {
   const { t } = useTranslation(['business', 'common', 'errors']);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
-  if (Platform.OS === 'web') {
-    return null;
-  }
-
   const label = kind === 'LOGO' ? t('business:upload.logo') : t('business:upload.cover');
-  const canEdit = !readOnly;
+  const canEdit = !readOnly && Platform.OS !== 'web';
 
   async function pickAndUpload(): Promise<void> {
     setMessage(null);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setMessage({ tone: 'error', text: t('errors:FORBIDDEN') });
-      return;
-    }
 
     const picked = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -126,30 +136,16 @@ export function BusinessImageUpload({
       const width = asset.width ?? IMAGE_MAX_EDGE_PX;
       const height = asset.height ?? IMAGE_MAX_EDGE_PX;
       const longest = Math.max(width, height);
-      const actions: ImageManipulator.Action[] =
-        longest > IMAGE_MAX_EDGE_PX
-          ? [
-              {
-                resize:
-                  width >= height ? { width: IMAGE_MAX_EDGE_PX } : { height: IMAGE_MAX_EDGE_PX },
-              },
-            ]
-          : [];
+      const needsResize = longest > IMAGE_MAX_EDGE_PX;
 
       let quality = 0.85;
-      let manipulated = await ImageManipulator.manipulateAsync(asset.uri, actions, {
-        compress: quality,
-        format: ImageManipulator.SaveFormat.JPEG,
-      });
+      let manipulated = await compressJpeg(asset.uri, needsResize, width, height, quality);
 
       // Re-compress if still over the API max (best-effort; size from fetch blob when available).
       let blobSize = await probeUriSize(manipulated.uri);
       while (blobSize != null && blobSize > UPLOAD_MAX_BYTES && quality > 0.4) {
         quality -= 0.15;
-        manipulated = await ImageManipulator.manipulateAsync(asset.uri, actions, {
-          compress: quality,
-          format: ImageManipulator.SaveFormat.JPEG,
-        });
+        manipulated = await compressJpeg(asset.uri, needsResize, width, height, quality);
         blobSize = await probeUriSize(manipulated.uri);
       }
       if (blobSize != null && blobSize > UPLOAD_MAX_BYTES) {

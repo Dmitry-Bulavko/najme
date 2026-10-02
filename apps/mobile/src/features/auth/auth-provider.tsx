@@ -23,6 +23,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import { clearAppMode, clearLastBusinessId } from '@/features/business/last-business';
 import { setLocale } from '@/i18n';
 import {
   ApiError,
@@ -121,6 +122,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       await clearSessionTokens();
     });
+    // Drop mode memory so the next account does not inherit business mode.
+    await clearAppMode();
+    await clearLastBusinessId();
     setSession({ state: 'anonymous' });
   }, []);
 

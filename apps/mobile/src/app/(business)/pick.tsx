@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Banner, Button, ListGroup, ListItem, Screen, Text } from '@/components/ui';
-import { writeAppMode, writeLastBusinessId } from '@/features/business/last-business';
+import { businessHref, writeLastBusinessId } from '@/features/business/last-business';
 import { useMyBusinesses } from '@/features/business/use-my-businesses';
 
 /** Explicit business picker when the user has multiple memberships. */
@@ -46,7 +46,7 @@ export default function PickBusinessScreen(): ReactElement {
         </Text>
         <Button
           label={t('business:list.emptyCta')}
-          onPress={() => router.push('/(business)/new')}
+          onPress={() => router.replace('/(business)/new')}
         />
       </Screen>
     );
@@ -68,9 +68,9 @@ export default function PickBusinessScreen(): ReactElement {
             subtitle={t('business:list.role', { role: biz.role })}
             onPress={() => {
               void (async () => {
+                // Provider persists appMode after a successful GET.
                 await writeLastBusinessId(biz.businessId);
-                await writeAppMode('business');
-                router.replace(`/(business)/${biz.businessId}`);
+                router.replace(businessHref(biz.businessId));
               })();
             }}
             testID={`pick-business-${biz.businessId}`}
@@ -80,7 +80,7 @@ export default function PickBusinessScreen(): ReactElement {
       <Button
         label={t('business:menu.createBusiness')}
         variant="secondary"
-        onPress={() => router.push('/(business)/new')}
+        onPress={() => router.replace('/(business)/new')}
       />
     </Screen>
   );

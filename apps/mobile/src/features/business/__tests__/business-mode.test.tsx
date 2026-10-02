@@ -4,16 +4,15 @@ import { catalogs } from '@najme/i18n';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, waitFor } from '@testing-library/react-native';
 import type { ReactElement, ReactNode } from 'react';
-import { Platform } from 'react-native';
 
-import { BusinessImageUpload } from '@/features/business/business-image-upload';
 import { BusinessMoreHome } from '@/features/business/business-more-home';
+import { BusinessProfileForm } from '@/features/business/business-profile-form';
 import { BusinessSettingsForm } from '@/features/business/business-settings-form';
 import { BusinessStatusBanner } from '@/features/business/business-status-banner';
 import { CreateBusinessForm } from '@/features/business/create-business-form';
 import { enterBusinessMode, enterClientMode } from '@/features/business/enter-mode';
-import { writeAppMode, writeLastBusinessId } from '@/features/business/last-business';
-import { apiRequest } from '@/lib/api/client';
+import { businessHref, writeAppMode, writeLastBusinessId } from '@/features/business/last-business';
+import { ApiError, apiRequest } from '@/lib/api/client';
 import { initTestI18n, renderWithI18n } from '@/test-utils/i18n';
 
 const mockReplace = jest.fn();
@@ -57,6 +56,7 @@ jest.mock('expo-router', () => {
       back: jest.fn(),
       canGoBack: () => true,
     }),
+    usePathname: () => '/',
     Redirect: ({ href }: { href: string }) =>
       ReactActual.createElement(ReactActual.Fragment, null, `redirect:${href}`),
     Link: ({ children }: { children: ReactNode }) =>
@@ -228,7 +228,49 @@ describe('CreateBusinessForm', () => {
           }),
         }),
       );
-      expect(mockReplace).toHaveBeenCalledWith(`/(business)/${baseBusiness.id}`);
+      expect(mockReplace).toHaveBeenCalledWith(businessHref(baseBusiness.id));
+    });
+
+    screen.unmount();
+  });
+
+  it('maps VALIDATION_FAILED.details onto form fields', async () => {
+    jest.mocked(apiRequest).mockImplementation(((path: string) => {
+      if (path.startsWith('/categories')) {
+        return Promise.resolve([
+          {
+            id: baseBusiness.categoryId,
+            slug: 'salon',
+            name: 'Salon',
+            iconKey: null,
+            sortOrder: 1,
+          },
+        ]);
+      }
+      if (path === '/businesses') {
+        return Promise.reject(
+          new ApiError('VALIDATION_FAILED', 'bad', 400, {
+            issues: [{ path: ['name'], message: 'taken' }],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+
+    const screen = await wrapQuery(<CreateBusinessForm />);
+    await waitFor(() => expect(screen.getByTestId('create-category-trigger')).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.changeText(screen.getByLabelText(catalogs.en.business.create.name), 'Taken');
+      fireEvent.press(screen.getByTestId('create-category-trigger'));
+      fireEvent.press(screen.getByTestId('create-city-trigger'));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('create-business-submit'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(catalogs.en.business.create.errors.invalid)).toBeTruthy();
     });
 
     screen.unmount();
@@ -236,7 +278,7 @@ describe('CreateBusinessForm', () => {
 });
 
 describe('BusinessSettingsForm', () => {
-  it('saves confirmation mode via SegmentedControl + PATCH', async () => {
+  it('saves confirmation mode with exact PATCH body', async () => {
     jest.mocked(apiRequest).mockResolvedValue({
       ...baseBusiness,
       confirmationMode: 'MANUAL',
@@ -253,16 +295,67 @@ describe('BusinessSettingsForm', () => {
     });
 
     await waitFor(() => {
-      expect(apiRequest).toHaveBeenCalledWith(
-        `/businesses/${baseBusiness.id}`,
-        expect.objectContaining({
-          method: 'PATCH',
-          body: expect.objectContaining({ confirmationMode: 'MANUAL' }),
-        }),
-      );
+      expect(apiRequest).toHaveBeenCalledWith(`/businesses/${baseBusiness.id}`, {
+        method: 'PATCH',
+        body: { confirmationMode: 'MANUAL' },
+      });
     });
     await waitFor(() => {
       expect(screen.getByText(catalogs.en.business.settings.saved)).toBeTruthy();
+    });
+
+    screen.unmount();
+  });
+
+  it('shows non-preset 45 and omits it from PATCH when untouched', async () => {
+    mockBusinessRef.current = { ...baseBusiness, cancellationWindowMinutes: 45 };
+    jest.mocked(apiRequest).mockResolvedValue({
+      ...baseBusiness,
+      cancellationWindowMinutes: 45,
+      confirmationMode: 'MANUAL',
+    });
+
+    const screen = await wrapQuery(<BusinessSettingsForm />);
+    expect(screen.getByText('45 minutes')).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText(catalogs.en.business.settings.confirmationManual));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('settings-save'));
+    });
+
+    await waitFor(() => {
+      expect(apiRequest).toHaveBeenCalledWith(`/businesses/${baseBusiness.id}`, {
+        method: 'PATCH',
+        body: { confirmationMode: 'MANUAL' },
+      });
+    });
+
+    screen.unmount();
+  });
+
+  it('second save sends only the new change', async () => {
+    mockBusinessRef.current = { ...baseBusiness, confirmationMode: 'MANUAL' };
+    jest.mocked(apiRequest).mockResolvedValue({
+      ...baseBusiness,
+      confirmationMode: 'MANUAL',
+      bookingHorizonDays: 7,
+    });
+
+    const screen = await wrapQuery(<BusinessSettingsForm />);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('settings-horizon-trigger'));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('settings-save'));
+    });
+
+    await waitFor(() => {
+      expect(apiRequest).toHaveBeenCalledWith(`/businesses/${baseBusiness.id}`, {
+        method: 'PATCH',
+        body: { bookingHorizonDays: 7 },
+      });
     });
 
     screen.unmount();
@@ -274,6 +367,69 @@ describe('BusinessSettingsForm', () => {
     expect(screen.getByTestId('business-settings-forbidden')).toBeTruthy();
     expect(screen.queryByTestId('settings-save')).toBeNull();
     expect(screen.queryByTestId('settings-confirmation-mode')).toBeNull();
+    screen.unmount();
+  });
+});
+
+describe('BusinessProfileForm', () => {
+  it('is read-only for STAFF (no Save, readOnlySubtitle)', async () => {
+    mockBusinessRef.current = { ...baseBusiness, myRole: 'STAFF' };
+    jest.mocked(apiRequest).mockResolvedValue([
+      {
+        id: baseBusiness.categoryId,
+        slug: 'salon',
+        name: 'Salon',
+        iconKey: null,
+        sortOrder: 1,
+      },
+    ]);
+
+    const screen = await wrapQuery(<BusinessProfileForm />);
+    await waitFor(() => {
+      expect(screen.getByText(catalogs.en.business.profile.readOnlySubtitle)).toBeTruthy();
+    });
+    expect(screen.queryByTestId('profile-save')).toBeNull();
+    expect(screen.getByDisplayValue('Salon Ada')).toBeTruthy();
+
+    screen.unmount();
+  });
+
+  it('PATCHes only changed fields', async () => {
+    jest.mocked(apiRequest).mockImplementation(((path: string) => {
+      if (path.startsWith('/categories')) {
+        return Promise.resolve([
+          {
+            id: baseBusiness.categoryId,
+            slug: 'salon',
+            name: 'Salon',
+            iconKey: null,
+            sortOrder: 1,
+          },
+        ]);
+      }
+      if (path === `/businesses/${baseBusiness.id}`) {
+        return Promise.resolve({ ...baseBusiness, name: 'New Name' });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+
+    const screen = await wrapQuery(<BusinessProfileForm />);
+    await waitFor(() => expect(screen.getByTestId('profile-save')).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.changeText(screen.getByLabelText(catalogs.en.business.profile.name), 'New Name');
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('profile-save'));
+    });
+
+    await waitFor(() => {
+      expect(apiRequest).toHaveBeenCalledWith(`/businesses/${baseBusiness.id}`, {
+        method: 'PATCH',
+        body: { name: 'New Name' },
+      });
+    });
+
     screen.unmount();
   });
 });
@@ -342,30 +498,11 @@ describe('BusinessStatusBanner', () => {
   });
 });
 
-describe('BusinessImageUpload', () => {
-  it('hides upload controls on web export', async () => {
-    const original = Platform.OS;
-    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'web' });
-    const screen = await renderWithI18n(
-      <BusinessImageUpload
-        businessId={baseBusiness.id}
-        kind="LOGO"
-        currentUrl={null}
-        frame="square"
-        onChanged={jest.fn()}
-      />,
-    );
-    expect(screen.queryByTestId('upload-logo')).toBeNull();
-    Object.defineProperty(Platform, 'OS', { configurable: true, value: original });
-    screen.unmount();
-  });
-});
-
 describe('enterBusinessMode', () => {
-  it('opens create when the user has no businesses', async () => {
+  it('opens create when the user has no businesses without writing appMode', async () => {
     await enterBusinessMode({ push: mockPush, replace: mockReplace }, []);
-    expect(writeAppMode).toHaveBeenCalledWith('business');
-    expect(mockPush).toHaveBeenCalledWith('/(business)/new');
+    expect(writeAppMode).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/(business)/new');
   });
 
   it('opens the only business directly', async () => {
@@ -381,7 +518,7 @@ describe('enterBusinessMode', () => {
       },
     ]);
     expect(writeLastBusinessId).toHaveBeenCalledWith(baseBusiness.id);
-    expect(mockReplace).toHaveBeenCalledWith(`/(business)/${baseBusiness.id}`);
+    expect(mockReplace).toHaveBeenCalledWith(businessHref(baseBusiness.id));
   });
 
   it('forces the picker when requested', async () => {
@@ -409,7 +546,7 @@ describe('enterBusinessMode', () => {
       ],
       { forcePick: true },
     );
-    expect(mockPush).toHaveBeenCalledWith('/(business)/pick');
+    expect(mockReplace).toHaveBeenCalledWith('/(business)/pick');
   });
 });
 

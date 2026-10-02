@@ -10,10 +10,12 @@ import { ApiError } from '@/lib/api/client';
 
 import { BusinessStatusBanner } from './business-status-banner';
 import { useBusinessContext } from './business-provider';
+import { businessHref } from './last-business';
 import { loadChecklist, type ChecklistState } from './load-checklist';
 
 /**
  * Business overview: status banner for everyone; setup checklist for OWNER/ADMIN only.
+ * Tab header already shows the Overview title — no duplicate in-page heading.
  */
 export function BusinessOverview(): ReactElement {
   const { t } = useTranslation(['business', 'errors']);
@@ -54,32 +56,30 @@ export function BusinessOverview(): ReactElement {
       key: 'logo',
       done: checklist?.hasLogo ?? false,
       label: t('business:overview.itemLogo'),
-      href: `/(business)/${business.id}/more/profile` as const,
+      href: businessHref(business.id, '/more/profile'),
     },
     {
       key: 'staff',
       done: checklist?.hasStaff ?? false,
       label: t('business:overview.itemStaff'),
-      href: `/(business)/${business.id}/staff` as const,
+      href: businessHref(business.id, '/staff'),
     },
     {
       key: 'service',
       done: checklist?.hasServiceWithStaff ?? false,
       label: t('business:overview.itemService'),
-      href: `/(business)/${business.id}/services` as const,
+      href: businessHref(business.id, '/services'),
     },
     {
       key: 'hours',
       done: checklist?.allActiveHaveHours ?? false,
       label: t('business:overview.itemHours'),
-      href: `/(business)/${business.id}/staff` as const,
+      href: businessHref(business.id, '/staff'),
     },
   ] as const;
 
   return (
     <View style={styles.root} testID="business-overview">
-      <Text variant="title">{t('business:overview.heading')}</Text>
-
       <BusinessStatusBanner business={business} onUpdated={setBusiness} />
 
       {canManageSetup ? (
@@ -110,7 +110,8 @@ export function BusinessOverview(): ReactElement {
               {items.map((item) => (
                 <Pressable
                   key={item.key}
-                  accessibilityRole="button"
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: item.done }}
                   accessibilityLabel={item.label}
                   onPress={() => router.push(item.href)}
                   style={({ pressed }) => [

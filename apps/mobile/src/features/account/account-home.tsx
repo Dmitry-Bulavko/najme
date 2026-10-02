@@ -42,10 +42,31 @@ export function AccountHome(): ReactElement | null {
     ]);
   }
 
+  function businessModeSubtitle(): string {
+    if (myBusinesses.isLoading) return t('business:list.loading');
+    if (myBusinesses.isError) return t('business:list.error');
+    if (myBusinesses.isSuccess && myBusinesses.data.length === 0) {
+      return t('business:menu.createBusiness');
+    }
+    if (myBusinesses.isSuccess && myBusinesses.data.length > 0) {
+      return t('business:menu.switchBusiness');
+    }
+    return t('business:list.loading');
+  }
+
   function openBusinessMode() {
     if (myBusinesses.isLoading) return;
-    void enterBusinessMode(router, myBusinesses.data ?? [], {
-      forcePick: (myBusinesses.data?.length ?? 0) > 1,
+    if (myBusinesses.isError) {
+      void myBusinesses.refetch();
+      return;
+    }
+    if (!myBusinesses.isSuccess) return;
+    if (myBusinesses.data.length === 0) {
+      void enterBusinessMode(router, []);
+      return;
+    }
+    void enterBusinessMode(router, myBusinesses.data, {
+      forcePick: myBusinesses.data.length > 1,
     });
   }
 
@@ -59,13 +80,7 @@ export function AccountHome(): ReactElement | null {
           <ListItem
             icon="briefcase-outline"
             title={t('business:menu.businessMode')}
-            subtitle={
-              myBusinesses.isLoading
-                ? t('business:list.loading')
-                : myBusinesses.data && myBusinesses.data.length > 0
-                  ? t('business:menu.switchBusiness')
-                  : t('business:menu.createBusiness')
-            }
+            subtitle={businessModeSubtitle()}
             onPress={openBusinessMode}
             testID="account-row-business-mode"
           />

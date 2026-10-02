@@ -6,6 +6,7 @@ import { ListGroup, ListItem, Screen, Section } from '@/components/ui';
 
 import { useBusinessContext } from './business-provider';
 import { enterClientMode } from './enter-mode';
+import { businessHref } from './last-business';
 
 /**
  * More tab home: profile, settings (OWNER/ADMIN), switch business, client mode.
@@ -15,7 +16,7 @@ export function BusinessMoreHome(): ReactElement {
   const router = useRouter();
   const { business } = useBusinessContext();
   const canManage = business.myRole === 'OWNER' || business.myRole === 'ADMIN';
-  const base = `/(business)/${business.id}/more`;
+  const base = businessHref(business.id, '/more');
 
   return (
     <Screen edges={['bottom', 'left', 'right']}>
@@ -38,7 +39,7 @@ export function BusinessMoreHome(): ReactElement {
           <ListItem
             icon="swap-horizontal-outline"
             title={t('menu.switchBusiness')}
-            onPress={() => router.push('/(business)/pick')}
+            onPress={() => router.replace('/(business)/pick')}
             testID="more-switch-business"
           />
           <ListItem
