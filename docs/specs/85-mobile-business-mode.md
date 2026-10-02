@@ -8,7 +8,7 @@
 
 Signed-in users switch into business mode on mobile (create or pick a business), land in a
 role-aware tab shell (Overview / Staff / Services / More), and manage profile + booking settings.
-Mode and last business id persist in AsyncStorage. Staff/services bodies stay stubs; delete and
+Mode and last business id persist in AsyncStorage. Staff/services editors land in #86; delete and
 slug editing stay web-only.
 
 ## Approach
@@ -56,7 +56,7 @@ None.
 
 - Namespace `business` (already in `UI_NAMESPACES`).
 - Cities via `common:cities.<CODE>`.
-- STAFF: read-only profile; Settings hidden; Staff/Services stubs OK.
+- STAFF: read-only profile; Settings hidden; Staff/Services read-only lists (#86).
 
 ## Test plan
 
@@ -72,7 +72,7 @@ None.
 ## Risks and open questions
 
 - Physical devices need LAN IPs for `EXPO_PUBLIC_API_URL` and `STORAGE_*` (see local-dev.md).
-- Staff/services/hours editors arrive in later M2 mobile tasks.
+- Staff/services/hours editors: staff & services in #86; hours in #87.
 
 ## Implementation notes
 
