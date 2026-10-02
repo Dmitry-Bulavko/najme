@@ -99,9 +99,9 @@ describe('loadChecklist', () => {
   it('maps business, staff, services and hours into checklist flags', async () => {
     const businessId = '11111111-1111-4111-8111-111111111111';
     const staffId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-    jest.mocked(apiRequest).mockImplementation(async (path: string) => {
+    jest.mocked(apiRequest).mockImplementation(((path: string) => {
       if (path === `/businesses/${businessId}`) {
-        return {
+        return Promise.resolve({
           id: businessId,
           name: 'Salon',
           slug: 'salon',
@@ -123,10 +123,10 @@ describe('loadChecklist', () => {
           createdAt: '2026-01-01T00:00:00.000Z',
           updatedAt: '2026-01-01T00:00:00.000Z',
           myRole: 'OWNER',
-        };
+        });
       }
       if (path === `/businesses/${businessId}/staff`) {
-        return [
+        return Promise.resolve([
           {
             id: staffId,
             businessId,
@@ -136,10 +136,10 @@ describe('loadChecklist', () => {
             createdAt: '2026-01-01T00:00:00.000Z',
             updatedAt: '2026-01-01T00:00:00.000Z',
           },
-        ];
+        ]);
       }
       if (path === `/businesses/${businessId}/services`) {
-        return [
+        return Promise.resolve([
           {
             id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
             businessId,
@@ -157,15 +157,15 @@ describe('loadChecklist', () => {
             createdAt: '2026-01-01T00:00:00.000Z',
             updatedAt: '2026-01-01T00:00:00.000Z',
           },
-        ];
+        ]);
       }
       if (path === `/businesses/${businessId}/staff/${staffId}/working-hours`) {
-        return {
+        return Promise.resolve({
           intervals: [{ weekday: 'MONDAY', start: '09:00', end: '17:00' }],
-        };
+        });
       }
-      throw new Error(`unexpected ${path}`);
-    });
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
 
     await expect(loadChecklist(businessId)).resolves.toEqual({
       hasLogo: true,

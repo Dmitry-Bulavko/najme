@@ -10,10 +10,12 @@ import { ApiError, apiRequest } from '@/lib/api/client';
 import { initTestI18n, renderWithI18n } from '@/test-utils/i18n';
 
 const mockReplace = jest.fn();
-const mockClearLastBusinessId = jest.fn(async () => undefined);
-const mockReadLastBusinessId = jest.fn(async () => '11111111-1111-4111-8111-111111111111');
+const mockClearLastBusinessId = jest.fn(async (_?: unknown) => undefined);
+const mockReadLastBusinessId = jest.fn(
+  async (_?: unknown) => '11111111-1111-4111-8111-111111111111',
+);
 const mockInvalidate = jest.fn();
-const mockEnterClientMode = jest.fn(async () => undefined);
+const mockEnterClientMode = jest.fn(async (_?: unknown) => undefined);
 
 const businessId = '11111111-1111-4111-8111-111111111111';
 
@@ -83,7 +85,7 @@ jest.mock('@/features/business/use-my-businesses', () => ({
 }));
 
 jest.mock('@/features/business/enter-mode', () => ({
-  enterClientMode: (...args: unknown[]) => mockEnterClientMode(...args),
+  enterClientMode: (...args: [unknown?]) => mockEnterClientMode(...args),
 }));
 
 jest.mock('@/features/business/last-business', () => {
@@ -94,8 +96,8 @@ jest.mock('@/features/business/last-business', () => {
     ...actual,
     writeAppMode: jest.fn(async () => undefined),
     writeLastBusinessId: jest.fn(async () => undefined),
-    clearLastBusinessId: (...args: unknown[]) => mockClearLastBusinessId(...args),
-    readLastBusinessId: (...args: unknown[]) => mockReadLastBusinessId(...args),
+    clearLastBusinessId: (...args: []) => mockClearLastBusinessId(...args),
+    readLastBusinessId: (...args: []) => mockReadLastBusinessId(...args),
   };
 });
 

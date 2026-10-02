@@ -108,7 +108,9 @@ const mockMyBusinessesState: {
   refetch: jest.fn(),
 };
 
-const mockEnterBusinessMode = jest.fn(async () => undefined);
+const mockEnterBusinessMode = jest.fn(
+  async (_router: unknown, _businesses: unknown, _options?: unknown) => undefined,
+);
 
 jest.mock('@/features/business/use-my-businesses', () => ({
   useMyBusinesses: () => mockMyBusinessesState,
@@ -116,7 +118,7 @@ jest.mock('@/features/business/use-my-businesses', () => ({
 }));
 
 jest.mock('@/features/business/enter-mode', () => ({
-  enterBusinessMode: (...args: unknown[]) => mockEnterBusinessMode(...args),
+  enterBusinessMode: (...args: [unknown, unknown, unknown?]) => mockEnterBusinessMode(...args),
   enterClientMode: jest.fn(async () => undefined),
 }));
 
