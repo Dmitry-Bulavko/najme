@@ -1,6 +1,7 @@
 import {
   UPLOAD_MAX_BYTES,
   attachBusinessImageResponseSchema,
+  attachStaffPhotoResponseSchema,
   attachUploadRequestSchema,
   createUploadRequestSchema,
   createUploadResponseSchema,
@@ -19,17 +20,35 @@ import { ApiError, apiRequest } from '@/lib/api/client';
 export const IMAGE_MAX_EDGE_PX = 1600;
 export const IMAGE_INPUT_MAX_BYTES = 25 * 1024 * 1024;
 
-export type BusinessImageUploadProps = {
+type LogoCoverKind = Extract<UploadKind, 'LOGO' | 'COVER'>;
+type StaffPhotoKind = Extract<UploadKind, 'STAFF_PHOTO'>;
+
+type BusinessImageUploadBase = {
   businessId: string;
-  kind: Extract<UploadKind, 'LOGO' | 'COVER'>;
   currentUrl: string | null;
   frame: 'square' | 'wide';
   readOnly?: boolean;
-  onChanged: (urls: { logoUrl?: string | null; coverUrl?: string | null }) => void;
 };
 
-function attachPath(businessId: string, kind: 'LOGO' | 'COVER'): string {
-  return kind === 'LOGO' ? `/businesses/${businessId}/logo` : `/businesses/${businessId}/cover`;
+export type BusinessImageUploadProps =
+  | (BusinessImageUploadBase & {
+      kind: LogoCoverKind;
+      staffId?: never;
+      onChanged: (urls: { logoUrl?: string | null; coverUrl?: string | null }) => void;
+    })
+  | (BusinessImageUploadBase & {
+      kind: StaffPhotoKind;
+      staffId: string;
+      onChanged: (urls: { photoUrl?: string | null }) => void;
+    });
+
+function attachPath(businessId: string, kind: UploadKind, staffId?: string): string {
+  if (kind === 'LOGO') return `/businesses/${businessId}/logo`;
+  if (kind === 'COVER') return `/businesses/${businessId}/cover`;
+  if (!staffId) {
+    throw new Error('staffId is required for STAFF_PHOTO');
+  }
+  return `/businesses/${businessId}/staff/${staffId}/photo`;
 }
 
 /**
@@ -90,23 +109,23 @@ async function compressJpeg(
 }
 
 /**
- * Logo/cover picker: gallery → resize ≤1600 px JPEG → presign → attach.
+ * Logo/cover/staff-photo picker: gallery → resize ≤1600 px JPEG → presign → attach.
  * On Expo web export, preview stays visible; edit actions are hidden (no reliable native picker).
  */
-export function BusinessImageUpload({
-  businessId,
-  kind,
-  currentUrl,
-  frame,
-  readOnly = false,
-  onChanged,
-}: BusinessImageUploadProps): ReactElement {
+export function BusinessImageUpload(props: BusinessImageUploadProps): ReactElement {
+  const { businessId, kind, currentUrl, frame, readOnly = false, onChanged } = props;
+  const staffId = kind === 'STAFF_PHOTO' ? props.staffId : undefined;
   const { t } = useTranslation(['business', 'common', 'errors']);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
-  const label = kind === 'LOGO' ? t('business:upload.logo') : t('business:upload.cover');
+  const label =
+    kind === 'LOGO'
+      ? t('business:upload.logo')
+      : kind === 'COVER'
+        ? t('business:upload.cover')
+        : t('business:upload.photo');
   const canEdit = !readOnly && Platform.OS !== 'web';
 
   async function pickAndUpload(): Promise<void> {
@@ -176,12 +195,22 @@ export function BusinessImageUpload({
         setProgress,
       );
       const attachBody = attachUploadRequestSchema.parse({ key: presign.key });
-      const rawAttach = await apiRequest<unknown>(attachPath(businessId, kind), {
+      const rawAttach = await apiRequest<unknown>(attachPath(businessId, kind, staffId), {
         method: 'PUT',
         body: attachBody,
       });
-      const attached = attachBusinessImageResponseSchema.parse(rawAttach);
-      onChanged({ logoUrl: attached.logoUrl, coverUrl: attached.coverUrl });
+      if (kind === 'STAFF_PHOTO') {
+        const attached = attachStaffPhotoResponseSchema.parse(rawAttach);
+        (onChanged as (urls: { photoUrl?: string | null }) => void)({
+          photoUrl: attached.photoUrl,
+        });
+      } else {
+        const attached = attachBusinessImageResponseSchema.parse(rawAttach);
+        (onChanged as (urls: { logoUrl?: string | null; coverUrl?: string | null }) => void)({
+          logoUrl: attached.logoUrl,
+          coverUrl: attached.coverUrl,
+        });
+      }
       setMessage({ tone: 'success', text: t('business:upload.success') });
     } catch (err) {
       if (
@@ -219,9 +248,19 @@ export function BusinessImageUpload({
     setBusy(true);
     setMessage(null);
     try {
-      const raw = await apiRequest<unknown>(attachPath(businessId, kind), { method: 'DELETE' });
-      const attached = attachBusinessImageResponseSchema.parse(raw);
-      onChanged({ logoUrl: attached.logoUrl, coverUrl: attached.coverUrl });
+      if (kind === 'STAFF_PHOTO') {
+        await apiRequest<unknown>(attachPath(businessId, kind, staffId), { method: 'DELETE' });
+        (onChanged as (urls: { photoUrl?: string | null }) => void)({ photoUrl: null });
+      } else {
+        const raw = await apiRequest<unknown>(attachPath(businessId, kind, staffId), {
+          method: 'DELETE',
+        });
+        const attached = attachBusinessImageResponseSchema.parse(raw);
+        (onChanged as (urls: { logoUrl?: string | null; coverUrl?: string | null }) => void)({
+          logoUrl: attached.logoUrl,
+          coverUrl: attached.coverUrl,
+        });
+      }
       setMessage({ tone: 'success', text: t('business:upload.removed') });
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';

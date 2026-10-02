@@ -405,4 +405,95 @@ describe('BusinessImageUpload', () => {
       restoreXhr();
     }
   });
+
+  it('attaches STAFF_PHOTO via /staff/:id/photo and reports photoUrl', async () => {
+    const restoreOs = setPlatformOs('ios');
+    const staffId = '33333333-3333-4333-8333-333333333333';
+    const choosePhotoLabel = catalogs.en.business.upload.chooseNamed.replace(
+      '{label}',
+      catalogs.en.business.upload.photo,
+    );
+
+    class MockXHR {
+      status = 204;
+      upload = { onprogress: null as ((e: ProgressEvent) => void) | null };
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      ontimeout: (() => void) | null = null;
+      open = jest.fn();
+      send = jest.fn(() => {
+        queueMicrotask(() => this.onload?.());
+      });
+    }
+    const restoreXhr = installXhr(MockXHR);
+    jest.spyOn(FormData.prototype, 'append').mockImplementation(() => undefined);
+
+    jest.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
+      canceled: false,
+      assets: [
+        {
+          uri: 'file:///staff.jpg',
+          width: 800,
+          height: 800,
+          fileSize: 100_000,
+        },
+      ],
+    } as Awaited<ReturnType<typeof ImagePicker.launchImageLibraryAsync>>);
+
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      blob: async () => ({ size: 80_000 }),
+    } as Response);
+
+    const onChanged = jest.fn();
+    jest.mocked(apiRequest).mockImplementation(((
+      path: string,
+      init?: { method?: string; body?: unknown },
+    ) => {
+      if (path.endsWith('/uploads') && init?.method === 'POST') {
+        expect(init.body).toEqual({
+          kind: 'STAFF_PHOTO',
+          contentType: 'image/jpeg',
+          contentLength: 80_000,
+        });
+        return Promise.resolve({
+          key: 'uploads/staff.jpg',
+          url: 'https://storage.example/post',
+          fields: { key: 'uploads/staff.jpg' },
+          expiresAt: '2026-06-15T12:10:00.000Z',
+        });
+      }
+      if (path.endsWith(`/staff/${staffId}/photo`) && init?.method === 'PUT') {
+        return Promise.resolve({ photoUrl: 'https://cdn.example/staff.jpg' });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+
+    try {
+      const screen = await renderWithI18n(
+        <BusinessImageUpload
+          businessId={baseBusinessId}
+          kind="STAFF_PHOTO"
+          staffId={staffId}
+          currentUrl={null}
+          frame="square"
+          onChanged={onChanged}
+        />,
+      );
+
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText(choosePhotoLabel));
+      });
+
+      await waitFor(() => {
+        expect(onChanged).toHaveBeenCalledWith({ photoUrl: 'https://cdn.example/staff.jpg' });
+      });
+      expect(screen.getByTestId('upload-staff_photo')).toBeTruthy();
+      screen.unmount();
+    } finally {
+      fetchSpy.mockRestore();
+      restoreXhr();
+      restoreOs();
+      jest.restoreAllMocks();
+    }
+  });
 });

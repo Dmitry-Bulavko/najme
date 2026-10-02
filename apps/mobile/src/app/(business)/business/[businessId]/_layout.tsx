@@ -69,6 +69,7 @@ function BusinessTabs(): ReactElement {
         name="staff"
         options={{
           title: t('shell.staff'),
+          headerShown: false,
           tabBarIcon: tabIcon('people', 'people-outline'),
         }}
       />
@@ -76,6 +77,7 @@ function BusinessTabs(): ReactElement {
         name="services"
         options={{
           title: t('shell.services'),
+          headerShown: false,
           tabBarIcon: tabIcon('cut', 'cut-outline'),
         }}
       />
