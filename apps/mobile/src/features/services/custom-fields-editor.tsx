@@ -300,6 +300,12 @@ export function CustomFieldsEditor({
                         {!readOnly ? (
                           <Button
                             label={t('customFields.removeOption')}
+                            accessibilityLabel={t('customFields.removeOptionNamed', {
+                              label:
+                                option.label.trim() ||
+                                option.value.trim() ||
+                                String(optionIndex + 1),
+                            })}
                             variant="ghost"
                             size="sm"
                             onPress={() => removeOption(index, optionIndex)}

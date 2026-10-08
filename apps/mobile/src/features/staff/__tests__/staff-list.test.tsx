@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { Business, StaffMember } from '@najme/contracts';
 import { catalogs } from '@najme/i18n';
-import { cleanup, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, cleanup, fireEvent, waitFor } from '@testing-library/react-native';
 
 import { StaffList } from '@/features/staff/staff-list';
 import { apiRequest } from '@/lib/api/client';
@@ -9,6 +9,7 @@ import { initTestI18n, renderWithI18n } from '@/test-utils/i18n';
 
 const mockPush = jest.fn();
 const mockConfirm = jest.fn<(options: unknown) => Promise<boolean>>();
+const mockFocusCallbacks: Array<() => void> = [];
 
 const baseBusiness: Business = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -36,14 +37,24 @@ const baseBusiness: Business = {
 
 const mockBusinessRef: { current: Business } = { current: { ...baseBusiness } };
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    push: mockPush,
-    replace: jest.fn(),
-    back: jest.fn(),
-    canGoBack: () => true,
-  }),
-}));
+jest.mock('expo-router', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    useRouter: () => ({
+      push: mockPush,
+      replace: jest.fn(),
+      back: jest.fn(),
+      canGoBack: () => true,
+    }),
+    useFocusEffect: (callback: () => void | (() => void)) => {
+      ReactActual.useEffect(() => {
+        mockFocusCallbacks.push(callback);
+        const cleanupFn = callback();
+        return typeof cleanupFn === 'function' ? cleanupFn : undefined;
+      }, [callback]);
+    },
+  };
+});
 
 jest.mock('@/features/business/business-provider', () => ({
   useBusinessContext: () => ({
@@ -86,6 +97,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   cleanup();
+  mockFocusCallbacks.length = 0;
   mockPush.mockReset();
   mockConfirm.mockReset();
   mockConfirm.mockResolvedValue(true);
@@ -107,7 +119,7 @@ describe('StaffList', () => {
     screen.unmount();
   });
 
-  it('hides manage actions for STAFF', async () => {
+  it('hides manage actions for STAFF and shows em dash instead of Not linked', async () => {
     mockBusinessRef.current = { ...baseBusiness, myRole: 'STAFF' };
     jest.mocked(apiRequest).mockImplementation(((path: string) => {
       if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
@@ -122,10 +134,36 @@ describe('StaffList', () => {
       screen.getByText(
         catalogs.en.business.staff.linkedLabel.replace(
           '{name}',
-          catalogs.en.business.staff.notLinked,
+          catalogs.en.business.staff.linkedUnknown,
         ),
       ),
     ).toBeTruthy();
+    expect(screen.queryByText(catalogs.en.business.staff.notLinked)).toBeNull();
+    expect(
+      jest.mocked(apiRequest).mock.calls.some(([path]) => String(path).endsWith('/members')),
+    ).toBe(false);
+    screen.unmount();
+  });
+
+  it('refetches on focus', async () => {
+    jest.mocked(apiRequest).mockImplementation(((path: string) => {
+      if (path.endsWith('/members')) return Promise.resolve([]);
+      if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+    const screen = await renderWithI18n(<StaffList />);
+    expect(await screen.findByText('Ana')).toBeTruthy();
+    const staffCalls = () =>
+      jest.mocked(apiRequest).mock.calls.filter(([path]) => String(path).endsWith('/staff')).length;
+    expect(staffCalls()).toBe(1);
+    const latest = mockFocusCallbacks[mockFocusCallbacks.length - 1];
+    expect(latest).toBeTruthy();
+    await act(async () => {
+      latest?.();
+    });
+    await waitFor(() => {
+      expect(staffCalls()).toBeGreaterThanOrEqual(2);
+    });
     screen.unmount();
   });
 
@@ -168,6 +206,23 @@ describe('StaffList', () => {
       false,
     );
     expect(screen.getByText('Ana')).toBeTruthy();
+    screen.unmount();
+  });
+
+  it('labels edit/delete with the staff name', async () => {
+    jest.mocked(apiRequest).mockImplementation(((path: string) => {
+      if (path.endsWith('/members')) return Promise.resolve([]);
+      if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+    const screen = await renderWithI18n(<StaffList />);
+    expect(await screen.findByText('Ana')).toBeTruthy();
+    expect(
+      screen.getByLabelText(catalogs.en.business.staff.editNamed.replace('{name}', 'Ana')),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText(catalogs.en.business.staff.deleteNamed.replace('{name}', 'Ana')),
+    ).toBeTruthy();
     screen.unmount();
   });
 });

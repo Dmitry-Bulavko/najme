@@ -1,6 +1,13 @@
 import { tokens } from '@najme/ui-tokens';
 import type { ReactElement, ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+  type RefreshControlProps,
+} from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 export interface ScreenProps {
@@ -10,6 +17,8 @@ export interface ScreenProps {
   /** Apply the standard token padding (default). */
   padded?: boolean;
   edges?: readonly Edge[];
+  /** Optional pull-to-refresh control (ScrollView only). */
+  refreshControl?: ReactElement<RefreshControlProps>;
 }
 
 const DEFAULT_EDGES: readonly Edge[] = ['top', 'bottom', 'left', 'right'];
@@ -23,6 +32,7 @@ export function Screen({
   scroll = true,
   padded = true,
   edges = DEFAULT_EDGES,
+  refreshControl,
 }: ScreenProps): ReactElement {
   return (
     <SafeAreaView edges={edges} style={styles.safe}>
@@ -37,6 +47,7 @@ export function Screen({
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            refreshControl={refreshControl}
           >
             {children}
           </ScrollView>

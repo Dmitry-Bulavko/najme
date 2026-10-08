@@ -5,10 +5,10 @@ import {
   type StaffMember,
 } from '@najme/contracts';
 import { tokens } from '@najme/ui-tokens';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { Avatar, Banner, Button, Screen, Text, confirm } from '@/components/ui';
 import { useBusinessContext } from '@/features/business/business-provider';
@@ -55,24 +55,26 @@ export function StaffList(): ReactElement {
           setMembers(null);
         }
       } else {
-        // STAFF cannot list members; treat as empty so the column shows “not linked”.
-        setMembers([]);
+        // STAFF cannot list members; show em dash instead of claiming "Not linked".
+        setMembers(null);
       }
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
       setError(t(`errors:${code}`, { defaultValue: t('errors:HTTP_ERROR') }));
-      setStaff(null);
+      // Keep previous rows on a failed refetch so the screen does not blank.
     } finally {
       setLoading(false);
     }
   }, [business.id, canManage, t]);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load on mount / business change
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   const empty = useMemo(() => staff !== null && staff.length === 0, [staff]);
+  const showInitialSpinner = loading && staff === null;
 
   async function onDelete(member: StaffMember): Promise<void> {
     const ok = await confirm({
@@ -100,7 +102,17 @@ export function StaffList(): ReactElement {
   }
 
   return (
-    <Screen scroll edges={['bottom', 'left', 'right']}>
+    <Screen
+      scroll
+      edges={['bottom', 'left', 'right']}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading && staff !== null}
+          onRefresh={() => void load()}
+          tintColor={tokens.colors.primary}
+        />
+      }
+    >
       <View style={styles.root}>
         <View style={styles.header}>
           <View style={styles.headerText}>
@@ -121,7 +133,7 @@ export function StaffList(): ReactElement {
         {toast ? <Banner tone="success" message={toast} /> : null}
         {error && staff ? <Banner tone="error" message={error} /> : null}
 
-        {loading ? (
+        {showInitialSpinner ? (
           <View
             style={styles.centered}
             accessibilityLabel={t('business:staff.loading')}
@@ -173,12 +185,18 @@ export function StaffList(): ReactElement {
                   <View style={styles.actions}>
                     <Button
                       label={t('business:staff.edit')}
+                      accessibilityLabel={t('business:staff.editNamed', {
+                        name: member.displayName,
+                      })}
                       variant="secondary"
                       size="sm"
                       onPress={() => router.push(`${base}/${member.id}`)}
                     />
                     <Button
                       label={t('business:staff.delete')}
+                      accessibilityLabel={t('business:staff.deleteNamed', {
+                        name: member.displayName,
+                      })}
                       variant="destructive"
                       size="sm"
                       loading={deletingId === member.id}

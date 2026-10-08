@@ -12,6 +12,13 @@ describe('slugCustomFieldKey', () => {
     expect(isValidCustomFieldKey(slugCustomFieldKey('Pickup address'))).toBe(true);
   });
 
+  it('transliterates Cyrillic, Latin-extended and Turkish labels', () => {
+    expect(slugCustomFieldKey('Аллергии')).toBe('allergii');
+    expect(isValidCustomFieldKey(slugCustomFieldKey('Аллергии'))).toBe(true);
+    expect(slugCustomFieldKey('Đorđe preferenca')).toBe('djordje_preferenca');
+    expect(slugCustomFieldKey('Iğdır notu')).toBe('igdir_notu');
+  });
+
   it('prefixes when the slug would start with a digit', () => {
     expect(slugCustomFieldKey('2nd preference')).toBe('f_2nd_preference');
   });

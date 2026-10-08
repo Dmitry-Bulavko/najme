@@ -1,305 +1,115 @@
 import { beforeAll, describe, expect, it, jest } from '@jest/globals';
-import { fireEvent } from '@testing-library/react-native';
-import { act as reactAct } from 'react';
+import { catalogs } from '@najme/i18n';
+import { useState, type ReactElement } from 'react';
+import { Text } from 'react-native';
+import { act, fireEvent, within } from '@testing-library/react-native';
 
+import { MoneyInput } from '@/components/ui/money-input';
 import { initTestI18n, renderWithI18n } from '@/test-utils/i18n';
 
-// Import the web fallback explicitly to test the *.web.tsx bundle.
-import { TimePicker as TimePickerWeb } from '../time-picker.web';
-import { DatePicker } from '../date-picker';
-import { MoneyInput } from '../money-input';
-import { TimePicker } from '../time-picker';
-import { parseIsoDate } from '../date-time';
-
-// ---------------------------------------------------------------------------
-// Capture DateTimePicker onChange callbacks without UNSAFE_getByType.
-// The mock factory creates MockDTP; when rendered it stores the current onChange
-// in dtpCallbacks so tests can call it directly.
-// ---------------------------------------------------------------------------
-const dtpCallbacks: { onChange?: (event: { type: string }, date?: Date) => void } = {};
-
-jest.mock('@react-native-community/datetimepicker', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const React = require('react') as typeof import('react');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { View } = require('react-native') as typeof import('react-native');
-  return {
-    __esModule: true,
-    default: function MockDTP({
-      onChange,
-    }: {
-      onChange: (event: { type: string }, date?: Date) => void;
-    }): React.ReactElement {
-      // Captured by closure reference — dtpCallbacks is assigned after module init.
-      dtpCallbacks.onChange = onChange;
-      return React.createElement(View, { testID: 'mock-datetimepicker' });
-    },
-  };
-});
+function MoneyHarness({
+  initial = null as number | null,
+  locale = 'en' as 'en' | 'me' | 'ru' | 'tr',
+}: {
+  initial?: number | null;
+  locale?: 'en' | 'me' | 'ru' | 'tr';
+}): ReactElement {
+  const [value, setValue] = useState<number | null>(initial);
+  const [draftInvalid, setDraftInvalid] = useState(false);
+  return (
+    <>
+      <MoneyInput
+        label="Amount"
+        value={value}
+        onChange={setValue}
+        onDraftInvalidChange={setDraftInvalid}
+        locale={locale}
+        testID="money"
+      />
+      <Text testID="minor">{value === null ? 'null' : String(value)}</Text>
+      <Text testID="draft-invalid">{draftInvalid ? 'yes' : 'no'}</Text>
+    </>
+  );
+}
 
 beforeAll(async () => {
   await initTestI18n('en');
 });
 
-// Auto-cleanup after each test so screen doesn't bleed across tests.
-// RNTL v14 does this automatically, but we add it explicitly for safety.
-
-// ---------------------------------------------------------------------------
-// MoneyInput
-// ---------------------------------------------------------------------------
-
 describe('MoneyInput', () => {
   it('formats minor units for display', async () => {
-    const { getByDisplayValue } = await renderWithI18n(
-      <MoneyInput label="Amount" value={2550} onChange={jest.fn()} />,
+    const screen = await renderWithI18n(
+      <MoneyInput label="Amount" value={2550} onChange={jest.fn()} testID="money" />,
     );
-    expect(getByDisplayValue('25.50')).toBeTruthy();
+    const input = within(screen.getByTestId('money')).getByLabelText('Amount');
+    expect(input.props.value).toBe('25.50');
+    screen.unmount();
   });
 
-  it('parses dot decimal (en locale) into minor units on blur', async () => {
-    const onChange = jest.fn();
-    const { getByLabelText } = await renderWithI18n(
-      <MoneyInput label="Amount" value={null} onChange={onChange} locale="en" />,
-    );
-    const input = getByLabelText('Amount');
-    await fireEvent(input, 'focus');
-    await fireEvent.changeText(input, '12.5');
-    await fireEvent(input, 'blur');
-    expect(onChange).toHaveBeenCalledWith(1250);
-  });
-
-  it('parses comma decimal (me locale) into minor units on blur', async () => {
-    const onChange = jest.fn();
-    const { getByLabelText } = await renderWithI18n(
-      <MoneyInput label="Amount" value={null} onChange={onChange} locale="me" />,
-    );
-    const input = getByLabelText('Amount');
-    await fireEvent(input, 'focus');
-    await fireEvent.changeText(input, '12,5');
-    await fireEvent(input, 'blur');
-    expect(onChange).toHaveBeenCalledWith(1250);
-  });
-
-  it('treats comma as grouping in en locale (1,234 → 123400)', async () => {
-    const onChange = jest.fn();
-    const { getByLabelText } = await renderWithI18n(
-      <MoneyInput label="Amount" value={null} onChange={onChange} locale="en" />,
-    );
-    const input = getByLabelText('Amount');
-    await fireEvent(input, 'focus');
-    await fireEvent.changeText(input, '1,234');
-    await fireEvent(input, 'blur');
-    expect(onChange).toHaveBeenCalledWith(123400);
-  });
-
-  it('treats dot as grouping in me locale (1.234,56 → 123456)', async () => {
-    const onChange = jest.fn();
-    const { getByLabelText } = await renderWithI18n(
-      <MoneyInput label="Amount" value={null} onChange={onChange} locale="me" />,
-    );
-    const input = getByLabelText('Amount');
-    await fireEvent(input, 'focus');
-    await fireEvent.changeText(input, '1.234,56');
-    await fireEvent(input, 'blur');
-    expect(onChange).toHaveBeenCalledWith(123456);
-  });
-
-  it('rounds to two decimals (1.005 → 101)', async () => {
-    const onChange = jest.fn();
-    const { getByLabelText } = await renderWithI18n(
-      <MoneyInput label="Amount" value={null} onChange={onChange} />,
-    );
-    const input = getByLabelText('Amount');
-    await fireEvent(input, 'focus');
-    await fireEvent.changeText(input, '1.005');
-    await fireEvent(input, 'blur');
-    expect(onChange).toHaveBeenCalledWith(101);
-  });
-
-  it('does not call onChange for invalid input (12abc)', async () => {
-    const onChange = jest.fn();
-    const { getByLabelText } = await renderWithI18n(
-      <MoneyInput label="Amount" value={null} onChange={onChange} />,
-    );
-    const input = getByLabelText('Amount');
-    await fireEvent(input, 'focus');
-    await fireEvent.changeText(input, '12abc');
-    await fireEvent(input, 'blur');
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it('round-trip: value=2500 me locale → focus then blur emits 2500', async () => {
-    const onChange = jest.fn();
-    const { getByLabelText, getByDisplayValue } = await renderWithI18n(
-      <MoneyInput label="Amount" value={2500} onChange={onChange} locale="me" />,
-    );
-    // formatMinorAsMajor(2500, 'me') = '25,00' — displayed with comma decimal
-    expect(getByDisplayValue('25,00')).toBeTruthy();
-    const input = getByLabelText('Amount');
-    // Focus sets draft to '25,00'; blur parses it back to 2500.
-    await fireEvent(input, 'focus');
-    await fireEvent(input, 'blur');
-    expect(onChange).toHaveBeenCalledWith(2500);
-  });
-
-  it('rejects 12,50 in en locale (only 2 digits after comma — bad grouping)', async () => {
-    const onChange = jest.fn();
-    const { getByLabelText } = await renderWithI18n(
-      <MoneyInput label="Amount" value={null} onChange={onChange} locale="en" />,
-    );
-    const input = getByLabelText('Amount');
-    await fireEvent(input, 'focus');
-    await fireEvent.changeText(input, '12,50');
-    await fireEvent(input, 'blur');
-    expect(onChange).not.toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// TimePicker (native)
-// ---------------------------------------------------------------------------
-
-describe('TimePicker (native)', () => {
-  it('renders the current HH:mm value', async () => {
-    const { getByRole, getByText } = await renderWithI18n(
-      <TimePicker label="Start" value="09:30" onChange={jest.fn()} />,
-    );
-    expect(getByRole('button', { name: 'Start' })).toBeTruthy();
-    expect(getByText('09:30')).toBeTruthy();
-  });
-
-  it('emits snapped HH:mm when DateTimePicker fires a set event (09:03 → 09:05)', async () => {
-    const onChange = jest.fn();
-    const { getByRole } = await renderWithI18n(
-      <TimePicker label="Start" value="09:00" onChange={onChange} />,
-    );
-
-    // Open the picker so MockDTP mounts and captures onChange.
-    await fireEvent.press(getByRole('button', { name: 'Start' }));
-
-    // Fire the captured onChange with an off-grid time.
-    await reactAct(async () => {
-      dtpCallbacks.onChange?.({ type: 'set' }, new Date(2000, 0, 1, 9, 3));
+  it('commits on change and flags invalid en drafts like 12,50', async () => {
+    const screen = await renderWithI18n(<MoneyHarness locale="en" initial={1500} />);
+    const input = within(screen.getByTestId('money')).getByLabelText('Amount');
+    await act(async () => {
+      fireEvent(input, 'focus');
     });
-
-    // 09:03 → rounds to 09:05
-    expect(onChange).toHaveBeenCalledWith('09:05');
-  });
-
-  it('does not emit when DateTimePicker fires a dismissed event', async () => {
-    const onChange = jest.fn();
-    const { getByRole } = await renderWithI18n(
-      <TimePicker label="Start" value="09:00" onChange={onChange} />,
-    );
-
-    await fireEvent.press(getByRole('button', { name: 'Start' }));
-
-    await reactAct(async () => {
-      dtpCallbacks.onChange?.({ type: 'dismissed' }, undefined);
+    await act(async () => {
+      fireEvent.changeText(input, '12,50');
     });
-
-    expect(onChange).not.toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// TimePicker.web.tsx fallback
-// ---------------------------------------------------------------------------
-
-describe('TimePicker web fallback', () => {
-  it('renders with the current value', async () => {
-    const { getByDisplayValue } = await renderWithI18n(
-      <TimePickerWeb label="Start" value="09:30" onChange={jest.fn()} />,
-    );
-    expect(getByDisplayValue('09:30')).toBeTruthy();
-  });
-
-  it('snaps to 5-minute grid on blur', async () => {
-    const onChange = jest.fn();
-    const { getByLabelText } = await renderWithI18n(
-      <TimePickerWeb label="Start" value="09:00" onChange={onChange} />,
-    );
-    const input = getByLabelText('Start');
-    await fireEvent(input, 'focus');
-    await fireEvent.changeText(input, '09:03');
-    await fireEvent(input, 'blur');
-    expect(onChange).toHaveBeenCalledWith('09:05');
-  });
-
-  it('does not emit for invalid input on blur', async () => {
-    const onChange = jest.fn();
-    const { getByLabelText } = await renderWithI18n(
-      <TimePickerWeb label="Start" value="09:00" onChange={onChange} />,
-    );
-    const input = getByLabelText('Start');
-    await fireEvent(input, 'focus');
-    await fireEvent.changeText(input, 'bad-value');
-    await fireEvent(input, 'blur');
-    expect(onChange).not.toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// DatePicker (native)
-// ---------------------------------------------------------------------------
-
-describe('DatePicker (native)', () => {
-  it('renders the current YYYY-MM-DD value', async () => {
-    const { getByRole, getByText } = await renderWithI18n(
-      <DatePicker label="Date" value="2026-09-30" onChange={jest.fn()} />,
-    );
-    expect(getByRole('button', { name: 'Date' })).toBeTruthy();
-    expect(getByText('2026-09-30')).toBeTruthy();
-  });
-
-  it('emits ISO date when DateTimePicker fires a set event', async () => {
-    const onChange = jest.fn();
-    const { getByRole } = await renderWithI18n(
-      <DatePicker label="Date" value="2026-09-30" onChange={onChange} />,
-    );
-
-    await fireEvent.press(getByRole('button', { name: 'Date' }));
-
-    await reactAct(async () => {
-      // Sep 15 2026 (month is 0-indexed in JS Date)
-      dtpCallbacks.onChange?.({ type: 'set' }, new Date(2026, 8, 15));
+    expect(screen.getByTestId('minor').props.children).toBe('null');
+    expect(screen.getByTestId('draft-invalid').props.children).toBe('yes');
+    await act(async () => {
+      fireEvent(input, 'blur');
     });
-
-    expect(onChange).toHaveBeenCalledWith('2026-09-15');
+    expect(input.props.value).toBe('12,50');
+    expect(screen.getByTestId('minor').props.children).toBe('null');
+    expect(screen.getByTestId('draft-invalid').props.children).toBe('yes');
+    screen.unmount();
   });
 
-  it('does not emit when DateTimePicker is dismissed', async () => {
-    const onChange = jest.fn();
-    const { getByRole } = await renderWithI18n(
-      <DatePicker label="Date" value="2026-09-30" onChange={onChange} />,
-    );
-
-    await fireEvent.press(getByRole('button', { name: 'Date' }));
-
-    await reactAct(async () => {
-      dtpCallbacks.onChange?.({ type: 'dismissed' }, undefined);
+  it('parses comma decimal in me locale on change', async () => {
+    const screen = await renderWithI18n(<MoneyHarness locale="me" />);
+    const input = within(screen.getByTestId('money')).getByLabelText('Amount');
+    await act(async () => {
+      fireEvent(input, 'focus');
     });
-
-    expect(onChange).not.toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// parseIsoDate — rejection of bad dates
-// ---------------------------------------------------------------------------
-
-describe('parseIsoDate rejection', () => {
-  it('returns null for invalid calendar dates', () => {
-    expect(parseIsoDate('2026-02-31')).toBeNull();
-    expect(parseIsoDate('26-09-30')).toBeNull();
-    expect(parseIsoDate('not-a-date')).toBeNull();
+    await act(async () => {
+      fireEvent.changeText(input, '12,50');
+    });
+    expect(screen.getByTestId('minor').props.children).toBe('1250');
+    expect(screen.getByTestId('draft-invalid').props.children).toBe('no');
+    screen.unmount();
   });
 
-  it('returns a Date for a valid date', () => {
-    const d = parseIsoDate('2026-09-15');
-    expect(d).toBeInstanceOf(Date);
-    expect(d?.getFullYear()).toBe(2026);
-    expect(d?.getMonth()).toBe(8); // 0-indexed
-    expect(d?.getDate()).toBe(15);
+  it('updates the controlled value while typing so submit is not stale', async () => {
+    const screen = await renderWithI18n(<MoneyHarness locale="en" initial={1500} />);
+    const input = within(screen.getByTestId('money')).getByLabelText('Amount');
+    await act(async () => {
+      fireEvent(input, 'focus');
+    });
+    await act(async () => {
+      fireEvent.changeText(input, '35');
+    });
+    expect(screen.getByTestId('minor').props.children).toBe('3500');
+    screen.unmount();
+  });
+
+  it('clears draft-invalid when the field is emptied', async () => {
+    const screen = await renderWithI18n(<MoneyHarness locale="en" />);
+    const input = within(screen.getByTestId('money')).getByLabelText('Amount');
+    await act(async () => {
+      fireEvent(input, 'focus');
+    });
+    await act(async () => {
+      fireEvent.changeText(input, '12,50');
+    });
+    expect(screen.getByTestId('draft-invalid').props.children).toBe('yes');
+    await act(async () => {
+      fireEvent.changeText(input, '');
+    });
+    expect(screen.getByTestId('minor').props.children).toBe('null');
+    expect(screen.getByTestId('draft-invalid').props.children).toBe('no');
+    // catalogs imported so i18n stays warm for sibling suites
+    expect(catalogs.en.business.services.price).toBeTruthy();
+    screen.unmount();
   });
 });

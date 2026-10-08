@@ -55,6 +55,7 @@ type ServiceFormValues = {
   bufferBeforeMinutes: string;
   bufferAfterMinutes: string;
   priceAmount: number | null;
+  priceDraftInvalid: boolean;
   active: boolean;
   staffMemberIds: string[];
   minBookingNoticeMinutes: string;
@@ -64,6 +65,8 @@ type ServiceFormValues = {
 type ServiceFormProps = {
   mode: 'create' | 'edit';
   serviceId?: string;
+  /** Show the created success banner once after navigate-from-create (`?created=1`). */
+  showCreatedBanner?: boolean;
 };
 
 function nullableSelectValue(raw: string): number | null {
@@ -76,7 +79,11 @@ function toSelectString(value: number | null): string {
 }
 
 /** Create or edit a service: duration/buffers, MoneyInput, staff chips, custom fields. */
-export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement {
+export function ServiceForm({
+  mode,
+  serviceId,
+  showCreatedBanner = false,
+}: ServiceFormProps): ReactElement {
   const { t } = useTranslation(['business', 'errors']);
   const router = useRouter();
   const { business } = useBusinessContext();
@@ -91,6 +98,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
   const [loadNonce, setLoadNonce] = useState(0);
   const [apiError, setApiError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [createdBanner, setCreatedBanner] = useState(showCreatedBanner);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const formSchema = useMemo(
@@ -127,12 +135,21 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
             .min(0, { error: t('business:services.errors.priceInvalid') })
             .max(99_999_999, { error: t('business:services.errors.priceInvalid') })
             .nullable(),
+          priceDraftInvalid: z.boolean(),
           active: z.boolean(),
           staffMemberIds: z.array(z.string().uuid()),
           minBookingNoticeMinutes: z.string(),
           bookingHorizonDays: z.string(),
         })
         .superRefine((data, ctx) => {
+          if (data.priceDraftInvalid) {
+            ctx.addIssue({
+              code: 'custom',
+              path: ['priceAmount'],
+              message: t('business:services.errors.priceInvalid'),
+            });
+            return;
+          }
           if (data.priceAmount === null) {
             ctx.addIssue({
               code: 'custom',
@@ -153,6 +170,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
       bufferBeforeMinutes: '0',
       bufferAfterMinutes: '0',
       priceAmount: null,
+      priceDraftInvalid: false,
       active: true,
       staffMemberIds: [],
       minBookingNoticeMinutes: 'null',
@@ -212,6 +230,23 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
     setLoadNonce((n) => n + 1);
   }, []);
 
+  function goBackToList(): void {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace(listHref);
+    }
+  }
+
+  const noticeError = form.formState.errors.minBookingNoticeMinutes?.message;
+  const horizonError = form.formState.errors.bookingHorizonDays?.message;
+
+  useEffect(() => {
+    if (noticeError || horizonError) {
+      setAdvancedOpen(true);
+    }
+  }, [noticeError, horizonError]);
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -234,6 +269,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
             bufferBeforeMinutes: String(service.bufferBeforeMinutes),
             bufferAfterMinutes: String(service.bufferAfterMinutes),
             priceAmount: service.price.amount,
+            priceDraftInvalid: false,
             active: service.active,
             staffMemberIds: service.staffMemberIds,
             minBookingNoticeMinutes: toSelectString(service.minBookingNoticeMinutes),
@@ -302,6 +338,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
     if (!canEdit) return;
     setApiError(null);
     setSaved(false);
+    setCreatedBanner(false);
     if (!validateCustomFieldsLocally()) {
       setApiError(t('business:customFields.errors.formInvalid'));
       return;
@@ -329,8 +366,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
           body,
         });
         const created = serviceSchema.parse(raw);
-        setSaved(true);
-        router.replace(businessHref(business.id, `/services/${created.id}`));
+        router.replace(`${businessHref(business.id, `/services/${created.id}`)}?created=1`);
         return;
       }
       if (!serviceId) return;
@@ -347,6 +383,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
         bufferBeforeMinutes: String(updated.bufferBeforeMinutes),
         bufferAfterMinutes: String(updated.bufferAfterMinutes),
         priceAmount: updated.price.amount,
+        priceDraftInvalid: false,
         active: updated.active,
         staffMemberIds: updated.staffMemberIds,
         minBookingNoticeMinutes: toSelectString(updated.minBookingNoticeMinutes),
@@ -392,7 +429,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
           <Button
             label={t('business:services.backToList')}
             variant="secondary"
-            onPress={() => router.replace(listHref)}
+            onPress={goBackToList}
           />
         </View>
       </Screen>
@@ -422,7 +459,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
           <Button
             label={t('business:services.backToList')}
             variant="secondary"
-            onPress={() => router.replace(listHref)}
+            onPress={goBackToList}
           />
         </View>
       </Screen>
@@ -448,16 +485,10 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
           </Text>
         </View>
 
-        {saved ? (
-          <Banner
-            tone="success"
-            message={
-              mode === 'create'
-                ? t('business:services.createdToast')
-                : t('business:services.savedToast')
-            }
-          />
+        {createdBanner ? (
+          <Banner tone="success" message={t('business:services.createdToast')} />
         ) : null}
+        {saved ? <Banner tone="success" message={t('business:services.savedToast')} /> : null}
         {apiError ? <Banner tone="error" message={apiError} /> : null}
 
         <FormField
@@ -539,6 +570,12 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
           onChange={(minor) =>
             form.setValue('priceAmount', minor, { shouldDirty: true, shouldValidate: true })
           }
+          onDraftInvalidChange={(invalid) => {
+            form.setValue('priceDraftInvalid', invalid, {
+              shouldDirty: true,
+              shouldValidate: true,
+            });
+          }}
           currency="EUR"
           disabled={readOnly || form.formState.isSubmitting}
           error={form.formState.errors.priceAmount?.message}
@@ -624,6 +661,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
           <Button
             label={t('business:services.advancedHeading')}
             variant="ghost"
+            accessibilityState={{ expanded: advancedOpen }}
             onPress={() => setAdvancedOpen((open) => !open)}
             testID="service-advanced-toggle"
           />
@@ -701,7 +739,7 @@ export function ServiceForm({ mode, serviceId }: ServiceFormProps): ReactElement
           <Button
             label={t('business:services.backToList')}
             variant="secondary"
-            onPress={() => router.replace(listHref)}
+            onPress={goBackToList}
           />
         </View>
       </View>

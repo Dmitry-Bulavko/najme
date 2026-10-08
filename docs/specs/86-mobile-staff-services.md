@@ -60,10 +60,10 @@ None.
 
 ## Risks and open questions
 
-- Photo only after create (API requires `staffId` for `STAFF_PHOTO`) — create navigates to edit.
-- Members list is OWNER/ADMIN-only; STAFF list shows “not linked” without a members fetch.
-- Mobile `MoneyInput` has no draft-invalid callback; empty/null is validated on submit (parity
-  for required price; invalid draft on blur keeps the previous amount).
+- Photo only after create (API requires `staffId` for `STAFF_PHOTO`) — create navigates to edit with
+  `?created=1` so the edit screen shows the created banner once.
+- Members list is OWNER/ADMIN-only; STAFF skip the members fetch and show “—” (`linkedUnknown`)
+  instead of “Not linked”.
 
 ## Implementation notes
 
@@ -73,10 +73,15 @@ None.
   `custom-fields-editor`, `service-presets`, `slug-custom-field-key`, `map-service-validation`.
 - `BusinessImageUpload` supports `STAFF_PHOTO` + `staffId` (PUT/DELETE
   `/businesses/:id/staff/:staffId/photo`); create navigates to edit for photo; Expo web keeps
-  preview and hides edit actions.
+  preview and hides edit actions. DELETE logo/cover/staff-photo returns 204 — clear the matching
+  URL via `onChanged` without parsing a body.
 - Staff selection uses `Chip`; active toggles use `SwitchRow`; deletes use `confirm({ destructive })`.
-- MoneyInput binds minor units directly; mobile has no draft-invalid callback — empty price fails
-  on submit; invalid draft on blur keeps the previous amount.
-- Linked member via `GET .../members` for OWNER/ADMIN; STAFF list shows “not linked” without fetch.
-- Reused existing `business.staff.*` / `services.*` / `customFields.*` i18n keys (no new keys).
+- `MoneyInput` commits on every change (same as web #82): valid → `onChange(minor)`; invalid
+  non-empty → `onChange(null)` + `onDraftInvalidChange(true)`; draft text stays visible. Service
+  form tracks `priceDraftInvalid` and blocks submit with `services.errors.priceInvalid`.
+- Lists refetch on focus (`useFocusEffect`); spinner only when there is no data yet; pull-to-refresh
+  via `RefreshControl`. Form back uses `router.back()` when possible.
+- Linked member via `GET .../members` for OWNER/ADMIN; STAFF show em dash without a members fetch.
+- Label-in-name a11y keys: `staff.editNamed` / `deleteNamed`, `services.editNamed` / `deleteNamed`,
+  `customFields.removeOptionNamed`.
 - No new ADR or contracts.

@@ -5,10 +5,10 @@ import {
   type Service,
 } from '@najme/contracts';
 import { tokens } from '@najme/ui-tokens';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { Banner, Button, Screen, Text, confirm } from '@/components/ui';
 import { useBusinessContext } from '@/features/business/business-provider';
@@ -41,18 +41,20 @@ export function ServiceList(): ReactElement {
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
       setError(t(`errors:${code}`, { defaultValue: t('errors:HTTP_ERROR') }));
-      setServices(null);
+      // Keep previous rows on a failed refetch so the screen does not blank.
     } finally {
       setLoading(false);
     }
   }, [business.id, t]);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load on mount / business change
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   const empty = useMemo(() => services !== null && services.length === 0, [services]);
+  const showInitialSpinner = loading && services === null;
 
   async function onDelete(service: Service): Promise<void> {
     const ok = await confirm({
@@ -80,7 +82,17 @@ export function ServiceList(): ReactElement {
   }
 
   return (
-    <Screen scroll edges={['bottom', 'left', 'right']}>
+    <Screen
+      scroll
+      edges={['bottom', 'left', 'right']}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading && services !== null}
+          onRefresh={() => void load()}
+          tintColor={tokens.colors.primary}
+        />
+      }
+    >
       <View style={styles.root}>
         <View style={styles.header}>
           <View style={styles.headerText}>
@@ -103,7 +115,7 @@ export function ServiceList(): ReactElement {
         {toast ? <Banner tone="success" message={toast} /> : null}
         {error && services ? <Banner tone="error" message={error} /> : null}
 
-        {loading ? (
+        {showInitialSpinner ? (
           <View
             style={styles.centered}
             accessibilityLabel={t('business:services.loading')}
@@ -158,12 +170,16 @@ export function ServiceList(): ReactElement {
                   <View style={styles.actions}>
                     <Button
                       label={t('business:services.edit')}
+                      accessibilityLabel={t('business:services.editNamed', { name: service.name })}
                       variant="secondary"
                       size="sm"
                       onPress={() => router.push(`${base}/${service.id}`)}
                     />
                     <Button
                       label={t('business:services.delete')}
+                      accessibilityLabel={t('business:services.deleteNamed', {
+                        name: service.name,
+                      })}
                       variant="destructive"
                       size="sm"
                       loading={deletingId === service.id}

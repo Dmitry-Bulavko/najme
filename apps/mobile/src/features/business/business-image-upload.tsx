@@ -248,17 +248,17 @@ export function BusinessImageUpload(props: BusinessImageUploadProps): ReactEleme
     setBusy(true);
     setMessage(null);
     try {
+      // DELETE returns 204 with an empty body — do not parse attach response schemas.
+      await apiRequest<unknown>(attachPath(businessId, kind, staffId), { method: 'DELETE' });
       if (kind === 'STAFF_PHOTO') {
-        await apiRequest<unknown>(attachPath(businessId, kind, staffId), { method: 'DELETE' });
         (onChanged as (urls: { photoUrl?: string | null }) => void)({ photoUrl: null });
-      } else {
-        const raw = await apiRequest<unknown>(attachPath(businessId, kind, staffId), {
-          method: 'DELETE',
-        });
-        const attached = attachBusinessImageResponseSchema.parse(raw);
+      } else if (kind === 'LOGO') {
         (onChanged as (urls: { logoUrl?: string | null; coverUrl?: string | null }) => void)({
-          logoUrl: attached.logoUrl,
-          coverUrl: attached.coverUrl,
+          logoUrl: null,
+        });
+      } else {
+        (onChanged as (urls: { logoUrl?: string | null; coverUrl?: string | null }) => void)({
+          coverUrl: null,
         });
       }
       setMessage({ tone: 'success', text: t('business:upload.removed') });

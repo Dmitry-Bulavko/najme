@@ -14,6 +14,7 @@ import { apiRequest } from '@/lib/api/client';
 import { initTestI18n, renderWithI18n } from '@/test-utils/i18n';
 
 const baseBusinessId = '11111111-1111-4111-8111-111111111111';
+const mockConfirm = jest.fn<(options: unknown) => Promise<boolean>>();
 
 jest.mock('@/lib/api/client', () => {
   const actual = jest.requireActual<typeof import('@/lib/api/client')>('@/lib/api/client');
@@ -23,12 +24,18 @@ jest.mock('@/lib/api/client', () => {
   };
 });
 
+jest.mock('@/components/ui/confirm', () => ({
+  confirm: (options: unknown) => mockConfirm(options),
+}));
+
 beforeAll(async () => {
   await initTestI18n('en');
 });
 
 beforeEach(() => {
   cleanup();
+  mockConfirm.mockReset();
+  mockConfirm.mockResolvedValue(true);
   jest.mocked(apiRequest).mockReset();
   jest.mocked(ImagePicker.launchImageLibraryAsync).mockReset();
   jest.mocked(ImageManipulator.manipulate).mockClear();
@@ -403,6 +410,84 @@ describe('BusinessImageUpload', () => {
     } finally {
       appendSpy.mockRestore();
       restoreXhr();
+    }
+  });
+
+  it('clears logoUrl after DELETE 204 without parsing a body', async () => {
+    const restoreOs = setPlatformOs('ios');
+    const removeLabel = catalogs.en.business.upload.removeNamed.replace(
+      '{label}',
+      catalogs.en.business.upload.logo,
+    );
+    const onChanged = jest.fn();
+    jest.mocked(apiRequest).mockImplementation(((path: string, init?: { method?: string }) => {
+      if (path.endsWith('/logo') && init?.method === 'DELETE') {
+        return Promise.resolve(undefined);
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+
+    try {
+      const screen = await renderWithI18n(
+        <BusinessImageUpload
+          businessId={baseBusinessId}
+          kind="LOGO"
+          currentUrl="https://cdn.example/logo.jpg"
+          frame="square"
+          onChanged={onChanged}
+        />,
+      );
+
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText(removeLabel));
+      });
+
+      await waitFor(() => {
+        expect(mockConfirm).toHaveBeenCalled();
+        expect(onChanged).toHaveBeenCalledWith({ logoUrl: null });
+      });
+      expect(screen.getByText(catalogs.en.business.upload.removed)).toBeTruthy();
+      screen.unmount();
+    } finally {
+      restoreOs();
+    }
+  });
+
+  it('clears coverUrl after DELETE 204 without parsing a body', async () => {
+    const restoreOs = setPlatformOs('ios');
+    const removeLabel = catalogs.en.business.upload.removeNamed.replace(
+      '{label}',
+      catalogs.en.business.upload.cover,
+    );
+    const onChanged = jest.fn();
+    jest.mocked(apiRequest).mockImplementation(((path: string, init?: { method?: string }) => {
+      if (path.endsWith('/cover') && init?.method === 'DELETE') {
+        return Promise.resolve(undefined);
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+
+    try {
+      const screen = await renderWithI18n(
+        <BusinessImageUpload
+          businessId={baseBusinessId}
+          kind="COVER"
+          currentUrl="https://cdn.example/cover.jpg"
+          frame="wide"
+          onChanged={onChanged}
+        />,
+      );
+
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText(removeLabel));
+      });
+
+      await waitFor(() => {
+        expect(onChanged).toHaveBeenCalledWith({ coverUrl: null });
+      });
+      screen.unmount();
+    } finally {
+      restoreOs();
     }
   });
 

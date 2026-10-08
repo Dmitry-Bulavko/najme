@@ -8,6 +8,8 @@ import { ApiError, apiRequest } from '@/lib/api/client';
 import { initTestI18n, renderWithI18n } from '@/test-utils/i18n';
 
 const mockReplace = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn(() => true);
 
 const baseBusiness: Business = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -34,13 +36,14 @@ const baseBusiness: Business = {
 };
 
 const mockBusinessRef: { current: Business } = { current: { ...baseBusiness } };
+const inactiveStaffId = '55555555-5555-4555-8555-555555555555';
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: jest.fn(),
     replace: mockReplace,
-    back: jest.fn(),
-    canGoBack: () => true,
+    back: mockBack,
+    canGoBack: () => mockCanGoBack(),
   }),
 }));
 
@@ -134,6 +137,21 @@ function makeService(overrides: Partial<Service> = {}): Service {
   };
 }
 
+async function fillPrice(
+  screen: Awaited<ReturnType<typeof renderWithI18n>>,
+  amount: string,
+): Promise<void> {
+  const priceInput = within(screen.getByTestId('service-price')).getByLabelText(
+    catalogs.en.business.services.price,
+  );
+  await act(async () => {
+    fireEvent(priceInput, 'focus');
+  });
+  await act(async () => {
+    fireEvent.changeText(priceInput, amount);
+  });
+}
+
 beforeAll(async () => {
   await initTestI18n('en');
 });
@@ -141,12 +159,15 @@ beforeAll(async () => {
 beforeEach(() => {
   cleanup();
   mockReplace.mockReset();
+  mockBack.mockReset();
+  mockCanGoBack.mockReset();
+  mockCanGoBack.mockReturnValue(true);
   jest.mocked(apiRequest).mockReset();
   mockBusinessRef.current = { ...baseBusiness, myRole: 'OWNER' };
 });
 
 describe('ServiceForm', () => {
-  it('binds MoneyInput to minor units and exposes duration presets', async () => {
+  it('submits typed price without blur', async () => {
     jest.mocked(apiRequest).mockImplementation(((path: string, init?: { method?: string }) => {
       if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
       if (init?.method === 'POST') {
@@ -160,22 +181,10 @@ describe('ServiceForm', () => {
     await waitFor(() => {
       expect(screen.getByTestId('service-price')).toBeTruthy();
     });
-    expect(screen.getByTestId('service-duration-value').props.children).toBe('30');
-    const priceInput = within(screen.getByTestId('service-price')).getByLabelText(
-      catalogs.en.business.services.price,
-    );
-    await act(async () => {
-      await fireEvent(priceInput, 'focus');
-    });
-    await act(async () => {
-      await fireEvent.changeText(priceInput, '12.50');
-    });
-    await act(async () => {
-      await fireEvent(priceInput, 'blur');
-    });
     await act(async () => {
       fireEvent.changeText(screen.getByLabelText(catalogs.en.business.services.name), 'Color');
     });
+    await fillPrice(screen, '12.50');
     await act(async () => {
       fireEvent.press(screen.getByTestId('service-submit'));
     });
@@ -187,12 +196,88 @@ describe('ServiceForm', () => {
           body: expect.objectContaining({
             name: 'Color',
             price: { amount: 1250, currency: 'EUR' },
-            durationMinutes: 30,
           }),
         }),
       );
     });
+    expect(mockReplace).toHaveBeenCalledWith(
+      expect.stringContaining(`/services/44444444-4444-4444-8444-444444444444?created=1`),
+    );
     screen.unmount();
+  });
+
+  it('blocks submit for invalid en price draft 12,50', async () => {
+    jest.mocked(apiRequest).mockImplementation(((path: string) => {
+      if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+    const screen = await renderWithI18n(<ServiceForm mode="create" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('service-price')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.changeText(screen.getByLabelText(catalogs.en.business.services.name), 'Cut');
+    });
+    await fillPrice(screen, '12,50');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('service-submit'));
+    });
+    await waitFor(() => {
+      expect(screen.getByText(catalogs.en.business.services.errors.priceInvalid)).toBeTruthy();
+    });
+    expect(jest.mocked(apiRequest).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(
+      false,
+    );
+    const priceInput = within(screen.getByTestId('service-price')).getByLabelText(
+      catalogs.en.business.services.price,
+    );
+    expect(priceInput.props.value).toBe('12,50');
+    screen.unmount();
+  });
+
+  it('saves me-locale 12,50 as 1250 minor units', async () => {
+    let posted: unknown;
+    jest.mocked(apiRequest).mockImplementation(((
+      path: string,
+      init?: { method?: string; body?: unknown },
+    ) => {
+      if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
+      if (init?.method === 'POST') {
+        posted = init.body;
+        return Promise.resolve(makeService());
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+    // Pass locale on MoneyInput via ServiceForm's i18n language — isolate with try/finally.
+    await initTestI18n('me');
+    try {
+      const screen = await renderWithI18n(<ServiceForm mode="create" />);
+      await waitFor(() => {
+        expect(screen.getByTestId('service-price')).toBeTruthy();
+      });
+      await act(async () => {
+        fireEvent.changeText(screen.getByLabelText(catalogs.me.business.services.name), 'Cut');
+      });
+      const priceInput = within(screen.getByTestId('service-price')).getByLabelText(
+        catalogs.me.business.services.price,
+      );
+      await act(async () => {
+        fireEvent(priceInput, 'focus');
+      });
+      await act(async () => {
+        fireEvent.changeText(priceInput, '12,50');
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('service-submit'));
+      });
+      await waitFor(() => {
+        expect(posted).toBeTruthy();
+      });
+      expect((posted as { price: { amount: number } }).price.amount).toBe(1250);
+      screen.unmount();
+    } finally {
+      await initTestI18n('en');
+    }
   });
 
   it('is read-only for STAFF on edit', async () => {
@@ -230,20 +315,11 @@ describe('ServiceForm', () => {
     await waitFor(() => {
       expect(screen.getByTestId('service-price')).toBeTruthy();
     });
-    const priceInput = within(screen.getByTestId('service-price')).getByLabelText(
-      catalogs.en.business.services.price,
-    );
-    await act(async () => {
-      await fireEvent(priceInput, 'focus');
-    });
-    await act(async () => {
-      await fireEvent.changeText(priceInput, '10');
-    });
-    await act(async () => {
-      await fireEvent(priceInput, 'blur');
-    });
     await act(async () => {
       fireEvent.changeText(screen.getByLabelText(catalogs.en.business.services.name), 'Color');
+    });
+    await fillPrice(screen, '10');
+    await act(async () => {
       fireEvent.press(screen.getByTestId('service-staff-33333333-3333-4333-8333-333333333333'));
     });
     await act(async () => {
@@ -252,6 +328,238 @@ describe('ServiceForm', () => {
     await waitFor(() => {
       expect(screen.getByText(catalogs.en.business.services.errors.invalid)).toBeTruthy();
     });
+    screen.unmount();
+  });
+
+  it('PATCHes edits including an updated price', async () => {
+    let patched: unknown;
+    const existing = makeService({ price: { amount: 1500, currency: 'EUR' }, name: 'Cut' });
+    jest.mocked(apiRequest).mockImplementation(((
+      path: string,
+      init?: { method?: string; body?: unknown },
+    ) => {
+      if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
+      if (path.includes('/services/') && (!init || !init.method || init.method === 'GET')) {
+        return Promise.resolve(existing);
+      }
+      if (path.includes('/services/') && init?.method === 'PATCH') {
+        patched = init.body;
+        return Promise.resolve({
+          ...existing,
+          price: { amount: 3500, currency: 'EUR' },
+          name: 'Fade',
+        });
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+
+    const screen = await renderWithI18n(<ServiceForm mode="edit" serviceId={existing.id} />);
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Cut')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.changeText(screen.getByLabelText(catalogs.en.business.services.name), 'Fade');
+    });
+    await fillPrice(screen, '35');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('service-submit'));
+    });
+    await waitFor(() => {
+      expect(patched).toBeTruthy();
+    });
+    expect((patched as { price: { amount: number }; name: string }).price.amount).toBe(3500);
+    expect((patched as { name: string }).name).toBe('Fade');
+    screen.unmount();
+  });
+
+  it('preserves non-preset duration 125 and buffer 45', async () => {
+    const existing = makeService({
+      durationMinutes: 125,
+      bufferBeforeMinutes: 45,
+    });
+    jest.mocked(apiRequest).mockImplementation(((path: string) => {
+      if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
+      if (path.includes('/services/')) return Promise.resolve(existing);
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+    const screen = await renderWithI18n(<ServiceForm mode="edit" serviceId={existing.id} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('service-duration-value').props.children).toBe('125');
+      expect(screen.getByTestId('service-buffer-before-value').props.children).toBe('45');
+    });
+    screen.unmount();
+  });
+
+  it('preserves advanced notice/horizon while collapsed on save', async () => {
+    let patched: unknown;
+    const existing = makeService({
+      minBookingNoticeMinutes: 120,
+      bookingHorizonDays: 30,
+    });
+    jest.mocked(apiRequest).mockImplementation(((
+      path: string,
+      init?: { method?: string; body?: unknown },
+    ) => {
+      if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
+      if (path.includes('/services/') && (!init || !init.method || init.method === 'GET')) {
+        return Promise.resolve(existing);
+      }
+      if (init?.method === 'PATCH') {
+        patched = init.body;
+        return Promise.resolve(existing);
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+
+    const screen = await renderWithI18n(<ServiceForm mode="edit" serviceId={existing.id} />);
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Haircut')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('service-notice')).toBeNull();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('service-submit'));
+    });
+    await waitFor(() => {
+      expect(patched).toBeTruthy();
+    });
+    expect(
+      (patched as { minBookingNoticeMinutes: number; bookingHorizonDays: number })
+        .minBookingNoticeMinutes,
+    ).toBe(120);
+    expect((patched as { bookingHorizonDays: number }).bookingHorizonDays).toBe(30);
+    screen.unmount();
+  });
+
+  it('maps customFields[i].key detail onto the matching row', async () => {
+    jest.mocked(apiRequest).mockImplementation(((path: string, init?: { method?: string }) => {
+      if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
+      if (init?.method === 'POST') {
+        return Promise.reject(
+          new ApiError('VALIDATION_FAILED', 'invalid', 422, {
+            issues: [{ path: ['customFields', 0, 'key'] }],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+
+    const screen = await renderWithI18n(<ServiceForm mode="create" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('service-price')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.changeText(screen.getByLabelText(catalogs.en.business.services.name), 'Cut');
+    });
+    await fillPrice(screen, '20');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('custom-fields-add'));
+    });
+    await act(async () => {
+      fireEvent.changeText(screen.getByLabelText(catalogs.en.business.customFields.label), 'Notes');
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('service-submit'));
+    });
+    await waitFor(() => {
+      expect(screen.getByText(catalogs.en.business.services.errors.invalid)).toBeTruthy();
+    });
+    screen.unmount();
+  });
+
+  it('shows formInvalid banner for local custom-field validation', async () => {
+    jest.mocked(apiRequest).mockImplementation(((path: string) => {
+      if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+
+    const screen = await renderWithI18n(<ServiceForm mode="create" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('service-price')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.changeText(screen.getByLabelText(catalogs.en.business.services.name), 'Cut');
+    });
+    await fillPrice(screen, '20');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('custom-fields-add'));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('service-submit'));
+    });
+    await waitFor(() => {
+      expect(screen.getByText(catalogs.en.business.customFields.errors.formInvalid)).toBeTruthy();
+    });
+    screen.unmount();
+  });
+
+  it('allows unassigning an inactive assigned staff chip', async () => {
+    const inactive = makeStaff({
+      id: inactiveStaffId,
+      displayName: 'Bojan',
+      active: false,
+    });
+    const existing = makeService({ staffMemberIds: [inactiveStaffId] });
+    jest.mocked(apiRequest).mockImplementation(((path: string) => {
+      if (path.endsWith('/staff')) return Promise.resolve([inactive]);
+      if (path.includes('/services/')) return Promise.resolve(existing);
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+
+    const screen = await renderWithI18n(<ServiceForm mode="edit" serviceId={existing.id} />);
+    const chip = await screen.findByTestId(`service-staff-${inactiveStaffId}`);
+    expect(chip.props.accessibilityState?.disabled).not.toBe(true);
+    await act(async () => {
+      fireEvent.press(chip);
+    });
+    await waitFor(() => {
+      expect(chip.props.accessibilityState?.selected).toBe(false);
+    });
+    screen.unmount();
+  });
+
+  it('retries after a load error', async () => {
+    let fail = true;
+    const existing = makeService({ name: 'Cut' });
+    jest.mocked(apiRequest).mockImplementation(((path: string) => {
+      if (path.endsWith('/staff')) {
+        if (fail) {
+          fail = false;
+          return Promise.reject(new ApiError('INTERNAL_ERROR', 'boom', 500));
+        }
+        return Promise.resolve([makeStaff()]);
+      }
+      if (path.includes('/services/')) return Promise.resolve(existing);
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+
+    const screen = await renderWithI18n(<ServiceForm mode="edit" serviceId={existing.id} />);
+    await waitFor(() => {
+      expect(screen.getByLabelText(catalogs.en.business.services.retry)).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText(catalogs.en.business.services.retry));
+    });
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Cut')).toBeTruthy();
+    });
+    screen.unmount();
+  });
+
+  it('exposes expanded state on the advanced toggle', async () => {
+    jest.mocked(apiRequest).mockImplementation(((path: string) => {
+      if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+    const screen = await renderWithI18n(<ServiceForm mode="create" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('service-advanced-toggle')).toBeTruthy();
+    });
+    const toggle = screen.getByTestId('service-advanced-toggle');
+    expect(toggle.props.accessibilityState?.expanded).toBe(false);
+    await act(async () => {
+      fireEvent.press(toggle);
+    });
+    expect(toggle.props.accessibilityState?.expanded).toBe(true);
     screen.unmount();
   });
 });

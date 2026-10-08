@@ -22,6 +22,12 @@ export interface MoneyInputProps {
   /** Amount in minor units; `null` clears the field. */
   value: number | null;
   onChange: (minor: number | null) => void;
+  /**
+   * Fired when draft validity changes. An invalid non-empty draft calls `onChange(null)` and
+   * `onDraftInvalidChange(true)` so the form can block submit with a price-invalid error
+   * instead of silently keeping a stale partial amount.
+   */
+  onDraftInvalidChange?: (invalid: boolean) => void;
   currency?: Money['currency'];
   /**
    * UI locale used to detect the decimal separator. Defaults to the active i18next language.
@@ -39,13 +45,15 @@ const { colors, spacing, radius } = tokens;
 
 /**
  * Edits a major-unit amount (`,` / `.`) and emits integer minor units.
- * Draft text is kept only while focused; otherwise the controlled value is shown.
- * The decimal separator follows the active i18next language unless overridden via `locale`.
+ * Valid drafts commit on every change. Invalid non-empty drafts stay visible, clear the committed
+ * value (`onChange(null)`), and signal `onDraftInvalidChange(true)` so submit cannot save a stale
+ * partial amount. The decimal separator follows the active i18next language unless overridden.
  */
 export function MoneyInput({
   label,
   value,
   onChange,
+  onDraftInvalidChange,
   currency = 'EUR',
   locale: localeProp,
   helperText,
@@ -66,17 +74,22 @@ export function MoneyInput({
   const hasError = Boolean(error);
   const message = error ?? helperText;
 
-  function commit(raw: string): void {
+  function applyDraft(raw: string): boolean {
     const trimmed = raw.trim();
     if (trimmed.length === 0) {
       onChange(null);
-      return;
+      onDraftInvalidChange?.(false);
+      return true;
     }
     const minor = parseMajorToMinor(trimmed, locale);
     if (minor === null) {
-      return;
+      onChange(null);
+      onDraftInvalidChange?.(true);
+      return false;
     }
     onChange(minor);
+    onDraftInvalidChange?.(false);
+    return true;
   }
 
   return (
@@ -104,15 +117,20 @@ export function MoneyInput({
           selectionColor={colors.primary}
           value={display}
           style={styles.input}
-          onChangeText={setDraft}
+          onChangeText={(raw) => {
+            setDraft(raw);
+            applyDraft(raw);
+          }}
           onFocus={() => {
             setFocused(true);
             setDraft(value === null ? '' : formatMinorAsMajor(value, locale));
           }}
           onBlur={() => {
             setFocused(false);
-            commit(draft ?? display);
-            setDraft(null);
+            // Valid drafts drop back to the controlled formatted value; invalid drafts stay visible.
+            if (applyDraft(draft ?? display)) {
+              setDraft(null);
+            }
           }}
         />
         <Text variant="caption" color="text03" accessibilityElementsHidden>

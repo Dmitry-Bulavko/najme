@@ -27,10 +27,16 @@ type StaffFormValues = {
 type StaffFormProps = {
   mode: 'create' | 'edit';
   staffId?: string;
+  /** Show the created success banner once after navigate-from-create (`?created=1`). */
+  showCreatedBanner?: boolean;
 };
 
 /** Create or edit a staff member. Photo upload is available after create (needs staffId). */
-export function StaffForm({ mode, staffId }: StaffFormProps): ReactElement {
+export function StaffForm({
+  mode,
+  staffId,
+  showCreatedBanner = false,
+}: StaffFormProps): ReactElement {
   const { t } = useTranslation(['business', 'errors']);
   const router = useRouter();
   const { business } = useBusinessContext();
@@ -43,6 +49,7 @@ export function StaffForm({ mode, staffId }: StaffFormProps): ReactElement {
   const [loadNonce, setLoadNonce] = useState(0);
   const [apiError, setApiError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [createdBanner, setCreatedBanner] = useState(showCreatedBanner);
 
   const formSchema = useMemo(
     () =>
@@ -65,6 +72,14 @@ export function StaffForm({ mode, staffId }: StaffFormProps): ReactElement {
   const reload = useCallback(() => {
     setLoadNonce((n) => n + 1);
   }, []);
+
+  function goBackToList(): void {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace(listHref);
+    }
+  }
 
   useEffect(() => {
     if (mode !== 'edit' || !staffId) {
@@ -100,6 +115,7 @@ export function StaffForm({ mode, staffId }: StaffFormProps): ReactElement {
     if (!canEdit) return;
     setApiError(null);
     setSaved(false);
+    setCreatedBanner(false);
     try {
       if (mode === 'create') {
         const body = createStaffMemberRequestSchema.parse({
@@ -111,8 +127,7 @@ export function StaffForm({ mode, staffId }: StaffFormProps): ReactElement {
           body,
         });
         const created = staffMemberSchema.parse(raw);
-        setSaved(true);
-        router.replace(businessHref(business.id, `/staff/${created.id}`));
+        router.replace(`${businessHref(business.id, `/staff/${created.id}`)}?created=1`);
         return;
       }
       if (!staffId) return;
@@ -155,7 +170,7 @@ export function StaffForm({ mode, staffId }: StaffFormProps): ReactElement {
           <Button
             label={t('business:staff.backToList')}
             variant="secondary"
-            onPress={() => router.replace(listHref)}
+            onPress={goBackToList}
           />
         </View>
       </Screen>
@@ -185,7 +200,7 @@ export function StaffForm({ mode, staffId }: StaffFormProps): ReactElement {
           <Button
             label={t('business:staff.backToList')}
             variant="secondary"
-            onPress={() => router.replace(listHref)}
+            onPress={goBackToList}
           />
         </View>
       </Screen>
@@ -208,14 +223,10 @@ export function StaffForm({ mode, staffId }: StaffFormProps): ReactElement {
           </Text>
         </View>
 
-        {saved ? (
-          <Banner
-            tone="success"
-            message={
-              mode === 'create' ? t('business:staff.createdToast') : t('business:staff.savedToast')
-            }
-          />
+        {createdBanner ? (
+          <Banner tone="success" message={t('business:staff.createdToast')} />
         ) : null}
+        {saved ? <Banner tone="success" message={t('business:staff.savedToast')} /> : null}
         {apiError ? <Banner tone="error" message={apiError} /> : null}
 
         {mode === 'edit' && staffId ? (
@@ -275,7 +286,7 @@ export function StaffForm({ mode, staffId }: StaffFormProps): ReactElement {
           <Button
             label={t('business:staff.backToList')}
             variant="secondary"
-            onPress={() => router.replace(listHref)}
+            onPress={goBackToList}
           />
         </View>
       </View>
