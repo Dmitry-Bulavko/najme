@@ -240,12 +240,8 @@ export function ServiceForm({
 
   const noticeError = form.formState.errors.minBookingNoticeMinutes?.message;
   const horizonError = form.formState.errors.bookingHorizonDays?.message;
-
-  useEffect(() => {
-    if (noticeError || horizonError) {
-      setAdvancedOpen(true);
-    }
-  }, [noticeError, horizonError]);
+  // Keep Advanced expanded while notice/horizon have form errors (no setState-in-effect).
+  const advancedExpanded = advancedOpen || Boolean(noticeError) || Boolean(horizonError);
 
   useEffect(() => {
     let cancelled = false;
@@ -661,11 +657,11 @@ export function ServiceForm({
           <Button
             label={t('business:services.advancedHeading')}
             variant="ghost"
-            accessibilityState={{ expanded: advancedOpen }}
+            accessibilityState={{ expanded: advancedExpanded }}
             onPress={() => setAdvancedOpen((open) => !open)}
             testID="service-advanced-toggle"
           />
-          {advancedOpen ? (
+          {advancedExpanded ? (
             <View style={styles.advancedBody}>
               <Controller
                 control={form.control}
