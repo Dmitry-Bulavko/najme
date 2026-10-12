@@ -1,6 +1,6 @@
 import type { CustomFieldType, SelectOption, ServiceCustomField } from '@najme/contracts';
 import { tokens } from '@najme/ui-tokens';
-import { useRef, type ReactElement } from 'react';
+import { memo, useRef, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
@@ -34,17 +34,22 @@ export function draftFromResponse(
     required: boolean;
     options: SelectOption[] | null;
   }[],
+  /** Reuse clientIds from the previous draft so rows do not remount after save. */
+  previous?: readonly DraftCustomField[],
 ): DraftCustomField[] {
-  return fields.map((field, index) => ({
-    clientId: `saved-${field.key}-${index}`,
-    key: field.key,
-    keyLocked: true,
-    keyTouched: false,
-    label: field.label,
-    type: field.type,
-    required: field.required,
-    options: field.options ?? [],
-  }));
+  return fields.map((field, index) => {
+    const prior = previous?.find((p) => p.key === field.key);
+    return {
+      clientId: prior?.clientId ?? `saved-${field.key}-${index}`,
+      key: field.key,
+      keyLocked: true,
+      keyTouched: false,
+      label: field.label,
+      type: field.type,
+      required: field.required,
+      options: field.options ?? [],
+    };
+  });
 }
 
 export function draftsToPayload(drafts: DraftCustomField[]): ServiceCustomField[] {
@@ -70,7 +75,7 @@ type CustomFieldsEditorProps = {
 };
 
 /** Editable list of service custom fields (add, reorder, remove, slug key until saved). */
-export function CustomFieldsEditor({
+export const CustomFieldsEditor = memo(function CustomFieldsEditor({
   value,
   onChange,
   readOnly = false,
@@ -366,7 +371,7 @@ export function CustomFieldsEditor({
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: { gap: tokens.spacing.sm },

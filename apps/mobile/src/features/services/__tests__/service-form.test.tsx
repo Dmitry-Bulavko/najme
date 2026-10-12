@@ -235,6 +235,102 @@ describe('ServiceForm', () => {
     screen.unmount();
   });
 
+  it('keeps Price and Name focus after saving a service that has custom fields', async () => {
+    const existing = makeService({
+      name: 'Color',
+      price: { amount: 1500, currency: 'EUR' },
+      customFields: [
+        {
+          id: '66666666-6666-4666-8666-666666666666',
+          key: 'allergies',
+          label: 'Allergies',
+          type: 'TEXT',
+          required: false,
+          options: null,
+          sortOrder: 0,
+        },
+      ],
+    });
+    let patched: unknown;
+    jest.mocked(apiRequest).mockImplementation(((
+      path: string,
+      init?: { method?: string; body?: unknown },
+    ) => {
+      if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
+      if (path.includes('/services/') && init?.method === 'PATCH') {
+        patched = init.body;
+        const body = (init.body ?? {}) as Partial<Service>;
+        return Promise.resolve({
+          ...existing,
+          ...body,
+          price: body.price ?? existing.price,
+          customFields: existing.customFields,
+        });
+      }
+      if (path.includes('/services/')) return Promise.resolve(existing);
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+
+    const screen = await renderWithI18n(<ServiceForm mode="edit" serviceId={existing.id} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('service-price')).toBeTruthy();
+      expect(screen.getByTestId('custom-field-saved-allergies-0')).toBeTruthy();
+    });
+
+    const nameInput = () => screen.getByLabelText(catalogs.en.business.services.name);
+    await act(async () => {
+      fireEvent.changeText(nameInput(), 'Brand new name');
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('service-submit'));
+    });
+    await waitFor(() => {
+      expect(screen.getByText(catalogs.en.business.services.savedToast)).toBeTruthy();
+    });
+
+    // After save, typing must not lose focus / truncate drafts (Expo web regression).
+    await act(async () => {
+      fireEvent.changeText(nameInput(), '');
+    });
+    for (const draft of ['B', 'Br', 'Bra', 'Brand new name']) {
+      await act(async () => {
+        fireEvent.changeText(nameInput(), draft);
+      });
+      expect(nameInput().props.value).toBe(draft);
+    }
+
+    const priceInput = () =>
+      within(screen.getByTestId('service-price')).getByLabelText(
+        catalogs.en.business.services.price,
+      );
+    await act(async () => {
+      fireEvent(priceInput(), 'focus');
+    });
+    await act(async () => {
+      fireEvent.changeText(priceInput(), '');
+    });
+    for (const draft of ['1', '12', '12.', '12.5', '12.50']) {
+      await act(async () => {
+        fireEvent.changeText(priceInput(), draft);
+      });
+      expect(priceInput().props.value).toBe(draft);
+    }
+    expect(priceInput().props.value).not.toBe('1.00');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('service-submit'));
+    });
+    await waitFor(() => {
+      expect(patched).toEqual(
+        expect.objectContaining({
+          name: 'Brand new name',
+          price: { amount: 1250, currency: 'EUR' },
+        }),
+      );
+    });
+    screen.unmount();
+  });
+
   it('keeps focus and invalid draft when retyping after a blocked Save', async () => {
     jest.mocked(apiRequest).mockImplementation(((path: string) => {
       if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);

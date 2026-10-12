@@ -385,7 +385,8 @@ export function ServiceForm({
         minBookingNoticeMinutes: toSelectString(updated.minBookingNoticeMinutes),
         bookingHorizonDays: toSelectString(updated.bookingHorizonDays),
       });
-      setCustomFields(draftFromResponse(updated.customFields));
+      // Preserve clientIds so CustomFieldsEditor rows do not remount after save (focus loss).
+      setCustomFields((prev) => draftFromResponse(updated.customFields, prev));
       setCustomFieldErrors({});
       setSaved(true);
     } catch (err) {
@@ -491,7 +492,7 @@ export function ServiceForm({
           control={form.control}
           name="name"
           label={t('business:services.name')}
-          editable={!readOnly && !form.formState.isSubmitting}
+          editable={!readOnly}
           autoComplete="off"
           testID="service-name"
         />
@@ -499,7 +500,7 @@ export function ServiceForm({
           control={form.control}
           name="description"
           label={t('business:services.description')}
-          editable={!readOnly && !form.formState.isSubmitting}
+          editable={!readOnly}
           multiline
           numberOfLines={3}
           testID="service-description"
@@ -517,7 +518,7 @@ export function ServiceForm({
                 label: t('business:services.minutesOption', { count: minutes }),
               }))}
               onChange={field.onChange}
-              disabled={readOnly || form.formState.isSubmitting}
+              disabled={readOnly}
               error={fieldState.error?.message}
               testID="service-duration"
             />
@@ -535,7 +536,7 @@ export function ServiceForm({
                 label: t('business:services.minutesOption', { count: minutes }),
               }))}
               onChange={field.onChange}
-              disabled={readOnly || form.formState.isSubmitting}
+              disabled={readOnly}
               error={fieldState.error?.message}
               testID="service-buffer-before"
             />
@@ -553,7 +554,7 @@ export function ServiceForm({
                 label: t('business:services.minutesOption', { count: minutes }),
               }))}
               onChange={field.onChange}
-              disabled={readOnly || form.formState.isSubmitting}
+              disabled={readOnly}
               error={fieldState.error?.message}
               testID="service-buffer-after"
             />
@@ -588,7 +589,7 @@ export function ServiceForm({
               label={t('business:services.activeToggle')}
               value={field.value}
               onValueChange={field.onChange}
-              disabled={readOnly || form.formState.isSubmitting}
+              disabled={readOnly}
               testID="service-active"
             />
           )}
@@ -607,8 +608,7 @@ export function ServiceForm({
             <View style={styles.chips}>
               {staff.map((member) => {
                 const selected = staffMemberIds.includes(member.id);
-                const disabled =
-                  readOnly || form.formState.isSubmitting || (!member.active && !selected);
+                const disabled = readOnly || (!member.active && !selected);
                 return (
                   <Chip
                     key={member.id}
@@ -651,7 +651,6 @@ export function ServiceForm({
           value={customFields}
           onChange={setCustomFields}
           readOnly={readOnly}
-          disabled={form.formState.isSubmitting}
           errors={customFieldErrors}
         />
 
@@ -680,7 +679,7 @@ export function ServiceForm({
                           : formatMinutesLabel(value, durationT),
                     }))}
                     onChange={field.onChange}
-                    disabled={readOnly || form.formState.isSubmitting}
+                    disabled={readOnly}
                     error={fieldState.error?.message}
                     testID="service-notice"
                   />
@@ -706,7 +705,7 @@ export function ServiceForm({
                           : formatHorizonLabel(value, durationT),
                     }))}
                     onChange={field.onChange}
-                    disabled={readOnly || form.formState.isSubmitting}
+                    disabled={readOnly}
                     error={fieldState.error?.message}
                     testID="service-horizon"
                   />

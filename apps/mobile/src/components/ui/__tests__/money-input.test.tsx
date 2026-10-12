@@ -197,6 +197,25 @@ describe('MoneyInput', () => {
     screen.unmount();
   });
 
+  it('keeps a typed prefix draft when blur fires before formatting matches', async () => {
+    const screen = await renderWithI18n(<MoneyHarness locale="en" initial={1500} />);
+    const input = within(screen.getByTestId('money')).getByLabelText('Amount');
+    await act(async () => {
+      fireEvent(input, 'focus');
+    });
+    await act(async () => {
+      fireEvent.changeText(input, '1');
+    });
+    expect(screen.getByTestId('minor').props.children).toBe('100');
+    await act(async () => {
+      fireEvent(input, 'blur');
+    });
+    // Unexpected blur must not rewrite "1" → "1.00" (truncated commit).
+    expect(input.props.value).toBe('1');
+    expect(screen.getByTestId('minor').props.children).toBe('100');
+    screen.unmount();
+  });
+
   it('clears draft-invalid when the field is emptied', async () => {
     const screen = await renderWithI18n(<MoneyHarness locale="en" />);
     const input = within(screen.getByTestId('money')).getByLabelText('Amount');

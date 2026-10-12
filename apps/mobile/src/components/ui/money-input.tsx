@@ -5,9 +5,17 @@ import {
   type Money,
 } from '@najme/contracts';
 import { tokens } from '@najme/ui-tokens';
-import { useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  AccessibilityInfo,
+  Platform,
+  StyleSheet,
+  TextInput,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 
 import { Text } from './text';
 import {
@@ -73,6 +81,13 @@ export function MoneyInput({
   const display = draft ?? (value === null ? '' : formatMinorAsMajor(value, locale));
   const hasError = Boolean(error);
   const message = error ?? helperText;
+  const announcedError = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!error || error === announcedError.current) return;
+    announcedError.current = error;
+    void AccessibilityInfo.announceForAccessibility(error);
+  }, [error]);
 
   function applyDraft(raw: string): boolean {
     const trimmed = raw.trim();
@@ -129,8 +144,21 @@ export function MoneyInput({
           }}
           onBlur={() => {
             setFocused(false);
-            // Valid drafts drop back to the controlled formatted value; invalid drafts stay visible.
-            if (applyDraft(draft ?? display)) {
+            const raw = draft ?? display;
+            const ok = applyDraft(raw);
+            if (!ok) return;
+            // Keep a typed prefix that does not yet match the formatted amount (e.g. "1"
+            // while typing "12.50"). An unexpected blur mid-keystroke must not rewrite the
+            // field to "1.00" and commit a truncated price.
+            const trimmed = raw.trim();
+            if (trimmed.length === 0) {
+              setDraft(null);
+              return;
+            }
+            const minor = parseMajorToMinor(trimmed, locale);
+            if (minor === null) return;
+            const formatted = formatMinorAsMajor(minor, locale);
+            if (trimmed === formatted) {
               setDraft(null);
             }
           }}
@@ -140,14 +168,15 @@ export function MoneyInput({
         </Text>
       </View>
       {/*
-        Always mount the message slot (no accessibilityRole="alert"): mounting/unmounting an
-        alert on web steals focus from the TextInput when validation errors appear or clear
-        mid-typing after a blocked Save.
+        Stable message slot. On web, role="alert" mount/unmount steals TextInput focus;
+        use alert only on native. Live region + announceForAccessibility cover SR updates.
       */}
       <Text
         variant="caption"
         color={hasError ? 'danger' : 'text03'}
         style={[styles.message, !message && styles.messageEmpty]}
+        accessibilityRole={hasError && Platform.OS !== 'web' ? 'alert' : undefined}
+        accessibilityLiveRegion={hasError ? 'polite' : undefined}
         accessibilityElementsHidden={!message}
         importantForAccessibility={message ? 'yes' : 'no-hide-descendants'}
       >
