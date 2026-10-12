@@ -46,6 +46,110 @@ describe('MoneyInput', () => {
     screen.unmount();
   });
 
+  it('parses dot decimal (en locale) into minor units on change', async () => {
+    const onChange = jest.fn();
+    const { getByLabelText } = await renderWithI18n(
+      <MoneyInput label="Amount" value={null} onChange={onChange} locale="en" />,
+    );
+    const input = getByLabelText('Amount');
+    await fireEvent(input, 'focus');
+    await fireEvent.changeText(input, '12.5');
+    expect(onChange).toHaveBeenCalledWith(1250);
+  });
+
+  it('parses comma decimal (me locale) into minor units on change', async () => {
+    const onChange = jest.fn();
+    const { getByLabelText } = await renderWithI18n(
+      <MoneyInput label="Amount" value={null} onChange={onChange} locale="me" />,
+    );
+    const input = getByLabelText('Amount');
+    await fireEvent(input, 'focus');
+    await fireEvent.changeText(input, '12,5');
+    expect(onChange).toHaveBeenCalledWith(1250);
+  });
+
+  it('treats comma as grouping in en locale (1,234 → 123400)', async () => {
+    const onChange = jest.fn();
+    const { getByLabelText } = await renderWithI18n(
+      <MoneyInput label="Amount" value={null} onChange={onChange} locale="en" />,
+    );
+    const input = getByLabelText('Amount');
+    await fireEvent(input, 'focus');
+    await fireEvent.changeText(input, '1,234');
+    expect(onChange).toHaveBeenCalledWith(123400);
+  });
+
+  it('treats dot as grouping in me locale (1.234,56 → 123456)', async () => {
+    const onChange = jest.fn();
+    const { getByLabelText } = await renderWithI18n(
+      <MoneyInput label="Amount" value={null} onChange={onChange} locale="me" />,
+    );
+    const input = getByLabelText('Amount');
+    await fireEvent(input, 'focus');
+    await fireEvent.changeText(input, '1.234,56');
+    expect(onChange).toHaveBeenCalledWith(123456);
+  });
+
+  it('rounds to two decimals (1.005 → 101)', async () => {
+    const onChange = jest.fn();
+    const { getByLabelText } = await renderWithI18n(
+      <MoneyInput label="Amount" value={null} onChange={onChange} />,
+    );
+    const input = getByLabelText('Amount');
+    await fireEvent(input, 'focus');
+    await fireEvent.changeText(input, '1.005');
+    expect(onChange).toHaveBeenCalledWith(101);
+  });
+
+  it('clears the committed value and flags invalid input (12abc)', async () => {
+    const onChange = jest.fn();
+    const onDraftInvalidChange = jest.fn();
+    const { getByLabelText } = await renderWithI18n(
+      <MoneyInput
+        label="Amount"
+        value={null}
+        onChange={onChange}
+        onDraftInvalidChange={onDraftInvalidChange}
+      />,
+    );
+    const input = getByLabelText('Amount');
+    await fireEvent(input, 'focus');
+    await fireEvent.changeText(input, '12abc');
+    expect(onChange).toHaveBeenCalledWith(null);
+    expect(onDraftInvalidChange).toHaveBeenCalledWith(true);
+  });
+
+  it('round-trip: value=2500 me locale → focus then blur emits 2500', async () => {
+    const onChange = jest.fn();
+    const { getByLabelText, getByDisplayValue } = await renderWithI18n(
+      <MoneyInput label="Amount" value={2500} onChange={onChange} locale="me" />,
+    );
+    expect(getByDisplayValue('25,00')).toBeTruthy();
+    const input = getByLabelText('Amount');
+    await fireEvent(input, 'focus');
+    await fireEvent(input, 'blur');
+    expect(onChange).toHaveBeenCalledWith(2500);
+  });
+
+  it('rejects 12,50 in en locale (only 2 digits after comma — bad grouping)', async () => {
+    const onChange = jest.fn();
+    const onDraftInvalidChange = jest.fn();
+    const { getByLabelText } = await renderWithI18n(
+      <MoneyInput
+        label="Amount"
+        value={null}
+        onChange={onChange}
+        onDraftInvalidChange={onDraftInvalidChange}
+        locale="en"
+      />,
+    );
+    const input = getByLabelText('Amount');
+    await fireEvent(input, 'focus');
+    await fireEvent.changeText(input, '12,50');
+    expect(onChange).toHaveBeenCalledWith(null);
+    expect(onDraftInvalidChange).toHaveBeenCalledWith(true);
+  });
+
   it('commits on change and flags invalid en drafts like 12,50', async () => {
     const screen = await renderWithI18n(<MoneyHarness locale="en" initial={1500} />);
     const input = within(screen.getByTestId('money')).getByLabelText('Amount');
@@ -66,7 +170,7 @@ describe('MoneyInput', () => {
     screen.unmount();
   });
 
-  it('parses comma decimal in me locale on change', async () => {
+  it('parses comma decimal in me locale on change (harness)', async () => {
     const screen = await renderWithI18n(<MoneyHarness locale="me" />);
     const input = within(screen.getByTestId('money')).getByLabelText('Amount');
     await act(async () => {
@@ -108,7 +212,6 @@ describe('MoneyInput', () => {
     });
     expect(screen.getByTestId('minor').props.children).toBe('null');
     expect(screen.getByTestId('draft-invalid').props.children).toBe('no');
-    // catalogs imported so i18n stays warm for sibling suites
     expect(catalogs.en.business.services.price).toBeTruthy();
     screen.unmount();
   });

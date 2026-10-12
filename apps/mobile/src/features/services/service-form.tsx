@@ -573,7 +573,9 @@ export function ServiceForm({
             });
           }}
           currency="EUR"
-          disabled={readOnly || form.formState.isSubmitting}
+          // Do not toggle `disabled` on isSubmitting — that blurs the focused price field
+          // and lets onBlur commit a partial draft (e.g. "12" → 1200) after a blocked Save.
+          disabled={readOnly}
           error={form.formState.errors.priceAmount?.message}
           testID="service-price"
         />

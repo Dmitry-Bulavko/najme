@@ -123,7 +123,9 @@ export function MoneyInput({
           }}
           onFocus={() => {
             setFocused(true);
-            setDraft(value === null ? '' : formatMinorAsMajor(value, locale));
+            // Keep an existing draft (e.g. invalid after a blocked submit) so retyping
+            // does not reset mid-edit when the parent re-renders.
+            setDraft((prev) => prev ?? (value === null ? '' : formatMinorAsMajor(value, locale)));
           }}
           onBlur={() => {
             setFocused(false);
@@ -137,16 +139,20 @@ export function MoneyInput({
           {currency}
         </Text>
       </View>
-      {message ? (
-        <Text
-          variant="caption"
-          color={hasError ? 'danger' : 'text03'}
-          accessibilityRole={hasError ? 'alert' : undefined}
-          style={styles.message}
-        >
-          {message}
-        </Text>
-      ) : null}
+      {/*
+        Always mount the message slot (no accessibilityRole="alert"): mounting/unmounting an
+        alert on web steals focus from the TextInput when validation errors appear or clear
+        mid-typing after a blocked Save.
+      */}
+      <Text
+        variant="caption"
+        color={hasError ? 'danger' : 'text03'}
+        style={[styles.message, !message && styles.messageEmpty]}
+        accessibilityElementsHidden={!message}
+        importantForAccessibility={message ? 'yes' : 'no-hide-descendants'}
+      >
+        {message ?? ' '}
+      </Text>
     </View>
   );
 }
@@ -175,4 +181,5 @@ const styles = StyleSheet.create({
     color: colors.text01,
   },
   message: { marginTop: spacing.xs },
+  messageEmpty: { opacity: 0 },
 });

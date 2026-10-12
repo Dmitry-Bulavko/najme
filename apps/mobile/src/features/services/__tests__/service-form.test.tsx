@@ -235,6 +235,57 @@ describe('ServiceForm', () => {
     screen.unmount();
   });
 
+  it('keeps focus and invalid draft when retyping after a blocked Save', async () => {
+    jest.mocked(apiRequest).mockImplementation(((path: string) => {
+      if (path.endsWith('/staff')) return Promise.resolve([makeStaff()]);
+      return Promise.reject(new Error(`unexpected ${path}`));
+    }) as typeof apiRequest);
+    const screen = await renderWithI18n(<ServiceForm mode="create" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('service-price')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.changeText(screen.getByLabelText(catalogs.en.business.services.name), 'Cut');
+    });
+    await fillPrice(screen, '12,50');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('service-submit'));
+    });
+    await waitFor(() => {
+      expect(screen.getByText(catalogs.en.business.services.errors.priceInvalid)).toBeTruthy();
+    });
+
+    const priceInput = () =>
+      within(screen.getByTestId('service-price')).getByLabelText(
+        catalogs.en.business.services.price,
+      );
+
+    await act(async () => {
+      fireEvent(priceInput(), 'focus');
+    });
+    // Retype character-by-character: a spurious blur after "12" would commit 1200 and
+    // replace the draft with the formatted "12.00", losing the rest of the keystrokes.
+    for (const draft of ['1', '12', '12,', '12,5', '12,50']) {
+      await act(async () => {
+        fireEvent.changeText(priceInput(), draft);
+      });
+      expect(priceInput().props.value).toBe(draft);
+    }
+    expect(priceInput().props.value).not.toBe('12.00');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('service-submit'));
+    });
+    await waitFor(() => {
+      expect(screen.getByText(catalogs.en.business.services.errors.priceInvalid)).toBeTruthy();
+    });
+    expect(jest.mocked(apiRequest).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(
+      false,
+    );
+    expect(priceInput().props.value).toBe('12,50');
+    screen.unmount();
+  });
+
   it('saves me-locale 12,50 as 1250 minor units', async () => {
     let posted: unknown;
     jest.mocked(apiRequest).mockImplementation(((
