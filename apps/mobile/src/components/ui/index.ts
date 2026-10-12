@@ -10,7 +10,7 @@ export { Divider } from './divider';
 export { FormField, type FormFieldProps } from './form-field';
 export { ListGroup, ListItem, type ListItemProps } from './list-item';
 export { MoneyInput, type MoneyInputProps } from './money-input';
-export { Screen, type ScreenProps } from './screen';
+export { Screen, screenKeyboardDismissMode, type ScreenProps } from './screen';
 export { Section } from './section';
 export {
   SegmentedControl,

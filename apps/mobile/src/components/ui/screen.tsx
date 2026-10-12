@@ -24,6 +24,19 @@ export interface ScreenProps {
 const DEFAULT_EDGES: readonly Edge[] = ['top', 'bottom', 'left', 'right'];
 
 /**
+ * ScrollView keyboard dismiss mode by platform.
+ * Web must be `none`: react-native-web's `on-drag` calls `dismissKeyboard()` on every scroll
+ * event, including the browser's scroll-into-view of a focused input.
+ */
+export function screenKeyboardDismissMode(
+  os: typeof Platform.OS = Platform.OS,
+): 'interactive' | 'on-drag' | 'none' {
+  if (os === 'ios') return 'interactive';
+  if (os === 'web') return 'none';
+  return 'on-drag';
+}
+
+/**
  * Screen container: safe-area insets (position-aware, so it composes with navigator headers and
  * tab bars), keyboard avoidance, optional scrolling and token-based padding.
  */
@@ -44,7 +57,7 @@ export function Screen({
           <ScrollView
             contentContainerStyle={[styles.content, padded && styles.padded]}
             contentInsetAdjustmentBehavior="automatic"
-            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            keyboardDismissMode={screenKeyboardDismissMode()}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             refreshControl={refreshControl}

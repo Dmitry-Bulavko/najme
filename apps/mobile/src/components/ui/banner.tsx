@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { tokens, type ColorToken } from '@najme/ui-tokens';
 import { memo, type ReactElement } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from './text';
 
@@ -25,8 +25,7 @@ const toneConfig: Record<
 
 /**
  * Inline status message: coloured accent bar and icon, neutral text for legibility.
- * Memoized so parent form re-renders (every keystroke) do not reconcile the live region —
- * on RN Web that re-announce was clearing focus from inputs below (relatedTarget=null).
+ * Memoized so parent form re-renders do not reconcile the live region unnecessarily.
  */
 export const Banner = memo(function Banner({
   tone = 'info',
@@ -40,9 +39,9 @@ export const Banner = memo(function Banner({
     <View
       accessibilityRole={urgent ? 'alert' : 'summary'}
       accessibilityLabel={message}
-      // Success/info: announce via role/label on mount only — polite liveRegion on every
-      // parent re-render steals TextInput focus on Expo web after a saved banner appears.
-      accessibilityLiveRegion={urgent ? 'assertive' : undefined}
+      // Native: polite for success/info. Web: skip non-urgent liveRegion (scroll-into-view
+      // focus loss is fixed in Screen; still avoid redundant polite announcements on web).
+      accessibilityLiveRegion={urgent ? 'assertive' : Platform.OS !== 'web' ? 'polite' : undefined}
       style={[styles.banner, { borderLeftColor: tokens.colors[color] }, style]}
     >
       <Ionicons name={icon} size={22} color={tokens.colors[color]} />

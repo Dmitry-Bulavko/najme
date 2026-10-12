@@ -86,7 +86,10 @@ export function MoneyInput({
   useEffect(() => {
     if (!error || error === announcedError.current) return;
     announcedError.current = error;
-    void AccessibilityInfo.announceForAccessibility(error);
+    // Android already announces via accessibilityLiveRegion; double-announce only on iOS.
+    if (Platform.OS === 'ios') {
+      void AccessibilityInfo.announceForAccessibility(error);
+    }
   }, [error]);
 
   function applyDraft(raw: string): boolean {

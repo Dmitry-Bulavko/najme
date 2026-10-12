@@ -372,20 +372,24 @@ export function ServiceForm({
         body,
       });
       const updated = serviceSchema.parse(raw);
-      form.reset({
-        name: updated.name,
-        description: updated.description ?? '',
-        durationMinutes: String(updated.durationMinutes),
-        bufferBeforeMinutes: String(updated.bufferBeforeMinutes),
-        bufferAfterMinutes: String(updated.bufferAfterMinutes),
-        priceAmount: updated.price.amount,
-        priceDraftInvalid: false,
-        active: updated.active,
-        staffMemberIds: updated.staffMemberIds,
-        minBookingNoticeMinutes: toSelectString(updated.minBookingNoticeMinutes),
-        bookingHorizonDays: toSelectString(updated.bookingHorizonDays),
-      });
-      // Preserve clientIds so CustomFieldsEditor rows do not remount after save (focus loss).
+      // keepDirtyValues: edits typed while the PATCH was in flight are not overwritten.
+      form.reset(
+        {
+          name: updated.name,
+          description: updated.description ?? '',
+          durationMinutes: String(updated.durationMinutes),
+          bufferBeforeMinutes: String(updated.bufferBeforeMinutes),
+          bufferAfterMinutes: String(updated.bufferAfterMinutes),
+          priceAmount: updated.price.amount,
+          priceDraftInvalid: false,
+          active: updated.active,
+          staffMemberIds: updated.staffMemberIds,
+          minBookingNoticeMinutes: toSelectString(updated.minBookingNoticeMinutes),
+          bookingHorizonDays: toSelectString(updated.bookingHorizonDays),
+        },
+        { keepDirtyValues: true },
+      );
+      // Preserve clientIds so CustomFieldsEditor rows do not remount after save.
       setCustomFields((prev) => draftFromResponse(updated.customFields, prev));
       setCustomFieldErrors({});
       setSaved(true);
