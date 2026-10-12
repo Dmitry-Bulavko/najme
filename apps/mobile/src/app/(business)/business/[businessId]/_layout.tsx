@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { tokens } from '@najme/ui-tokens';
 import { Tabs, useLocalSearchParams } from 'expo-router';
-import type { ReactElement } from 'react';
+import { useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +12,8 @@ import {
   TAB_LABEL_FONT_SIZE,
   TAB_LABEL_LINE_HEIGHT,
 } from '@/components/ui/theme';
-import { BusinessProvider } from '@/features/business/business-provider';
+import { BusinessProvider, useBusinessContext } from '@/features/business/business-provider';
+import { useMyBusinesses } from '@/features/business/use-my-businesses';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -34,6 +35,17 @@ function tabIcon(active: IconName, inactive: IconName) {
 function BusinessTabs(): ReactElement {
   const { t } = useTranslation('business');
   const insets = useSafeAreaInsets();
+  const { business } = useBusinessContext();
+  const { data: myBusinesses } = useMyBusinesses();
+
+  const myStaffMemberId = useMemo(() => {
+    const row = myBusinesses?.find((b) => b.businessId === business.id);
+    return row?.staffMemberId ?? null;
+  }, [business.id, myBusinesses]);
+
+  const isStaff = business.myRole === 'STAFF';
+  // Hide Schedule for unlinked STAFF (mirrors web nav).
+  const hideScheduleTab = isStaff && myBusinesses !== undefined && myStaffMemberId === null;
 
   return (
     <Tabs
@@ -79,6 +91,15 @@ function BusinessTabs(): ReactElement {
           title: t('shell.services'),
           headerShown: false,
           tabBarIcon: tabIcon('cut', 'cut-outline'),
+        }}
+      />
+      <Tabs.Screen
+        name="schedule"
+        options={{
+          title: isStaff ? t('shell.mySchedule') : t('shell.schedule'),
+          headerShown: false,
+          href: hideScheduleTab ? null : undefined,
+          tabBarIcon: tabIcon('calendar', 'calendar-outline'),
         }}
       />
       <Tabs.Screen

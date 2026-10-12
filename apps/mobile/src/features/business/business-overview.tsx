@@ -74,7 +74,7 @@ export function BusinessOverview(): ReactElement {
       key: 'hours',
       done: checklist?.allActiveHaveHours ?? false,
       label: t('business:overview.itemHours'),
-      href: businessHref(business.id, '/staff'),
+      href: businessHref(business.id, '/schedule'),
     },
   ] as const;
 

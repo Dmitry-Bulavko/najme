@@ -17,6 +17,7 @@ import { Banner, Button, FormField, Screen, SwitchRow, Text } from '@/components
 import { BusinessImageUpload } from '@/features/business/business-image-upload';
 import { useBusinessContext } from '@/features/business/business-provider';
 import { businessHref } from '@/features/business/last-business';
+import { staffScheduleHref } from '@/features/schedule/schedule-href';
 import { ApiError, apiRequest } from '@/lib/api/client';
 
 type StaffFormValues = {
@@ -281,6 +282,14 @@ export function StaffForm({
               loading={form.formState.isSubmitting}
               onPress={form.handleSubmit(onSubmit)}
               testID="staff-submit"
+            />
+          ) : null}
+          {mode === 'edit' && staffId && canEdit ? (
+            <Button
+              label={t('business:schedule.openSchedule')}
+              variant="secondary"
+              onPress={() => router.push(staffScheduleHref(business.id, staffId))}
+              testID="staff-open-schedule"
             />
           ) : null}
           <Button
