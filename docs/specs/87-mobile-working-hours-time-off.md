@@ -18,17 +18,19 @@ helpers (including `24:00` ends). Times are labelled Europe/Podgorica and format
 - Port web draft/format/validation helpers into `apps/mobile/src/features/schedule/`.
 - Controls: `TimePicker`, `DatePicker`, `SwitchRow`, `Chip` (copy-to days), `confirm` (delete).
 - Explicit “until end of day” toggle (TimePicker cannot express `24:00`).
-- Reuse existing `business.schedule.*` i18n keys; no new contracts or ADR.
+- Reuse existing `business.schedule.*` i18n keys; add named a11y / deleteNamed keys as needed.
 
 ## Changes
 
-| Area / path                                      | Change                                   |
-| ------------------------------------------------ | ---------------------------------------- |
-| `apps/mobile/.../schedule/*`                     | Nested stack: picker + staff schedule    |
-| `apps/mobile/src/features/schedule/*`            | Editor, picker, time off, helpers, tests |
-| `apps/mobile/.../[businessId]/_layout.tsx`       | Schedule tab (role-aware label / hide)   |
-| `apps/mobile/.../business-overview.tsx`          | Hours checklist → schedule picker        |
-| `docs/specs/87-mobile-working-hours-time-off.md` | This spec                                |
+| Area / path                                      | Change                                        |
+| ------------------------------------------------ | --------------------------------------------- |
+| `apps/mobile/.../schedule/*`                     | Nested stack: picker + staff schedule         |
+| `apps/mobile/src/features/schedule/*`            | Editor, picker, time off, helpers, tests      |
+| `apps/mobile/.../[businessId]/_layout.tsx`       | Schedule tab (role-aware label / hide)        |
+| `apps/mobile/.../business-overview.tsx`          | Hours checklist → schedule picker             |
+| `apps/mobile/.../staff/staff-form.tsx`           | “Open schedule” for OWNER/ADMIN edit          |
+| `packages/i18n/.../business.json`                | Named labels, deleteNamed, shorter mySchedule |
+| `docs/specs/87-mobile-working-hours-time-off.md` | This spec                                     |
 
 ### Contracts / API
 
@@ -45,14 +47,21 @@ None.
 
 ## Test plan
 
-- Unit: draft round-trip / overlap / copy / `24:00`; time-off body builder; schedule hrefs.
-- RNTL: picker empty CTA; STAFF redirect path resolution; forbidden for other staffId;
-  working-hours closed + until-end-of-day; time-off create all-day body; delete confirm.
+- Unit: draft round-trip / overlap / copy / `24:00`; time-off body builder (all-day, timed, DST
+  2026-10-25, year-end); schedule hrefs; validation mapping.
+- RNTL WorkingHoursEditor: overlap blocks save + row error (Closed / `24:00` / Copy payloads are
+  asserted in working-hours-draft unit tests).
+- RNTL StaffScheduleView: PUT body, 422 `details.issues` mapping, failed save/create/delete keep
+  the editor mounted, all-day create body (timed create body covered by unit), delete via mocked
+  `confirm`, refresh on focus, OWNER ignores memberships errors, STAFF forbidden for other
+  staffId, back-to-picker uses `canGoBack()`.
+- RNTL SchedulePicker: empty CTA, STAFF redirect / no-linked, pull-to-refresh via focus load.
 
 ## Risks and open questions
 
 - TimePicker max is `23:55` — until-end-of-day control is required (grooming note).
 - Five tabs on a phone is tight; Schedule stays as a primary surface to match web nav.
+  STAFF tab label shortened (`My hours` / `Мой график` / `Saatlerim`) to fit ~390px.
 
 ## Implementation notes
 
@@ -61,7 +70,10 @@ None.
 - Feature module ports web #83 helpers (`working-hours-draft`, `schedule-format`,
   `map-schedule-validation`, time-off body builder) and screens (`SchedulePicker`,
   `StaffScheduleView`, `WorkingHoursEditor`, `TimeOffSection`).
-- `TimePicker` + “until end of day” for `24:00`; Copy to… uses a modal with `Chip`s; time-off
-  create uses a bottom sheet modal with `DatePicker`/`TimePicker`/`SwitchRow`.
+- `TimePicker` + “until end of day” for `24:00`; Copy to… uses Select-style modal (sibling
+  backdrop + ScrollView); time-off create uses the same pattern with KeyboardAvoidingView.
+- Action failures (save/create/delete) use an inline Banner near Save / inside the dialog — they
+  never replace the load-error full-screen state.
+- Load uses `useFocusEffect` + `RefreshControl` on both the editor and the picker.
+- Delete rows are custom (not `ListItem`) so the button stays pressable on web/iOS.
 - Overview hours checklist CTA → `/schedule`. Staff edit (OWNER/ADMIN) has “Open schedule”.
-- No new i18n keys — reused `business.schedule.*` / `shell.schedule` / `shell.mySchedule`.

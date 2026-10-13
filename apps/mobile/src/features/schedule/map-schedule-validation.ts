@@ -98,14 +98,23 @@ export function mapTimeOffValidationErrors<TFieldValues extends FieldValues>(
   return mapped;
 }
 
-/** Duck-type ApiError so tests and ESM mocks still match. */
+/** True when the API rejected with VALIDATION_FAILED (details optional — e.g. >366 days). */
+export function isValidationFailedCode(err: unknown): boolean {
+  if (err instanceof ApiError) {
+    return err.code === 'VALIDATION_FAILED';
+  }
+  if (typeof err !== 'object' || err === null) return false;
+  return (err as { code?: unknown }).code === 'VALIDATION_FAILED';
+}
+
+/** Duck-type ApiError so tests and ESM mocks still match. Requires `details` for field mapping. */
 export function isValidationFailedError(
   err: unknown,
 ): err is ApiError & { code: 'VALIDATION_FAILED'; details: Record<string, unknown> } {
+  if (!isValidationFailedCode(err)) return false;
   if (err instanceof ApiError) {
-    return err.code === 'VALIDATION_FAILED' && err.details !== undefined;
+    return err.details !== undefined;
   }
-  if (typeof err !== 'object' || err === null) return false;
-  const candidate = err as { code?: unknown; details?: unknown };
-  return candidate.code === 'VALIDATION_FAILED' && typeof candidate.details === 'object';
+  const candidate = err as { details?: unknown };
+  return typeof candidate.details === 'object' && candidate.details !== null;
 }

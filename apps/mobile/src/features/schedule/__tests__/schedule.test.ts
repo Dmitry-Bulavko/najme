@@ -159,6 +159,38 @@ describe('time-off body builder', () => {
     });
   });
 
+  it('maps all-day across Europe/Podgorica DST start (2026-10-25)', () => {
+    expect(
+      buildCreateBody({
+        allDay: true,
+        startDate: '2026-10-25',
+        endDate: '2026-10-25',
+        startTime: '09:00',
+        endTime: '17:00',
+        reason: '',
+      }),
+    ).toEqual({
+      start: '2026-10-25T00:00',
+      end: '2026-10-26T00:00',
+    });
+  });
+
+  it('maps all-day across year end (2026-12-31)', () => {
+    expect(
+      buildCreateBody({
+        allDay: true,
+        startDate: '2026-12-31',
+        endDate: '2026-12-31',
+        startTime: '09:00',
+        endTime: '17:00',
+        reason: '',
+      }),
+    ).toEqual({
+      start: '2026-12-31T00:00',
+      end: '2027-01-01T00:00',
+    });
+  });
+
   it('maps timed time-off body', () => {
     expect(
       buildCreateBody({

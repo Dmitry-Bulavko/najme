@@ -2,9 +2,25 @@ import { weekdaySchemaValues, type Weekday, type WorkingHoursInterval } from '@n
 import { tokens } from '@najme/ui-tokens';
 import { useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 
-import { Banner, Button, Chip, SwitchRow, Text, TimePicker } from '@/components/ui';
+import {
+  Banner,
+  Button,
+  Chip,
+  SwitchRow,
+  Text,
+  TimePicker,
+  type BannerTone,
+} from '@/components/ui';
 import { fontFamilies } from '@/components/ui/theme';
 
 import {
@@ -27,6 +43,8 @@ type WorkingHoursEditorProps = {
   initialIntervals: WorkingHoursInterval[];
   disabled?: boolean;
   saving?: boolean;
+  /** Success/error from parent mutations — shown next to Save so the editor stays mounted. */
+  statusBanner?: { tone: BannerTone; message: string } | null;
   onSave: (intervals: WorkingHoursInterval[]) => Promise<void>;
 };
 
@@ -35,9 +53,10 @@ export function WorkingHoursEditor({
   initialIntervals,
   disabled = false,
   saving = false,
+  statusBanner = null,
   onSave,
 }: WorkingHoursEditorProps): ReactElement {
-  const { t, i18n } = useTranslation('business');
+  const { t, i18n } = useTranslation(['business', 'mobile']);
   const locale = i18n.language;
   const [days, setDays] = useState<DayDraft[]>(() =>
     initialIntervals.length === 0 ? emptyWeekDraft() : intervalsToDraft(initialIntervals),
@@ -50,13 +69,13 @@ export function WorkingHoursEditor({
   const weekdayLabel = useMemo(
     () =>
       ({
-        MONDAY: t('schedule.weekday.monday'),
-        TUESDAY: t('schedule.weekday.tuesday'),
-        WEDNESDAY: t('schedule.weekday.wednesday'),
-        THURSDAY: t('schedule.weekday.thursday'),
-        FRIDAY: t('schedule.weekday.friday'),
-        SATURDAY: t('schedule.weekday.saturday'),
-        SUNDAY: t('schedule.weekday.sunday'),
+        MONDAY: t('business:schedule.weekday.monday'),
+        TUESDAY: t('business:schedule.weekday.tuesday'),
+        WEDNESDAY: t('business:schedule.weekday.wednesday'),
+        THURSDAY: t('business:schedule.weekday.thursday'),
+        FRIDAY: t('business:schedule.weekday.friday'),
+        SATURDAY: t('business:schedule.weekday.saturday'),
+        SUNDAY: t('business:schedule.weekday.sunday'),
       }) satisfies Record<Weekday, string>,
     [t],
   );
@@ -116,9 +135,13 @@ export function WorkingHoursEditor({
   async function handleSave(): Promise<void> {
     const parsed = validateWorkingHoursDraft(days);
     if (!parsed.success) {
-      setFormError(t('schedule.hours.validationError'));
+      setFormError(t('business:schedule.hours.validationError'));
       setRowErrors(
-        mapWorkingHoursIssues(days, parsed.error.issues, t('schedule.hours.rowValidationError')),
+        mapWorkingHoursIssues(
+          days,
+          parsed.error.issues,
+          t('business:schedule.hours.rowValidationError'),
+        ),
       );
       return;
     }
@@ -127,9 +150,13 @@ export function WorkingHoursEditor({
     try {
       await onSave(parsed.data.intervals);
     } catch (err) {
-      const apiRows = mapWorkingHoursApiErrors(err, days, t('schedule.hours.rowValidationError'));
+      const apiRows = mapWorkingHoursApiErrors(
+        err,
+        days,
+        t('business:schedule.hours.rowValidationError'),
+      );
       if (apiRows) {
-        setFormError(t('schedule.hours.validationError'));
+        setFormError(t('business:schedule.hours.validationError'));
         setRowErrors(apiRows);
       }
     }
@@ -149,7 +176,7 @@ export function WorkingHoursEditor({
 
   function daySummary(day: DayDraft): string {
     if (day.closed || day.intervals.length === 0) {
-      return t('schedule.hours.closed');
+      return t('business:schedule.hours.closed');
     }
     return day.intervals
       .map((interval) => {
@@ -162,10 +189,10 @@ export function WorkingHoursEditor({
   return (
     <View style={styles.section} testID="working-hours-editor">
       <Text variant="title" style={styles.heading}>
-        {t('schedule.hours.heading')}
+        {t('business:schedule.hours.heading')}
       </Text>
       <Text variant="caption" color="text03">
-        {t('schedule.hours.subtitle')}
+        {t('business:schedule.hours.subtitle')}
       </Text>
 
       {days.map((day) => (
@@ -182,11 +209,11 @@ export function WorkingHoursEditor({
           </View>
 
           <SwitchRow
-            label={t('schedule.hours.closed')}
+            label={t('business:schedule.hours.closedNamed', { day: weekdayLabel[day.weekday] })}
             value={day.closed}
             onValueChange={(closed) => setClosed(day.weekday, closed)}
             disabled={disabled || saving}
-            description={day.closed ? t('schedule.hours.closedHint') : undefined}
+            description={day.closed ? t('business:schedule.hours.closedHint') : undefined}
             testID={`closed-${day.weekday}`}
           />
 
@@ -206,14 +233,19 @@ export function WorkingHoursEditor({
               ))}
               <View style={styles.dayActions}>
                 <Button
-                  label={t('schedule.hours.addInterval')}
+                  label={t('business:schedule.hours.addIntervalNamed', {
+                    day: weekdayLabel[day.weekday],
+                  })}
                   variant="secondary"
                   size="sm"
                   disabled={disabled || saving || day.intervals.length >= 6}
                   onPress={() => addInterval(day.weekday)}
+                  testID={`add-interval-${day.weekday}`}
                 />
                 <Button
-                  label={t('schedule.hours.copyTo')}
+                  label={t('business:schedule.hours.copyToNamed', {
+                    day: weekdayLabel[day.weekday],
+                  })}
                   variant="secondary"
                   size="sm"
                   disabled={disabled || saving}
@@ -230,9 +262,14 @@ export function WorkingHoursEditor({
       ))}
 
       {formError ? <Banner tone="error" message={formError} /> : null}
+      {statusBanner ? (
+        <View testID="hours-status-banner">
+          <Banner tone={statusBanner.tone} message={statusBanner.message} />
+        </View>
+      ) : null}
 
       <Button
-        label={saving ? t('schedule.hours.saving') : t('schedule.hours.save')}
+        label={saving ? t('business:schedule.hours.saving') : t('business:schedule.hours.save')}
         loading={saving}
         disabled={disabled || saving}
         onPress={() => void handleSave()}
@@ -246,44 +283,66 @@ export function WorkingHoursEditor({
         onRequestClose={() => setCopyOpenFor(null)}
         accessibilityViewIsModal
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setCopyOpenFor(null)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text variant="title">{t('schedule.hours.copyTo')}</Text>
-            <Text variant="caption" color="text03">
-              {t('schedule.hours.copyHint')}
-            </Text>
-            <View
-              style={styles.chipRow}
-              accessibilityRole="summary"
-              accessibilityLabel={t('schedule.hours.copyGroupLabel')}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('mobile:ui.close')}
+          style={styles.modalBackdrop}
+          onPress={() => setCopyOpenFor(null)}
+        />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalAvoid}
+        >
+          <View style={styles.modalCard}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.modalScroll}
             >
-              {weekdaySchemaValues
-                .filter((w) => w !== copyOpenFor)
-                .map((target) => {
-                  const selected = copyTargets.includes(target);
-                  return (
-                    <Chip
-                      key={target}
-                      label={weekdayLabel[target]}
-                      selected={selected}
-                      onPress={() =>
-                        setCopyTargets((prev) =>
-                          selected ? prev.filter((w) => w !== target) : [...prev, target],
-                        )
-                      }
-                      testID={`copy-target-${target}`}
-                    />
-                  );
-                })}
-            </View>
-            <Button
-              label={t('schedule.hours.copyApply')}
-              disabled={copyTargets.length === 0}
-              onPress={applyCopy}
-              testID="copy-apply"
-            />
-          </Pressable>
-        </Pressable>
+              <Text variant="title">{t('business:schedule.hours.copyTo')}</Text>
+              <Text variant="caption" color="text03">
+                {t('business:schedule.hours.copyHint')}
+              </Text>
+              <View
+                style={styles.chipRow}
+                accessibilityRole="summary"
+                accessibilityLabel={t('business:schedule.hours.copyGroupLabel')}
+              >
+                {weekdaySchemaValues
+                  .filter((w) => w !== copyOpenFor)
+                  .map((target) => {
+                    const selected = copyTargets.includes(target);
+                    return (
+                      <Chip
+                        key={target}
+                        label={weekdayLabel[target]}
+                        selected={selected}
+                        onPress={() =>
+                          setCopyTargets((prev) =>
+                            selected ? prev.filter((w) => w !== target) : [...prev, target],
+                          )
+                        }
+                        testID={`copy-target-${target}`}
+                      />
+                    );
+                  })}
+              </View>
+              <View style={styles.modalActions}>
+                <Button
+                  label={t('mobile:ui.cancel')}
+                  variant="secondary"
+                  onPress={() => setCopyOpenFor(null)}
+                  testID="copy-cancel"
+                />
+                <Button
+                  label={t('business:schedule.hours.copyApply')}
+                  disabled={copyTargets.length === 0}
+                  onPress={applyCopy}
+                  testID="copy-apply"
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -327,7 +386,7 @@ function IntervalRow({
           <Text variant="caption" color="text02">
             {t('schedule.hours.endNamed', { day: weekdayLabel, n: intervalIndex })}
           </Text>
-          <Text variant="body" style={styles.endOfDayValue}>
+          <Text variant="body" style={styles.endOfDayValue} testID={`end-24-${interval.key}`}>
             {formatLocalHhMm('24:00', locale)}
           </Text>
         </View>
@@ -340,7 +399,10 @@ function IntervalRow({
         />
       )}
       <SwitchRow
-        label={t('schedule.hours.untilEndOfDay')}
+        label={t('schedule.hours.untilEndOfDayNamed', {
+          day: weekdayLabel,
+          n: intervalIndex,
+        })}
         value={interval.untilEndOfDay}
         onValueChange={(untilEndOfDay) => onChange({ untilEndOfDay })}
         disabled={disabled}
@@ -387,15 +449,21 @@ const styles = StyleSheet.create({
   endOfDayValue: { marginTop: tokens.spacing.xs, fontFamily: fontFamilies.medium },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: `${tokens.colors.text01}66`,
+  },
+  modalAvoid: {
     justifyContent: 'center',
     padding: tokens.spacing.xl,
   },
   modalCard: {
-    gap: tokens.spacing.md,
-    padding: tokens.spacing.xl,
+    maxHeight: '80%',
     borderRadius: tokens.radius.lg,
     backgroundColor: tokens.colors.base01,
   },
+  modalScroll: {
+    gap: tokens.spacing.md,
+    padding: tokens.spacing.xl,
+  },
+  modalActions: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.sm },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.sm },
 });

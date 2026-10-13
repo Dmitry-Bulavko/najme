@@ -3,7 +3,7 @@ import { tokens } from '@najme/ui-tokens';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { Banner, Button, ListGroup, ListItem, Screen, Text } from '@/components/ui';
 import { fontFamilies } from '@/components/ui/theme';
@@ -57,7 +57,7 @@ export function SchedulePicker(): ReactElement {
     } catch (err) {
       const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
       setError(t(`errors:${code}`, { defaultValue: t('errors:HTTP_ERROR') }));
-      setStaff(null);
+      // Keep previous rows on a failed refetch.
     } finally {
       setLoading(false);
     }
@@ -119,9 +119,19 @@ export function SchedulePicker(): ReactElement {
   }
 
   const empty = staff !== null && staff.length === 0;
+  const showInitialSpinner = loading && staff === null;
 
   return (
-    <Screen edges={['bottom', 'left', 'right']}>
+    <Screen
+      edges={['bottom', 'left', 'right']}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading && staff !== null}
+          onRefresh={() => void load()}
+          tintColor={tokens.colors.primary}
+        />
+      }
+    >
       <View style={styles.header} testID="schedule-picker">
         <Text variant="title" style={styles.heading}>
           {t('business:schedule.pickerHeading')}
@@ -134,12 +144,12 @@ export function SchedulePicker(): ReactElement {
         </Text>
       </View>
 
-      {loading ? (
+      {showInitialSpinner ? (
         <ActivityIndicator
           color={tokens.colors.primary}
           accessibilityLabel={t('business:schedule.loading')}
         />
-      ) : error ? (
+      ) : error && !staff ? (
         <View style={styles.block}>
           <Banner tone="error" message={error} />
           <Button
@@ -160,18 +170,21 @@ export function SchedulePicker(): ReactElement {
           />
         </View>
       ) : (
-        <ListGroup>
-          {staff?.map((member) => (
-            <ListItem
-              key={member.id}
-              title={member.displayName}
-              subtitle={member.active ? t('business:staff.active') : t('business:staff.inactive')}
-              onPress={() => router.push(staffScheduleHref(business.id, member.id))}
-              accessibilityLabel={`${member.displayName}, ${t('business:schedule.openSchedule')}`}
-              testID={`open-schedule-${member.id}`}
-            />
-          ))}
-        </ListGroup>
+        <>
+          {error ? <Banner tone="error" message={error} /> : null}
+          <ListGroup>
+            {staff?.map((member) => (
+              <ListItem
+                key={member.id}
+                title={member.displayName}
+                subtitle={member.active ? t('business:staff.active') : t('business:staff.inactive')}
+                onPress={() => router.push(staffScheduleHref(business.id, member.id))}
+                accessibilityLabel={`${member.displayName}, ${t('business:schedule.openSchedule')}`}
+                testID={`open-schedule-${member.id}`}
+              />
+            ))}
+          </ListGroup>
+        </>
       )}
     </Screen>
   );

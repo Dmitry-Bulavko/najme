@@ -60,7 +60,10 @@ function BusinessTabs(): ReactElement {
           fontFamily: fontFamilies.bold,
           fontSize: TAB_LABEL_FONT_SIZE,
           lineHeight: TAB_LABEL_LINE_HEIGHT,
+          // Allow wrapping on narrow phones (STAFF schedule label).
+          textAlign: 'center',
         },
+        tabBarAllowFontScaling: true,
         tabBarStyle: {
           backgroundColor: tokens.colors.base01,
           borderTopColor: tokens.colors.base04,

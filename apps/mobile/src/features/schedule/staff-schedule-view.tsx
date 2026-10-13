@@ -10,12 +10,19 @@ import {
   type WorkingHoursInterval,
 } from '@najme/contracts';
 import { tokens } from '@najme/ui-tokens';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  Platform,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from 'react-native';
 
-import { Banner, Button, Screen, Text } from '@/components/ui';
+import { Banner, Button, Screen, Text, type BannerTone } from '@/components/ui';
 import { fontFamilies } from '@/components/ui/theme';
 import { useBusinessContext } from '@/features/business/business-provider';
 import { businessHref } from '@/features/business/last-business';
@@ -23,13 +30,15 @@ import { useMyBusinesses } from '@/features/business/use-my-businesses';
 import { ApiError, apiRequest } from '@/lib/api/client';
 
 import { isValidationFailedError } from './map-schedule-validation';
-import { TimeOffSection } from './time-off-section';
 import { pastFromIso } from './time-off-body';
+import { TimeOffSection } from './time-off-section';
 import { WorkingHoursEditor } from './working-hours-editor';
 
 type StaffScheduleViewProps = {
   staffId: string;
 };
+
+type ActionBanner = { tone: BannerTone; message: string };
 
 /**
  * Working-hours + time-off editor for one staff member.
@@ -39,6 +48,7 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps): ReactEle
   const { t } = useTranslation(['business', 'errors']);
   const router = useRouter();
   const { business } = useBusinessContext();
+  const isStaff = business.myRole === 'STAFF';
   const {
     data: myBusinesses,
     isLoading: membershipsLoading,
@@ -47,11 +57,12 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps): ReactEle
   } = useMyBusinesses();
 
   const myStaffMemberId = useMemo(() => {
+    if (!isStaff) return null;
     const row = myBusinesses?.find((b) => b.businessId === business.id);
     return row?.staffMemberId ?? null;
-  }, [business.id, myBusinesses]);
+  }, [business.id, isStaff, myBusinesses]);
 
-  const isStaff = business.myRole === 'STAFF';
+  // OWNER/ADMIN never wait on /me/businesses — only STAFF need the linked staffMemberId.
   const forbidden =
     isStaff && !membershipsLoading && myStaffMemberId !== null && myStaffMemberId !== staffId;
   const staffUnlinked =
@@ -60,6 +71,7 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps): ReactEle
     !membershipsError &&
     myBusinesses !== undefined &&
     myStaffMemberId === null;
+  const blockOnMemberships = isStaff && (membershipsLoading || membershipsError);
 
   const [member, setMember] = useState<StaffMember | null>(null);
   const [intervals, setIntervals] = useState<WorkingHoursInterval[] | null>(null);
@@ -69,70 +81,81 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps): ReactEle
   const [error, setError] = useState<string | null>(null);
   const [forbiddenFromApi, setForbiddenFromApi] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const [loadNonce, setLoadNonce] = useState(0);
+  const [actionBanner, setActionBanner] = useState<ActionBanner | null>(null);
+  /** True after a successful load so a failed refetch keeps the editor mounted. */
+  const hasLoadedRef = useRef(false);
 
   const apiBase = `/businesses/${business.id}/staff/${staffId}`;
   const pickerHref = businessHref(business.id, '/schedule');
 
-  const reload = useCallback(() => {
-    setLoadNonce((n) => n + 1);
-  }, []);
-
-  useEffect(() => {
-    if (forbidden || staffUnlinked || membershipsLoading || membershipsError) {
+  const load = useCallback(async () => {
+    if (forbidden || staffUnlinked || blockOnMemberships) {
       return;
     }
-
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      setForbiddenFromApi(false);
-      try {
-        const [staffRaw, hoursRaw, timeOffRaw] = await Promise.all([
-          apiRequest<unknown>(apiBase),
-          apiRequest<unknown>(`${apiBase}/working-hours`),
-          apiRequest<unknown>(`${apiBase}/time-off?from=${pastFromIso()}`),
-        ]);
-        if (cancelled) return;
-        setMember(staffMemberSchema.parse(staffRaw));
-        setIntervals(workingHoursResponseSchema.parse(hoursRaw).intervals);
-        const list = timeOffListResponseSchema.parse(timeOffRaw);
-        const nowMs = Date.now();
-        setUpcoming(
-          list
-            .filter((row) => new Date(row.endsAt).getTime() > nowMs)
-            .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
-        );
-        setPast(
-          list
-            .filter((row) => new Date(row.endsAt).getTime() <= nowMs)
-            .sort((a, b) => new Date(b.endsAt).getTime() - new Date(a.endsAt).getTime()),
-        );
-      } catch (err) {
-        if (cancelled) return;
-        if (err instanceof ApiError && err.status === 403) {
-          setForbiddenFromApi(true);
-          return;
-        }
-        const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
-        setError(t(`errors:${code}`, { defaultValue: t('errors:HTTP_ERROR') }));
+    setLoading(true);
+    setError(null);
+    setForbiddenFromApi(false);
+    try {
+      const [staffRaw, hoursRaw, timeOffRaw] = await Promise.all([
+        apiRequest<unknown>(apiBase),
+        apiRequest<unknown>(`${apiBase}/working-hours`),
+        apiRequest<unknown>(`${apiBase}/time-off?from=${pastFromIso()}`),
+      ]);
+      setMember(staffMemberSchema.parse(staffRaw));
+      setIntervals(workingHoursResponseSchema.parse(hoursRaw).intervals);
+      const list = timeOffListResponseSchema.parse(timeOffRaw);
+      const nowMs = Date.now();
+      setUpcoming(
+        list
+          .filter((row) => new Date(row.endsAt).getTime() > nowMs)
+          .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+      );
+      setPast(
+        list
+          .filter((row) => new Date(row.endsAt).getTime() <= nowMs)
+          .sort((a, b) => new Date(b.endsAt).getTime() - new Date(a.endsAt).getTime()),
+      );
+      hasLoadedRef.current = true;
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        setForbiddenFromApi(true);
+        return;
+      }
+      const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
+      setError(t(`errors:${code}`, { defaultValue: t('errors:HTTP_ERROR') }));
+      if (!hasLoadedRef.current) {
         setMember(null);
         setIntervals(null);
-      } finally {
-        if (!cancelled) setLoading(false);
       }
+    } finally {
+      setLoading(false);
     }
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [apiBase, forbidden, membershipsError, membershipsLoading, staffUnlinked, t, loadNonce]);
+  }, [apiBase, blockOnMemberships, forbidden, staffUnlinked, t]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
+
+  function announceSuccess(message: string): void {
+    setActionBanner({ tone: 'success', message });
+    if (Platform.OS === 'ios') {
+      void AccessibilityInfo.announceForAccessibility(message);
+    }
+  }
+
+  function showActionError(err: unknown): void {
+    const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
+    setActionBanner({
+      tone: 'error',
+      message: t(`errors:${code}`, { defaultValue: t('errors:HTTP_ERROR') }),
+    });
+  }
 
   async function saveHours(next: WorkingHoursInterval[]): Promise<void> {
     setSavingHours(true);
-    setToast(null);
+    setActionBanner(null);
     try {
       const body = putWorkingHoursRequestSchema.parse({ intervals: next });
       const raw = await apiRequest<unknown>(`${apiBase}/working-hours`, {
@@ -140,65 +163,61 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps): ReactEle
         body,
       });
       setIntervals(workingHoursResponseSchema.parse(raw).intervals);
-      setToast(t('business:schedule.hours.savedToast'));
+      announceSuccess(t('business:schedule.hours.savedToast'));
     } catch (err) {
       if (isValidationFailedError(err)) {
+        // Editor maps field-level issues; rethrow so it can attach row errors.
         throw err;
       }
-      const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
-      setToast(null);
-      setError(t(`errors:${code}`, { defaultValue: t('errors:HTTP_ERROR') }));
+      showActionError(err);
     } finally {
       setSavingHours(false);
     }
   }
 
   async function createTimeOff(body: CreateTimeOffRequest): Promise<TimeOff> {
-    try {
-      const raw = await apiRequest<unknown>(`${apiBase}/time-off`, { method: 'POST', body });
-      const created = timeOffSchema.parse(raw);
-      setToast(t('business:schedule.timeOff.createdToast'));
-      const nowMs = Date.now();
-      if (new Date(created.endsAt).getTime() <= nowMs) {
-        setPast((prev) =>
-          [...prev, created].sort(
-            (a, b) => new Date(b.endsAt).getTime() - new Date(a.endsAt).getTime(),
-          ),
-        );
-      } else {
-        setUpcoming((prev) =>
-          [...prev, created].sort(
-            (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
-          ),
-        );
-      }
-      return created;
-    } catch (err) {
-      if (isValidationFailedError(err)) {
-        throw err;
-      }
-      const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
-      setToast(null);
-      setError(t(`errors:${code}`, { defaultValue: t('errors:HTTP_ERROR') }));
-      throw err;
+    // Errors propagate to TimeOffDialog (keep dialog open + inline Banner).
+    const raw = await apiRequest<unknown>(`${apiBase}/time-off`, { method: 'POST', body });
+    const created = timeOffSchema.parse(raw);
+    announceSuccess(t('business:schedule.timeOff.createdToast'));
+    const nowMs = Date.now();
+    if (new Date(created.endsAt).getTime() <= nowMs) {
+      setPast((prev) =>
+        [...prev, created].sort(
+          (a, b) => new Date(b.endsAt).getTime() - new Date(a.endsAt).getTime(),
+        ),
+      );
+    } else {
+      setUpcoming((prev) =>
+        [...prev, created].sort(
+          (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+        ),
+      );
     }
+    return created;
   }
 
   async function deleteTimeOff(timeOffId: string): Promise<void> {
     try {
       await apiRequest(`${apiBase}/time-off/${timeOffId}`, { method: 'DELETE' });
-      setToast(t('business:schedule.timeOff.deletedToast'));
+      announceSuccess(t('business:schedule.timeOff.deletedToast'));
       setUpcoming((prev) => prev.filter((row) => row.id !== timeOffId));
       setPast((prev) => prev.filter((row) => row.id !== timeOffId));
     } catch (err) {
-      const code = err instanceof ApiError ? err.code : 'INTERNAL_ERROR';
-      setToast(null);
-      setError(t(`errors:${code}`, { defaultValue: t('errors:HTTP_ERROR') }));
+      showActionError(err);
       throw err;
     }
   }
 
-  if (membershipsLoading) {
+  function goToPicker(): void {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace(pickerHref);
+    }
+  }
+
+  if (isStaff && membershipsLoading) {
     return (
       <Screen edges={['bottom', 'left', 'right']}>
         <ActivityIndicator
@@ -252,7 +271,7 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps): ReactEle
     );
   }
 
-  if (loading) {
+  if (loading && intervals === null) {
     return (
       <Screen edges={['bottom', 'left', 'right']}>
         <ActivityIndicator
@@ -263,17 +282,21 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps): ReactEle
     );
   }
 
-  if (error || intervals === null) {
+  if (error && intervals === null) {
     return (
       <Screen edges={['bottom', 'left', 'right']}>
-        <Banner tone="error" message={error ?? t('business:schedule.error')} />
+        <Banner tone="error" message={error} />
         <View style={styles.row}>
-          <Button label={t('business:schedule.retry')} variant="secondary" onPress={reload} />
+          <Button
+            label={t('business:schedule.retry')}
+            variant="secondary"
+            onPress={() => void load()}
+          />
           {!isStaff ? (
             <Button
               label={t('business:schedule.backToPicker')}
               variant="secondary"
-              onPress={() => router.replace(pickerHref)}
+              onPress={goToPicker}
             />
           ) : null}
         </View>
@@ -281,8 +304,28 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps): ReactEle
     );
   }
 
+  if (intervals === null) {
+    return (
+      <Screen edges={['bottom', 'left', 'right']}>
+        <ActivityIndicator
+          color={tokens.colors.primary}
+          accessibilityLabel={t('business:schedule.loading')}
+        />
+      </Screen>
+    );
+  }
+
   return (
-    <Screen edges={['bottom', 'left', 'right']}>
+    <Screen
+      edges={['bottom', 'left', 'right']}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() => void load()}
+          tintColor={tokens.colors.primary}
+        />
+      }
+    >
       <View style={styles.header} testID="staff-schedule">
         <Text variant="title" style={styles.heading}>
           {t('business:schedule.heading', { name: member?.displayName ?? '—' })}
@@ -299,7 +342,8 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps): ReactEle
               label={t('business:schedule.backToPicker')}
               variant="secondary"
               size="sm"
-              onPress={() => router.push(pickerHref)}
+              onPress={goToPicker}
+              testID="back-to-picker"
             />
             <Button
               label={t('business:schedule.editStaff')}
@@ -311,12 +355,13 @@ export function StaffScheduleView({ staffId }: StaffScheduleViewProps): ReactEle
         ) : null}
       </View>
 
-      {toast ? <Banner tone="success" message={toast} /> : null}
+      {error ? <Banner tone="error" message={error} /> : null}
 
       <WorkingHoursEditor
         key={`${staffId}-${intervals.map((i) => `${i.weekday}${i.start}${i.end}`).join('|')}`}
         initialIntervals={intervals}
         saving={savingHours}
+        statusBanner={actionBanner}
         onSave={saveHours}
       />
 
