@@ -1,7 +1,8 @@
 import { hash } from '@node-rs/argon2';
-import { v7 as uuidv7 } from 'uuid';
 
 import type { PrismaClient } from '../../generated/prisma/client.js';
+import { newId } from '../common/id.js';
+import { assertNotProductionEnv } from './assert-not-production.js';
 import {
   DEMO_SALON,
   DEMO_WEEKDAY_INTERVALS,
@@ -19,6 +20,12 @@ type SeedUserSpec = {
   displayName: string;
   isPlatformAdmin: boolean;
 };
+
+/** Prisma client or interactive transaction client. */
+type SeedDb = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$extends' | '$use'
+>;
 
 const SEED_USERS: readonly SeedUserSpec[] = [
   {
@@ -62,9 +69,11 @@ export type DevSeedResult = {
 
 /**
  * Idempotent demo dataset for local development and the CI Playwright M2 exit flow.
- * Safe to re-run: fixed emails/slugs upsert; Demo Salon children are replaced each run.
+ * Safe to re-run: fixed emails/ids upsert; Demo Salon children are replaced each run.
  */
 export async function runDevSeed(prisma: PrismaClient): Promise<DevSeedResult> {
+  assertNotProductionEnv(process.env.NODE_ENV);
+
   const passwordHash = await hash(DEV_SEED_PASSWORD);
   const now = new Date();
 
@@ -96,6 +105,7 @@ export async function runDevSeed(prisma: PrismaClient): Promise<DevSeedResult> {
     approvedAt: now,
     reviewedAt: now,
     reviewedByUserId: adminUserId,
+    description: 'Dev seed Demo Salon — hair in Podgorica.',
     now,
   });
 
@@ -109,22 +119,25 @@ export async function runDevSeed(prisma: PrismaClient): Promise<DevSeedResult> {
     approvedAt: null,
     reviewedAt: null,
     reviewedByUserId: null,
+    description: 'Dev seed business awaiting platform approval.',
     now,
   });
 
-  await resetBusinessChildren(prisma, demoBusinessId);
-  await ensureOwnerMembership(
-    prisma,
-    DEV_SEED_IDS.pendingOwnerMembership,
-    ownerUserId,
-    pendingBusinessId,
-    now,
-  );
-  await seedDemoSalonContent(prisma, {
-    businessId: demoBusinessId,
-    ownerUserId,
-    staffUserId,
-    now,
+  await prisma.$transaction(async (tx) => {
+    await resetBusinessChildren(tx, demoBusinessId);
+    await ensureOwnerMembership(
+      tx,
+      DEV_SEED_IDS.pendingOwnerMembership,
+      ownerUserId,
+      pendingBusinessId,
+      now,
+    );
+    await seedDemoSalonContent(tx, {
+      businessId: demoBusinessId,
+      ownerUserId,
+      staffUserId,
+      now,
+    });
   });
 
   return {
@@ -138,7 +151,7 @@ export async function runDevSeed(prisma: PrismaClient): Promise<DevSeedResult> {
 }
 
 async function upsertSeedUser(
-  prisma: PrismaClient,
+  prisma: SeedDb,
   user: SeedUserSpec,
   passwordHash: string,
   now: Date,
@@ -199,7 +212,7 @@ async function upsertSeedUser(
 }
 
 async function upsertBusiness(
-  prisma: PrismaClient,
+  prisma: SeedDb,
   input: {
     preferredId: string;
     name: string;
@@ -210,14 +223,38 @@ async function upsertBusiness(
     approvedAt: Date | null;
     reviewedAt: Date | null;
     reviewedByUserId: string | null;
+    description: string;
     now: Date;
   },
 ): Promise<string> {
-  const existing = await prisma.business.findUnique({
+  const byId = await prisma.business.findUnique({
+    where: { id: input.preferredId },
+    select: {
+      id: true,
+      approvedAt: true,
+      reviewedAt: true,
+      reviewedByUserId: true,
+      status: true,
+    },
+  });
+  const bySlug = await prisma.business.findUnique({
     where: { slug: input.slug },
     select: { id: true },
   });
-  const businessId = existing?.id ?? input.preferredId;
+
+  // Never take over a user-created business that only shares the demo slug.
+  if (bySlug && bySlug.id !== input.preferredId) {
+    throw new Error(
+      `Dev seed refused: slug "${input.slug}" belongs to business ${bySlug.id}, expected ${input.preferredId}. Rename or delete the conflicting business.`,
+    );
+  }
+
+  const businessId = input.preferredId;
+  const keepApproval =
+    input.status === 'APPROVED' &&
+    byId !== null &&
+    byId.status === 'APPROVED' &&
+    byId.approvedAt !== null;
 
   await prisma.business.upsert({
     where: { id: businessId },
@@ -226,8 +263,13 @@ async function upsertBusiness(
       name: input.name,
       slug: input.slug,
       categoryId: input.categoryId,
+      description: input.description,
       timezone: 'Europe/Podgorica',
       city: input.city,
+      confirmationMode: 'AUTO',
+      cancellationWindowMinutes: 120,
+      minBookingNoticeMinutes: 60,
+      bookingHorizonDays: 60,
       status: input.status,
       approvedAt: input.approvedAt,
       reviewedAt: input.reviewedAt,
@@ -240,11 +282,18 @@ async function upsertBusiness(
       name: input.name,
       slug: input.slug,
       categoryId: input.categoryId,
+      description: input.description,
+      timezone: 'Europe/Podgorica',
       city: input.city,
+      confirmationMode: 'AUTO',
+      cancellationWindowMinutes: 120,
+      minBookingNoticeMinutes: 60,
+      bookingHorizonDays: 60,
       status: input.status,
-      approvedAt: input.approvedAt,
-      reviewedAt: input.reviewedAt,
-      reviewedByUserId: input.reviewedByUserId,
+      // Keep the first approval timestamps stable across re-seeds.
+      approvedAt: keepApproval ? byId.approvedAt : input.approvedAt,
+      reviewedAt: keepApproval ? byId.reviewedAt : input.reviewedAt,
+      reviewedByUserId: keepApproval ? byId.reviewedByUserId : input.reviewedByUserId,
       rejectionReason: null,
       deletedAt: null,
       updatedAt: input.now,
@@ -255,7 +304,7 @@ async function upsertBusiness(
 }
 
 /** Drop configuration children so a re-seed always matches the documented Demo Salon shape. */
-async function resetBusinessChildren(prisma: PrismaClient, businessId: string): Promise<void> {
+async function resetBusinessChildren(prisma: SeedDb, businessId: string): Promise<void> {
   await prisma.invitation.deleteMany({ where: { businessId } });
   await prisma.serviceStaffAssignment.deleteMany({
     where: { service: { businessId } },
@@ -281,7 +330,7 @@ async function resetBusinessChildren(prisma: PrismaClient, businessId: string): 
 }
 
 async function ensureOwnerMembership(
-  prisma: PrismaClient,
+  prisma: SeedDb,
   preferredId: string,
   userId: string,
   businessId: string,
@@ -312,7 +361,7 @@ async function ensureOwnerMembership(
 }
 
 async function seedDemoSalonContent(
-  prisma: PrismaClient,
+  prisma: SeedDb,
   input: {
     businessId: string;
     ownerUserId: string;
@@ -378,7 +427,7 @@ async function seedDemoSalonContent(
   const hoursRows = [DEV_SEED_IDS.staffAna, DEV_SEED_IDS.staffMarko].flatMap((staffMemberId) =>
     DEMO_WEEKDAYS.flatMap((weekday) =>
       DEMO_WEEKDAY_INTERVALS.map((interval) => ({
-        id: uuidv7(),
+        id: newId(),
         staffMemberId,
         weekday,
         startMinute: interval.startMinute,
@@ -451,7 +500,7 @@ async function seedDemoSalonContent(
     DEV_SEED_IDS.serviceConsult,
   ].flatMap((serviceId) =>
     [DEV_SEED_IDS.staffAna, DEV_SEED_IDS.staffMarko].map((staffMemberId) => ({
-      id: uuidv7(),
+      id: newId(),
       serviceId,
       staffMemberId,
       createdAt: now,

@@ -57,8 +57,8 @@ test.describe('M2 exit flow', () => {
       throw new Error(`Could not parse business id from ${businessUrl}`);
     }
 
-    await createStaffMember(page, businessId, STAFF_A);
-    await createStaffMember(page, businessId, STAFF_B);
+    const alexId = await createStaffMember(page, businessId, STAFF_A);
+    const samId = await createStaffMember(page, businessId, STAFF_B);
 
     for (const service of SERVICES) {
       await createService(page, businessId, service);
@@ -114,9 +114,19 @@ test.describe('M2 exit flow', () => {
       await expect(businessNav.getByRole('link', { name: 'Settings' })).toHaveCount(0);
       await businessNav.getByRole('link', { name: 'My hours' }).click();
       await expect(staffPage).toHaveURL(
-        new RegExp(`/en/business/${businessId}/staff/[0-9a-f-]+/schedule`),
+        new RegExp(`/en/business/${businessId}/staff/${alexId}/schedule`),
       );
       await expect(staffPage.getByRole('heading', { name: 'Working hours' })).toBeVisible();
+
+      // Exit criterion: staff can open only their own hours.
+      await staffPage.goto(`/en/business/${businessId}/staff/${samId}/schedule`);
+      await expect(staffPage.getByText('You do not have access to this schedule.')).toBeVisible();
+      await staffPage.goto(`/en/business/${businessId}/team`);
+      await expect(staffPage.getByText('You do not have access to team management.')).toBeVisible();
+      await staffPage.goto(`/en/business/${businessId}/settings`);
+      await expect(
+        staffPage.getByText('You do not have access to business settings.'),
+      ).toBeVisible();
     } finally {
       await staffContext.close();
     }
@@ -128,7 +138,7 @@ test.describe('M2 exit flow', () => {
       await signInViaUi(adminPage, SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD);
       await adminPage.goto('/en/admin/businesses');
       await expect(adminPage.getByRole('heading', { name: 'Businesses' })).toBeVisible();
-      await adminPage.getByRole('button', { name: BUSINESS_NAME }).click();
+      await openPendingBusiness(adminPage, BUSINESS_NAME);
       await adminPage.getByRole('button', { name: 'Approve' }).click();
       await expect(adminPage.getByText('Business approved.')).toBeVisible({ timeout: 15_000 });
     } finally {
@@ -141,11 +151,17 @@ test.describe('M2 exit flow', () => {
   });
 });
 
-async function createStaffMember(page: Page, businessId: string, name: string): Promise<void> {
+async function createStaffMember(page: Page, businessId: string, name: string): Promise<string> {
   await page.goto(`/en/business/${businessId}/staff/new`);
   await page.getByLabel('Display name').fill(name);
   await page.getByRole('button', { name: 'Create' }).click();
-  await expect(page.getByText(name, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page).toHaveURL(/\/staff\/[0-9a-f-]{36}/);
+  await expect(page.getByLabel('Display name')).toHaveValue(name);
+  const staffId = page.url().match(/\/staff\/([0-9a-f-]{36})/)?.[1];
+  if (!staffId) {
+    throw new Error(`Could not parse staff id from ${page.url()}`);
+  }
+  return staffId;
 }
 
 async function createService(
@@ -165,9 +181,8 @@ async function createService(
   }
 
   await page.getByRole('button', { name: 'Create' }).click();
-  await expect(page.getByText(service.name, { exact: true }).first()).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(page).toHaveURL(/\/services\/[0-9a-f-]{36}/);
+  await expect(page.getByLabel('Service name')).toHaveValue(service.name);
 }
 
 async function setWeekdayHours(page: Page, businessId: string, staffName: string): Promise<void> {
@@ -192,7 +207,25 @@ async function setWeekdayHours(page: Page, businessId: string, staffName: string
   for (const day of ['Tuesday', 'Wednesday', 'Thursday', 'Friday']) {
     await page.getByRole('checkbox', { name: day }).check();
   }
-  await page.getByRole('button', { name: 'Copy' }).click();
+  await page.getByRole('button', { name: 'Copy', exact: true }).click();
   await page.getByRole('button', { name: 'Save hours' }).click();
   await expect(page.getByText('Working hours saved.')).toBeVisible({ timeout: 15_000 });
+}
+
+/** Pending list is oldest-first (page size 20); load more until the row is visible. */
+async function openPendingBusiness(page: Page, businessName: string): Promise<void> {
+  const rowButton = page.getByRole('button', { name: businessName });
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (await rowButton.isVisible().catch(() => false)) {
+      await rowButton.click();
+      return;
+    }
+    const loadMore = page.getByRole('button', { name: 'Load more' });
+    if (!(await loadMore.isVisible().catch(() => false))) {
+      break;
+    }
+    await loadMore.click();
+  }
+  await expect(rowButton).toBeVisible({ timeout: 5_000 });
+  await rowButton.click();
 }

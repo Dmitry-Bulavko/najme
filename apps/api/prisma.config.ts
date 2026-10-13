@@ -12,7 +12,7 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
-    // Dev/CI demo data only (#88). `tsx` is a workspace dep of @najme/api.
+    // Dev/CI demo data only (#88). `tsx` is a devDependency of @najme/api.
     seed: 'tsx prisma/seed.ts',
   },
   datasource: {

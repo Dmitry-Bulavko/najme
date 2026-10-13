@@ -136,7 +136,14 @@ pnpm --filter @najme/api db:seed
 
 Also created: **Demo Salon** (`APPROVED`, hair, Podgorica — 2 staff, 3 services, Mon–Fri
 09:00–13:00 and 14:00–18:00) and **Pending Studio** (`PENDING_APPROVAL`). No booking rows.
-Re-running the seed updates the same emails/slugs instead of duplicating them.
+
+Re-running the seed upserts the same fixed emails/ids (does not duplicate). It **resets seed
+passwords** and **recreates** Demo Salon’s staff, services, working hours, invitations, and
+non-owner memberships so the shape matches this table again. A conflicting user-created business
+that only shares the `demo-salon` / `pending-studio` slug (different id) makes the seed refuse.
+
+The API e2e suite (`pnpm --filter @najme/api test:e2e`) runs the seed against `DATABASE_URL`
+(fixed emails; no per-test cleanup of those rows).
 
 ## Other API commands
 
