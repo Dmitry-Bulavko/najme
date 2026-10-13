@@ -56,13 +56,15 @@ describe('Dev seed (e2e)', () => {
     for (const user of users) {
       const hash = user.authIdentities[0]?.passwordHash;
       expect(hash).toBeTruthy();
-      expect(await passwords.verify(hash!, DEV_SEED_PASSWORD)).toBe(true);
+      if (!hash) continue;
+      expect(await passwords.verify(hash, DEV_SEED_PASSWORD)).toBe(true);
     }
 
     const demo = await prisma.business.findUniqueOrThrow({
       where: { id: first.demoBusinessId },
       include: {
         staffMembers: { where: { deletedAt: null } },
+        memberships: { where: { role: 'STAFF' }, include: { user: true } },
         services: { where: { deletedAt: null }, include: { customFields: true } },
       },
     });
@@ -72,6 +74,9 @@ describe('Dev seed (e2e)', () => {
     expect(demo.staffMembers).toHaveLength(2);
     expect(demo.services).toHaveLength(3);
     expect(demo.services.some((s) => s.customFields.length === 1)).toBe(true);
+    const linkedStaff = demo.memberships.find((m) => m.user.email === DEV_SEED_EMAILS.staff);
+    expect(linkedStaff?.staffMemberId).toBeTruthy();
+    expect(demo.staffMembers.some((s) => s.id === linkedStaff?.staffMemberId)).toBe(true);
 
     const hours = await prisma.workingHours.count({
       where: { staffMember: { businessId: demo.id } },

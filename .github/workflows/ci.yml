@@ -239,6 +239,8 @@ jobs:
           EOF
           unset DATABASE_URL
           pnpm --filter @najme/api db:migrate:deploy
+          # Generated client is gitignored — seed imports it; generate before db:seed (#88).
+          pnpm --filter @najme/api db:generate
           # Demo accounts for M2 exit Playwright (#88); refused when NODE_ENV=production.
           pnpm --filter @najme/api db:seed
           rm -rf packages/*/dist

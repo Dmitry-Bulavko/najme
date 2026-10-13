@@ -53,17 +53,19 @@ test.describe('M2 exit flow', () => {
 
     const businessUrl = page.url();
     const businessId = businessUrl.match(/\/business\/([0-9a-f-]+)/)?.[1];
-    expect(businessId).toBeTruthy();
-
-    await createStaffMember(page, businessId!, STAFF_A);
-    await createStaffMember(page, businessId!, STAFF_B);
-
-    for (const service of SERVICES) {
-      await createService(page, businessId!, service);
+    if (!businessId) {
+      throw new Error(`Could not parse business id from ${businessUrl}`);
     }
 
-    await setWeekdayHours(page, businessId!, STAFF_A);
-    await setWeekdayHours(page, businessId!, STAFF_B);
+    await createStaffMember(page, businessId, STAFF_A);
+    await createStaffMember(page, businessId, STAFF_B);
+
+    for (const service of SERVICES) {
+      await createService(page, businessId, service);
+    }
+
+    await setWeekdayHours(page, businessId, STAFF_A);
+    await setWeekdayHours(page, businessId, STAFF_B);
 
     // --- 2. Invite staff; accept in a second browser context ---
     await page.goto(`/en/business/${businessId}/team`);

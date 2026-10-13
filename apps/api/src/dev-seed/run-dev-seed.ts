@@ -68,10 +68,14 @@ export async function runDevSeed(prisma: PrismaClient): Promise<DevSeedResult> {
   const passwordHash = await hash(DEV_SEED_PASSWORD);
   const now = new Date();
 
-  const adminUserId = await upsertSeedUser(prisma, SEED_USERS[0]!, passwordHash, now);
-  const ownerUserId = await upsertSeedUser(prisma, SEED_USERS[1]!, passwordHash, now);
-  const staffUserId = await upsertSeedUser(prisma, SEED_USERS[2]!, passwordHash, now);
-  const clientUserId = await upsertSeedUser(prisma, SEED_USERS[3]!, passwordHash, now);
+  const [adminSeed, ownerSeed, staffSeed, clientSeed] = SEED_USERS;
+  if (!adminSeed || !ownerSeed || !staffSeed || !clientSeed) {
+    throw new Error('SEED_USERS must define admin, owner, staff, and client');
+  }
+  const adminUserId = await upsertSeedUser(prisma, adminSeed, passwordHash, now);
+  const ownerUserId = await upsertSeedUser(prisma, ownerSeed, passwordHash, now);
+  const staffUserId = await upsertSeedUser(prisma, staffSeed, passwordHash, now);
+  const clientUserId = await upsertSeedUser(prisma, clientSeed, passwordHash, now);
 
   const hair = await prisma.category.findUniqueOrThrow({
     where: { slug: DEMO_SALON.categorySlug },
