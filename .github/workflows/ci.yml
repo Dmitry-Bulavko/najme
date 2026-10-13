@@ -156,8 +156,8 @@ jobs:
           pkill -f 'typescript/bin/tsc' || true
           pkill -f 'turbo' || true
 
-  # Browser account-flow e2e (#57). Independent of the unit `ci` job so it can grow services
-  # (e.g. MinIO in M2) without coupling to format/lint. Runs every apps/web/e2e/*.spec.ts file.
+  # Browser e2e (#57 account flow, #88 M2 exit). Independent of the unit `ci` job so it can grow
+  # services (e.g. MinIO) without coupling to format/lint. Runs every apps/web/e2e/*.spec.ts file.
   e2e:
     name: e2e
     runs-on: ubuntu-latest
@@ -239,6 +239,8 @@ jobs:
           EOF
           unset DATABASE_URL
           pnpm --filter @najme/api db:migrate:deploy
+          # Demo accounts for M2 exit Playwright (#88); refused when NODE_ENV=production.
+          pnpm --filter @najme/api db:seed
           rm -rf packages/*/dist
           setsid nohup pnpm dev >e2e-dev.log 2>&1 &
           echo $! >e2e-dev.pid
@@ -255,14 +257,14 @@ jobs:
             exit 1
           fi
 
-      - name: Playwright account e2e
+      - name: Playwright e2e
         run: pnpm test:e2e
 
       - name: Upload Playwright artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-account-e2e
+          name: playwright-e2e
           path: |
             apps/web/test-results/
             apps/web/playwright-report/

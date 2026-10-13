@@ -16,6 +16,7 @@ pnpm install
 cp .env.example .env
 docker compose -f compose.dev.yml up -d   # PostgreSQL, Mailpit, MinIO (+ minio-init)
 pnpm --filter @najme/api db:migrate:deploy  # first run only: create the schema
+pnpm --filter @najme/api db:seed            # optional: demo accounts (see Dev seed below)
 pnpm dev                                  # builds shared packages, then API + web
 ```
 
@@ -72,17 +73,19 @@ machine’s LAN IP (the presign `url` is built from `STORAGE_ENDPOINT`), e.g.
 `http://192.168.1.20:9000` and `http://192.168.1.20:9000/najme`, not `localhost`. Same rule as
 `EXPO_PUBLIC_API_URL`.
 
-### Web Playwright e2e (account flow)
+### Web Playwright e2e (account + M2 exit)
 
-With the stack from "First run" already healthy (API `:3000`, web `:3001`, Mailpit `:8025`):
+With the stack from "First run" already healthy (API `:3000`, web `:3001`, Mailpit `:8025`), and
+after `pnpm --filter @najme/api db:seed` (needed for the M2 exit admin step):
 
 ```bash
 pnpm --filter @najme/web exec playwright install chromium   # once per machine
 MAILPIT_URL=http://localhost:8025 pnpm test:e2e
 ```
 
-Specs are under `apps/web/e2e/`. Plain `pnpm test` / `pnpm check` do **not** run them. On failure,
-Playwright writes traces and screenshots under `apps/web/test-results/` (gitignored).
+Specs are under `apps/web/e2e/` (`account-flow.spec.ts`, `m2-exit-flow.spec.ts`). Plain
+`pnpm test` / `pnpm check` do **not** run them. On failure, Playwright writes traces and
+screenshots under `apps/web/test-results/` (gitignored); CI uploads that folder.
 
 ## Mobile
 
@@ -116,12 +119,32 @@ stays hidden and the app does not crash. `pnpm --filter @najme/mobile build` (`e
 
 See `apps/mobile/README.md` for the full mobile auth notes.
 
+## Dev seed (#88)
+
+After migrate, load the idempotent demo dataset (refuses to run when `NODE_ENV=production`):
+
+```bash
+pnpm --filter @najme/api db:seed
+```
+
+| Email              | Role                                 | Password             |
+| ------------------ | ------------------------------------ | -------------------- |
+| `admin@najme.dev`  | Platform admin                       | `najme-dev-password` |
+| `owner@najme.dev`  | Owner of Demo Salon + Pending Studio | `najme-dev-password` |
+| `staff@najme.dev`  | Staff at Demo Salon (Marko)          | `najme-dev-password` |
+| `client@najme.dev` | Client (no membership)               | `najme-dev-password` |
+
+Also created: **Demo Salon** (`APPROVED`, hair, Podgorica — 2 staff, 3 services, Mon–Fri
+09:00–13:00 and 14:00–18:00) and **Pending Studio** (`PENDING_APPROVAL`). No booking rows.
+Re-running the seed updates the same emails/slugs instead of duplicating them.
+
 ## Other API commands
 
 ```bash
 pnpm --filter @najme/api run db:generate        # regenerate the Prisma client
 pnpm --filter @najme/api run db:migrate:dev     # create/apply a dev migration
 pnpm --filter @najme/api run db:migrate:deploy  # apply pending migrations (CI/prod contract)
+pnpm --filter @najme/api db:seed                # demo accounts + Demo Salon (not production)
 pnpm --filter @najme/api test                   # unit + e2e (needs DATABASE_URL, real Postgres)
 pnpm --filter @najme/api admin:grant <email>    # set User.isPlatformAdmin (platform moderation)
 pnpm --filter @najme/api admin:revoke <email>   # clear User.isPlatformAdmin
@@ -142,13 +165,13 @@ schema change, run `pnpm --filter @najme/api db:generate`, or any turbo task suc
 
 ## Everyday commands
 
-| Command                                                   | What                                     |
-| --------------------------------------------------------- | ---------------------------------------- |
-| `pnpm check`                                              | Everything CI runs (not Playwright)      |
-| `pnpm test:e2e`                                           | Web Playwright account e2e (needs stack) |
-| `pnpm turbo run test --filter=@najme/<pkg>`               | Tests for one package                    |
-| `pnpm turbo run lint typecheck --filter=...[origin/main]` | Only what changed on the branch          |
-| `pnpm format`                                             | Format the repo                          |
+| Command                                                   | What                                    |
+| --------------------------------------------------------- | --------------------------------------- |
+| `pnpm check`                                              | Everything CI runs (not Playwright)     |
+| `pnpm test:e2e`                                           | Web Playwright e2e (needs stack + seed) |
+| `pnpm turbo run test --filter=@najme/<pkg>`               | Tests for one package                   |
+| `pnpm turbo run lint typecheck --filter=...[origin/main]` | Only what changed on the branch         |
+| `pnpm format`                                             | Format the repo                         |
 
 ## Claude Code
 
