@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { AccountBusinessMenu } from '@/features/business/account-business-menu';
 import { useSession } from '@/features/auth/session-context';
 
 /** Returns up to two uppercase initials from a display name or email address. */
@@ -34,6 +35,7 @@ function getInitials(name: string | null, email: string): string {
  */
 export function AccountSlot() {
   const t = useTranslations('auth');
+  const tAdmin = useTranslations('admin');
   const locale = useLocale();
   const session = useSession();
   const router = useRouter();
@@ -79,6 +81,12 @@ export function AccountSlot() {
         <DropdownMenuItem asChild>
           <Link href={`/${locale}/account`}>{t('header.profile')}</Link>
         </DropdownMenuItem>
+        <AccountBusinessMenu />
+        {me.isPlatformAdmin ? (
+          <DropdownMenuItem asChild>
+            <Link href={`/${locale}/admin/businesses`}>{tAdmin('menuLink')}</Link>
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={async () => {

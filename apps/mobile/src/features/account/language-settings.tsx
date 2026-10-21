@@ -3,7 +3,7 @@ import { isLocale, LOCALE_META, SUPPORTED_LOCALES, type Locale } from '@najme/i1
 import { tokens } from '@najme/ui-tokens';
 import { useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Banner, ListGroup, ListItem } from '@/components/ui';
 import { useSession } from '@/features/auth/auth-provider';
@@ -13,6 +13,9 @@ import { ApiError, apiRequest } from '@/lib/api/client';
 /**
  * Account-backed language picker: PATCH /me with the chosen locale, then `setLocale` so the app
  * UI updates immediately (ADR-0004). Used when signed in; anonymous users keep the device switcher.
+ *
+ * If `setLocale` fails after a successful PATCH, the account locale is already saved server-side,
+ * so we report success and warn locally instead of showing an error (#148).
  */
 export function AccountLanguageSettings(): ReactElement {
   const { t, i18n } = useTranslation(['account', 'errors', 'common']);
@@ -48,7 +51,16 @@ export function AccountLanguageSettings(): ReactElement {
       if (session.state === 'authenticated') {
         session.updateMe(parsed.data);
       }
-      await setLocale(locale);
+      // setLocale updates the UI locale; a failure here is non-fatal — the account locale was
+      // already persisted server-side, so we still report success and warn instead of erroring.
+      try {
+        await setLocale(locale);
+      } catch (localeError) {
+        console.warn(
+          '[language-settings] setLocale failed after successful PATCH /me; UI may lag:',
+          localeError,
+        );
+      }
       setSaved(true);
     } catch (error) {
       if (error instanceof ApiError) {
@@ -62,7 +74,7 @@ export function AccountLanguageSettings(): ReactElement {
   }
 
   return (
-    <View style={{ gap: tokens.spacing.lg }}>
+    <View style={styles.root}>
       {saved ? <Banner tone="success" message={t('account:languageSection.saved')} /> : null}
       {apiError ? <Banner tone="error" message={apiError} /> : null}
 
@@ -85,3 +97,7 @@ export function AccountLanguageSettings(): ReactElement {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { gap: tokens.spacing.lg },
+});

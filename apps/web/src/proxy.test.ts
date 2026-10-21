@@ -37,6 +37,24 @@ describe('proxy', () => {
     expect(response.headers.get('x-middleware-request-x-next-intl-locale')).toBe('ru');
   });
 
+  it('sets Referrer-Policy: no-referrer on verify-email, reset-password and invitations/accept', () => {
+    for (const path of [
+      '/en/verify-email',
+      '/me/reset-password',
+      '/ru/verify-email?token=x',
+      '/en/invitations/accept',
+      '/tr/invitations/accept?token=abc',
+    ]) {
+      const response = proxy(new NextRequest(`https://najme.example${path}`));
+      expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
+    }
+  });
+
+  it('does not set Referrer-Policy on unrelated locale routes', () => {
+    const response = proxy(new NextRequest('https://najme.example/en/sign-in'));
+    expect(response.headers.get('Referrer-Policy')).toBeNull();
+  });
+
   it('replaces an unsupported locale segment instead of prefixing it', () => {
     expect(redirectPath('/xx/foo')).toBe('/en/foo');
     expect(redirectPath('/xx-YY/foo/bar', { 'accept-language': 'tr' })).toBe('/tr/foo/bar');

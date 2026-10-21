@@ -24,8 +24,8 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 
+import { clearMyBusinessesCache } from '@/features/business/my-businesses-cache';
 import {
-  ApiError,
   apiRequest,
   refreshSession,
   setAccessToken,
@@ -76,6 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const tErrors = useTranslations('errors');
 
+  const clearLocalSession = useCallback(() => {
+    setAccessToken(null);
+    setSession({ state: 'anonymous' });
+    // Drop memberships so the next user never sees a stale list.
+    clearMyBusinessesCache();
+  }, []);
+
   const signIn = useCallback((accessToken: string, me: Me) => {
     setAccessToken(accessToken);
     setSession({ state: 'authenticated', me });
@@ -87,9 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Logout is best-effort; clear local state regardless.
     }
-    setAccessToken(null);
-    setSession({ state: 'anonymous' });
-  }, []);
+    clearLocalSession();
+  }, [clearLocalSession]);
 
   const updateMe = useCallback((me: Me) => {
     setSession((prev) => (prev.state === 'authenticated' ? { ...prev, me } : prev));
@@ -98,13 +104,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Refresh-token reuse: clear session, notify, and send the user to sign-in (ADR-0010).
   useEffect(() => {
     setRefreshTokenReusedHandler(() => {
-      setAccessToken(null);
-      setSession({ state: 'anonymous' });
+      clearLocalSession();
       toast.error(tErrors('REFRESH_TOKEN_REUSED'));
       router.replace(`/${locale}/sign-in`);
     });
     return () => setRefreshTokenReusedHandler(null);
-  }, [locale, router, tErrors]);
+  }, [clearLocalSession, locale, router, tErrors]);
 
   useEffect(() => {
     if (hasMounted.current) {
@@ -117,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Restore access token from the httpOnly cookie via refresh.
         const newToken = await refreshSession();
         if (!newToken) {
-          setSession({ state: 'anonymous' });
+          clearLocalSession();
           return;
         }
 
@@ -125,19 +130,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const raw = await apiRequest<unknown>('/me');
         const parsed = meSchema.safeParse(raw);
         if (!parsed.success) {
-          setSession({ state: 'anonymous' });
+          clearLocalSession();
           return;
         }
         setSession({ state: 'authenticated', me: parsed.data });
-      } catch (error) {
-        if (error instanceof ApiError && error.code === 'REFRESH_TOKEN_REUSED') {
-          // Handler already cleared token / toasted / redirected; keep anonymous.
-          setAccessToken(null);
-        }
-        setSession({ state: 'anonymous' });
+      } catch {
+        // Reuse handler may already have cleared/toasted/redirected; always drop the token.
+        clearLocalSession();
       }
     })();
-  }, []);
+  }, [clearLocalSession]);
 
   const value = useMemo<SessionContextValue>(
     () => ({ ...session, signIn, signOut, updateMe }),

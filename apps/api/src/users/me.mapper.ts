@@ -11,5 +11,6 @@ export function toMe(user: User, hasPassword: boolean): Me {
     avatarUrl: user.avatarUrl,
     locale: localeSchema.catch('en').parse(user.localePreference),
     hasPassword,
+    isPlatformAdmin: user.isPlatformAdmin,
   };
 }

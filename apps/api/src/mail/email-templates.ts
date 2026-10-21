@@ -1,12 +1,22 @@
 import { catalogs, type Locale } from '@najme/i18n';
+import type { MembershipRole } from '@najme/contracts';
+import { INVITATION_TTL_DAYS } from '@najme/contracts';
 
-export type EmailKind = 'verifyEmail' | 'resetPassword';
+export type AuthEmailKind = 'verifyEmail' | 'resetPassword';
+export type EmailKind = AuthEmailKind | 'businessInvitation';
 
 export interface RenderedEmail {
   subject: string;
   text: string;
   html: string;
 }
+
+export type InvitationEmailValues = {
+  businessName: string;
+  inviterName: string;
+  role: MembershipRole;
+  url: string;
+};
 
 /** Lifetimes quoted in the emails; the token services use the same constants. */
 export const EMAIL_TOKEN_TTL_HOURS = { verifyEmail: 24, resetPassword: 1 } as const;
@@ -31,26 +41,67 @@ function escapeHtml(value: string): string {
 }
 
 /**
- * Minimal ICU rendering for the `emails` catalog: `{hours, plural, ...}` with `#`, chosen with the
- * locale's CLDR plural rules. Enough for these messages; a full ICU formatter is not worth a
- * dependency until emails need more.
+ * Minimal ICU rendering for the `emails` catalog: `{name, plural, ...}` with `#`, chosen with the
+ * locale's CLDR plural rules. Also replaces `{name}` plain placeholders from `values`.
  */
-export function formatMessage(message: string, locale: Locale, values: { hours: number }): string {
-  const plural = /\{hours, plural, ((?:[a-z]+ \{[^}]*\} ?)+)\}/.exec(message);
-  if (!plural) return message.replaceAll('{hours}', () => String(values.hours));
-  const forms = new Map<string, string>();
-  for (const match of plural[1]!.matchAll(/([a-z]+) \{([^}]*)\}/g)) {
-    forms.set(match[1]!, match[2]!);
+export function formatMessage(
+  message: string,
+  locale: Locale,
+  values: Record<string, string | number>,
+): string {
+  let out = message;
+  for (const [name, raw] of Object.entries(values)) {
+    if (typeof raw !== 'number') continue;
+    const plural = new RegExp(`\\{${name}, plural, ((?:[a-z]+ \\{[^}]*\\} ?)+)\\}`).exec(out);
+    if (!plural) continue;
+    const forms = new Map<string, string>();
+    for (const match of plural[1]!.matchAll(/([a-z]+) \{([^}]*)\}/g)) {
+      forms.set(match[1]!, match[2]!);
+    }
+    const category = new Intl.PluralRules(locale === 'me' ? 'sr-Latn' : locale).select(raw);
+    const form = forms.get(category) ?? forms.get('other') ?? '';
+    const chosen = form.replaceAll('#', String(raw));
+    out = out.replace(plural[0], () => chosen);
   }
-  const category = new Intl.PluralRules(locale === 'me' ? 'sr-Latn' : locale).select(values.hours);
-  const form = forms.get(category) ?? forms.get('other') ?? '';
-  const chosen = form.replaceAll('#', String(values.hours));
-  // A replacer function: `$` sequences in a translation must not act as replacement patterns.
-  return message.replace(plural[0], () => chosen);
+  // Single pass so a substituted value containing `{otherKey}` is not re-expanded.
+  out = out.replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (match, name: string) => {
+    if (!Object.hasOwn(values, name)) return match;
+    return String(values[name]);
+  });
+  return out;
+}
+
+function wrapHtml(
+  locale: Locale,
+  heading: string,
+  intro: string,
+  action: string,
+  url: string,
+  footerLines: string[],
+): string {
+  const { layout } = catalogs[locale].emails;
+  const safeUrl = escapeHtml(url);
+  return `<!doctype html>
+<html lang="${locale === 'me' ? 'sr-Latn' : locale}">
+<body style="margin:0;padding:24px;background:${COLOR.bg};font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${COLOR.text};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+    <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background:${COLOR.card};border-radius:12px;">
+      <tr><td style="padding:24px 32px 0;font-size:20px;font-weight:700;color:${COLOR.brand};">${escapeHtml(layout.brand)}</td></tr>
+      <tr><td style="padding:16px 32px 0;font-size:22px;font-weight:600;">${escapeHtml(heading)}</td></tr>
+      <tr><td style="padding:12px 32px 0;font-size:15px;line-height:22px;">${escapeHtml(intro)}</td></tr>
+      <tr><td style="padding:24px 32px;"><a href="${safeUrl}" style="display:inline-block;padding:12px 24px;background:${COLOR.brand};color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">${escapeHtml(action)}</a></td></tr>
+      <tr><td style="padding:0 32px;font-size:13px;line-height:20px;color:${COLOR.muted};">${footerLines.map(escapeHtml).join(' ')}</td></tr>
+      <tr><td style="padding:16px 32px 0;font-size:13px;line-height:20px;color:${COLOR.muted};">${escapeHtml(layout.linkFallback)}<br><a href="${safeUrl}" style="color:${COLOR.brand};word-break:break-all;">${safeUrl}</a></td></tr>
+      <tr><td style="padding:24px 32px;font-size:12px;color:${COLOR.muted};">${escapeHtml(layout.footer)}</td></tr>
+    </table>
+  </td></tr></table>
+</body>
+</html>
+`;
 }
 
 /** Renders the localized text and HTML parts of a transactional email that carries one link. */
-export function renderEmail(kind: EmailKind, locale: Locale, url: string): RenderedEmail {
+export function renderEmail(kind: AuthEmailKind, locale: Locale, url: string): RenderedEmail {
   const { layout, [kind]: m } = catalogs[locale].emails;
   const expiry = formatMessage(m.expiry, locale, { hours: EMAIL_TOKEN_TTL_HOURS[kind] });
 
@@ -69,24 +120,48 @@ export function renderEmail(kind: EmailKind, locale: Locale, url: string): Rende
     '',
   ].join('\n');
 
-  const safeUrl = escapeHtml(url);
-  const html = `<!doctype html>
-<html lang="${locale === 'me' ? 'sr-Latn' : locale}">
-<body style="margin:0;padding:24px;background:${COLOR.bg};font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${COLOR.text};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
-    <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background:${COLOR.card};border-radius:12px;">
-      <tr><td style="padding:24px 32px 0;font-size:20px;font-weight:700;color:${COLOR.brand};">${escapeHtml(layout.brand)}</td></tr>
-      <tr><td style="padding:16px 32px 0;font-size:22px;font-weight:600;">${escapeHtml(m.heading)}</td></tr>
-      <tr><td style="padding:12px 32px 0;font-size:15px;line-height:22px;">${escapeHtml(m.intro)}</td></tr>
-      <tr><td style="padding:24px 32px;"><a href="${safeUrl}" style="display:inline-block;padding:12px 24px;background:${COLOR.brand};color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">${escapeHtml(m.action)}</a></td></tr>
-      <tr><td style="padding:0 32px;font-size:13px;line-height:20px;color:${COLOR.muted};">${escapeHtml(expiry)} ${escapeHtml(m.ignore)}</td></tr>
-      <tr><td style="padding:16px 32px 0;font-size:13px;line-height:20px;color:${COLOR.muted};">${escapeHtml(layout.linkFallback)}<br><a href="${safeUrl}" style="color:${COLOR.brand};word-break:break-all;">${safeUrl}</a></td></tr>
-      <tr><td style="padding:24px 32px;font-size:12px;color:${COLOR.muted};">${escapeHtml(layout.footer)}</td></tr>
-    </table>
-  </td></tr></table>
-</body>
-</html>
-`;
+  return {
+    subject: m.subject,
+    text,
+    html: wrapHtml(locale, m.heading, m.intro, m.action, url, [expiry, m.ignore]),
+  };
+}
 
-  return { subject: m.subject, text, html };
+export function renderInvitationEmail(
+  locale: Locale,
+  values: InvitationEmailValues,
+): RenderedEmail {
+  const { layout, businessInvitation: m } = catalogs[locale].emails;
+  const role = m.roles[values.role];
+  const vars = {
+    businessName: values.businessName,
+    inviterName: values.inviterName || m.inviterFallback,
+    role,
+    days: INVITATION_TTL_DAYS,
+  };
+  const subject = formatMessage(m.subject, locale, vars);
+  const heading = formatMessage(m.heading, locale, vars);
+  const intro = formatMessage(m.intro, locale, vars);
+  const expiry = formatMessage(m.expiry, locale, vars);
+
+  const text = [
+    heading,
+    '',
+    intro,
+    '',
+    `${m.action}: ${values.url}`,
+    '',
+    expiry,
+    m.ignore,
+    '',
+    `-- ${layout.brand}`,
+    layout.footer,
+    '',
+  ].join('\n');
+
+  return {
+    subject,
+    text,
+    html: wrapHtml(locale, heading, intro, m.action, values.url, [expiry, m.ignore]),
+  };
 }

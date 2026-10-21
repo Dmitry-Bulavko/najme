@@ -31,5 +31,52 @@ services:
       timeout: 5s
       retries: 20
 
+  # S3-compatible object storage for photo uploads (ADR-0014).
+  # Docker Hub minio/minio was removed (2026-09); Pigsty community image is a drop-in MinIO fork.
+  # Console: http://localhost:9001
+  minio:
+    image: pgsty/minio:RELEASE.2026-06-18T00-00-00Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_ACCESS_KEY:-minioadmin}
+      # PutBucketCors is not implemented on this image; allow browser uploads from the web app.
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_API_CORS_ALLOW_ORIGIN:-http://localhost:3001,http://127.0.0.1:3001}
+    ports:
+      - '${MINIO_API_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+    volumes:
+      - najme_dev_minio:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # One-shot: bucket + anonymous read + CORS via @aws-sdk/client-s3 (apps/api/scripts/storage-init.mjs).
+  minio-init:
+    image: node:22-bookworm-slim
+    depends_on:
+      minio:
+        condition: service_healthy
+    working_dir: /work
+    volumes:
+      - ./apps/api/scripts/storage-init.mjs:/work/storage-init.mjs:ro
+    entrypoint: ['bash', '-ec']
+    command:
+      - |
+        npm install --no-save --prefix /tmp/storage-init @aws-sdk/client-s3@3.1144.0 >/dev/null
+        NODE_PATH=/tmp/storage-init/node_modules node /work/storage-init.mjs
+    environment:
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-najme}
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-minioadmin}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-minioadmin}
+    restart: 'no'
+
 volumes:
   najme_dev_pgdata:
+  najme_dev_minio:

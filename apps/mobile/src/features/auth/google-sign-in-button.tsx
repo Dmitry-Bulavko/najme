@@ -58,20 +58,11 @@ export function GoogleSignInButton(): ReactElement | null {
     setBusy(true);
     try {
       // Lazy require — never evaluate the native module until the user taps in a dev build.
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { GoogleSignin } = require('@react-native-google-signin/google-signin') as {
-        GoogleSignin: {
-          configure: (options: {
-            iosClientId?: string;
-            webClientId: string;
-            offlineAccess?: boolean;
-          }) => void;
-          hasPlayServices: (options?: {
-            showPlayServicesUpdateDialog?: boolean;
-          }) => Promise<boolean>;
-          signIn: () => Promise<{ data?: { idToken?: string | null } | null; type?: string }>;
-        };
-      };
+      /* eslint-disable @typescript-eslint/no-require-imports -- native module must stay lazy */
+      const googleSignIn =
+        require('@react-native-google-signin/google-signin') as typeof import('@react-native-google-signin/google-signin');
+      /* eslint-enable @typescript-eslint/no-require-imports */
+      const { GoogleSignin, isCancelledResponse } = googleSignIn;
 
       GoogleSignin.configure({
         iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
@@ -82,6 +73,10 @@ export function GoogleSignInButton(): ReactElement | null {
 
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const result = await GoogleSignin.signIn();
+      // Library returns `{ type: 'cancelled', data: null }` — not `'cancel'` (#148).
+      if (isCancelledResponse(result)) {
+        return;
+      }
       const idToken = result.data?.idToken;
       if (!idToken) {
         setApiError(t('errors:GOOGLE_TOKEN_INVALID'));

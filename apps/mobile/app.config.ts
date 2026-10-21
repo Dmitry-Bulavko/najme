@@ -3,11 +3,19 @@ import type { ExpoConfig } from 'expo/config';
 /**
  * Reversed iOS OAuth client ID for the Google Sign-In URL scheme
  * (`123-abc.apps.googleusercontent.com` → `com.googleusercontent.apps.123-abc`).
- * Placeholder keeps the config plugin valid when #58 credentials are unset.
+ * Falls back to a placeholder for development/preview builds where credentials are optional.
+ * Throws for production EAS builds so a missing credential can never reach the store (#148).
  */
 function iosUrlSchemeFromClientId(clientId: string | undefined): string {
   const trimmed = clientId?.trim();
   if (!trimmed) {
+    const profile = process.env.EAS_BUILD_PROFILE?.trim();
+    if (profile === 'production') {
+      throw new Error(
+        'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID must be set for production EAS builds. ' +
+          'Add it to the build environment or eas.json env section.',
+      );
+    }
     return 'com.googleusercontent.apps.placeholder';
   }
   const prefix = trimmed.replace(/\.apps\.googleusercontent\.com$/i, '');
@@ -44,6 +52,15 @@ const config: ExpoConfig = {
   plugins: [
     'expo-router',
     'expo-secure-store',
+    [
+      'expo-image-picker',
+      {
+        photosPermission:
+          'Allow Najme to access your photos so you can upload a business logo or cover.',
+        cameraPermission: false,
+        microphonePermission: false,
+      },
+    ],
     [
       'expo-splash-screen',
       {

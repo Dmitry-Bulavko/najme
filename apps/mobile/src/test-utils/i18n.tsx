@@ -1,14 +1,11 @@
-import { catalogs, flattenMessages, type Namespaces } from '@najme/i18n';
+import { catalogs, flattenMessages } from '@najme/i18n';
 import { render } from '@testing-library/react-native';
 import i18next from 'i18next';
 import ICU from 'i18next-icu';
 import type { ReactElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
-/** Same UI namespaces as the app (everything except `emails`). */
-const UI_NAMESPACES = (Object.keys(catalogs.en) as (keyof Namespaces)[]).filter(
-  (ns) => ns !== 'emails',
-);
+import { UI_NAMESPACES } from '@/i18n';
 
 /** Initializes a test i18next instance with the real catalogs (idempotent). */
 export async function initTestI18n(lng = 'en'): Promise<void> {

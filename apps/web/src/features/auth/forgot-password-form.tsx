@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { ApiError, apiRequest } from '@/lib/api/client';
+import { errorMessage } from '@/lib/i18n/error-message';
 
 /**
  * Forgot-password form. Always shows the "sent" confirmation after a successful 202 so the
@@ -38,7 +39,7 @@ export function ForgotPasswordForm() {
       setSent(true);
     } catch (error) {
       if (error instanceof ApiError) {
-        setApiError(tErrors(error.code as Parameters<typeof tErrors>[0]));
+        setApiError(errorMessage(tErrors, error.code));
       } else {
         setApiError(tErrors('HTTP_ERROR'));
       }
@@ -76,7 +77,7 @@ export function ForgotPasswordForm() {
           type="email"
           autoComplete="email"
           inputMode="email"
-          placeholder="you@example.com"
+          placeholder={t('emailPlaceholder')}
         />
       </FormField>
 

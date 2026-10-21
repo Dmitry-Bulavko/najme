@@ -50,6 +50,13 @@ jobs:
       MAIL_FROM: Najme <no-reply@najme.test>
       APP_WEB_URL: http://localhost:3001
       MAILPIT_URL: http://localhost:8025
+      STORAGE_ENDPOINT: http://localhost:9000
+      STORAGE_REGION: us-east-1
+      STORAGE_BUCKET: najme
+      STORAGE_ACCESS_KEY_ID: minioadmin
+      STORAGE_SECRET_ACCESS_KEY: minioadmin
+      STORAGE_PUBLIC_BASE_URL: http://localhost:9000/najme
+      STORAGE_FORCE_PATH_STYLE: 'true'
       TURBO_TELEMETRY_DISABLED: '1'
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
@@ -62,8 +69,30 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      - name: Start MinIO
+        run: |
+          # Docker Hub minio/minio was removed (2026-09); Pigsty community image is MinIO-compatible.
+          docker run -d --name najme-minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            -e MINIO_API_CORS_ALLOW_ORIGIN=http://localhost:3001,http://127.0.0.1:3001 \
+            pgsty/minio:RELEASE.2026-06-18T00-00-00Z server /data
+          for _ in $(seq 30); do
+            if curl -sf http://localhost:9000/minio/health/live; then break; fi
+            sleep 1
+          done
+          if ! curl -sf http://localhost:9000/minio/health/live; then
+            echo "MinIO did not become healthy"
+            docker logs najme-minio || true
+            exit 1
+          fi
+
       - name: Install
         run: pnpm install --frozen-lockfile
+
+      - name: Init MinIO bucket
+        run: pnpm --filter @najme/api exec node scripts/storage-init.mjs
 
       - name: Format
         run: pnpm format:check
@@ -87,6 +116,13 @@ jobs:
           MAIL_FROM="Najme <no-reply@najme.test>"
           APP_WEB_URL=http://localhost:3001
           API_INTERNAL_URL=http://localhost:3000/api/v1
+          STORAGE_ENDPOINT=http://localhost:9000
+          STORAGE_REGION=us-east-1
+          STORAGE_BUCKET=najme
+          STORAGE_ACCESS_KEY_ID=minioadmin
+          STORAGE_SECRET_ACCESS_KEY=minioadmin
+          STORAGE_PUBLIC_BASE_URL=http://localhost:9000/najme
+          STORAGE_FORCE_PATH_STYLE=true
           EOF
           # Prove the root-.env-only path: DATABASE_URL must come from the file, not the job env.
           unset DATABASE_URL
@@ -120,8 +156,8 @@ jobs:
           pkill -f 'typescript/bin/tsc' || true
           pkill -f 'turbo' || true
 
-  # Browser account-flow e2e (#57). Independent of the unit `ci` job so it can grow services
-  # (e.g. MinIO in M2) without coupling to format/lint. Runs every apps/web/e2e/*.spec.ts file.
+  # Browser e2e (#57 account flow, #88 M2 exit). Independent of the unit `ci` job so it can grow
+  # services (e.g. MinIO) without coupling to format/lint. Runs every apps/web/e2e/*.spec.ts file.
   e2e:
     name: e2e
     runs-on: ubuntu-latest
@@ -193,9 +229,20 @@ jobs:
           MAIL_FROM="Najme <no-reply@najme.test>"
           APP_WEB_URL=http://localhost:3001
           API_INTERNAL_URL=http://localhost:3000/api/v1
+          STORAGE_ENDPOINT=http://localhost:9000
+          STORAGE_REGION=us-east-1
+          STORAGE_BUCKET=najme
+          STORAGE_ACCESS_KEY_ID=minioadmin
+          STORAGE_SECRET_ACCESS_KEY=minioadmin
+          STORAGE_PUBLIC_BASE_URL=http://localhost:9000/najme
+          STORAGE_FORCE_PATH_STYLE=true
           EOF
           unset DATABASE_URL
           pnpm --filter @najme/api db:migrate:deploy
+          # Generated client is gitignored — seed imports it; generate before db:seed (#88).
+          pnpm --filter @najme/api db:generate
+          # Demo accounts for M2 exit Playwright (#88); refused when NODE_ENV=production.
+          pnpm --filter @najme/api db:seed
           rm -rf packages/*/dist
           setsid nohup pnpm dev >e2e-dev.log 2>&1 &
           echo $! >e2e-dev.pid
@@ -212,14 +259,14 @@ jobs:
             exit 1
           fi
 
-      - name: Playwright account e2e
+      - name: Playwright e2e
         run: pnpm test:e2e
 
       - name: Upload Playwright artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-account-e2e
+          name: playwright-e2e
           path: |
             apps/web/test-results/
             apps/web/playwright-report/

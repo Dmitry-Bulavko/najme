@@ -19,5 +19,19 @@
     "action": "Izaberi novu lozinku",
     "expiry": "Link važi {hours, plural, one {# sat} few {# sata} other {# sati}} i može se iskoristiti samo jednom.",
     "ignore": "Ako niste vi tražili ovo, ignorišite poruku; vaša lozinka se neće promijeniti."
+  },
+  "businessInvitation": {
+    "subject": "Pozvani ste da se pridružite {businessName} na Najme",
+    "heading": "Pridružite se {businessName}",
+    "intro": "{inviterName} vas je pozvao/la da se pridružite {businessName} kao {role}.",
+    "action": "Prihvati pozivnicu",
+    "expiry": "Link važi {days, plural, one {# dan} few {# dana} other {# dana}}.",
+    "ignore": "Ako niste očekivali ovu pozivnicu, slobodno ignorišite poruku.",
+    "roles": {
+      "OWNER": "vlasnik",
+      "ADMIN": "administrator",
+      "STAFF": "član osoblja"
+    },
+    "inviterFallback": "Neko"
   }
 }

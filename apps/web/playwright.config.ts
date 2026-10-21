@@ -11,7 +11,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 1 : 0,
+  // No CI retries: a flaky e2e must fail the build rather than hide behind a second attempt (#146).
+  retries: 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   timeout: 60_000,
   expect: { timeout: 15_000 },

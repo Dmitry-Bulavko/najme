@@ -16,8 +16,9 @@ in JSON body stored in `expo-secure-store`, access token in memory only. Google 
 `@react-native-google-signin/google-signin` (dev builds only); hide the button in Expo Go, on web
 export, or when providers/env are missing so Expo Go and `expo export --platform web` never crash.
 
-i18next loads every catalog namespace except `emails` (and later `notifications`) so new namespaces
-need no wiring. Auth UI strings reuse the existing `auth` catalog; API errors use `errors:<CODE>`.
+i18next loads every catalog namespace except `emails` and `notifications` (via shared
+`UI_NAMESPACES`) so new UI namespaces need no wiring. Auth UI strings reuse the existing `auth`
+catalog; API errors use `errors:<CODE>`.
 
 ## Changes
 
@@ -27,7 +28,7 @@ need no wiring. Auth UI strings reuse the existing `auth` catalog; API errors us
 | `apps/mobile/src/features/auth/`                        | AuthProvider, forms, Google button, unverified banner, sign-in CTA |
 | `apps/mobile/src/app/(auth)/`                           | Sign-in, sign-up, forgot-password screens                          |
 | `apps/mobile/src/app/(tabs)/`                           | Anonymous CTAs; authenticated account + unverified banner; tab bar |
-| `apps/mobile/src/i18n/`, `test-utils/i18n.tsx`          | Register all namespaces except `emails`                            |
+| `apps/mobile/src/i18n/`, `test-utils/i18n.tsx`          | Shared `UI_NAMESPACES` (all except `emails` + `notifications`)     |
 | `app.config.ts`, env examples, turbo, README, local-dev | Google plugin + `EXPO_PUBLIC_GOOGLE_*`                             |
 
 ### Contracts / API
@@ -41,7 +42,7 @@ None.
 ### UI and i18n
 
 - Routes: `(auth)/sign-in`, `sign-up`, `forgot-password`; Discover stays public.
-- Namespaces: `auth`, `errors`, `common`, `mobile`, `shell` (all except `emails`).
+- Namespaces: every UI catalog except `emails` and `notifications` (`UI_NAMESPACES`).
 - New mobile keys only if needed for bookings anonymous CTA / account signed-in chrome.
 
 ## Test plan
@@ -64,10 +65,11 @@ None.
 - `(auth)` screens reuse the shared `auth` i18n catalog; Bookings/Account show `SignInCta` when
   anonymous; Account shows unverified banner + sign-out when signed in.
 - Google button gated on providers + both `EXPO_PUBLIC_GOOGLE_*` IDs + native module (hidden in
-  Expo Go / web export). Config plugin always registered with a placeholder iOS URL scheme when IDs
-  are unset.
-- i18next loads every catalog namespace except `emails`. Tab bar height is safe-area aware with an
-  explicit label line-height (#45 review clipping).
+  Expo Go / web export). Config plugin uses a placeholder iOS URL scheme when IDs are unset in
+  non-production profiles; **production EAS builds throw** if the iOS client ID is missing (#148).
+- i18next loads every catalog namespace except `emails` and `notifications`. Tab bar height is
+  safe-area aware with an explicit label line-height; base height raised in #148 so labels are not
+  clipped on the Expo web export at 390×844.
 - Screenshots of tab labels on device were not attached (no simulator in this environment); covered
   by layout metrics + existing tabs-layout locale test.
 

@@ -14,7 +14,7 @@ deployment has Google enabled (`GET /auth/providers`).
 
 Reuse the #52 API client and session context. New thin routes call the existing auth endpoints
 from #49/#50. The Google button loads Google Identity Services only when both `providers.google`
-and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` are set; otherwise it stays hidden (#58 supplies the IDs).
+and `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` are set; otherwise it stays hidden (#58 supplies the IDs).
 
 ## Changes
 
@@ -30,7 +30,7 @@ and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` are set; otherwise it stays hidden (#58 suppl
 | `apps/web/src/features/auth/google-sign-in-button.tsx`   | GIS → POST /auth/google            |
 | `apps/web/src/app/[locale]/layout.tsx`                   | Mount unverified banner            |
 | `packages/i18n/src/catalogs/*/auth.json`                 | New keys (4 locales)               |
-| `.env.example`, `apps/web/.env.example`, turbo env       | `NEXT_PUBLIC_GOOGLE_CLIENT_ID`     |
+| `.env.example`, `apps/web/.env.example`, turbo env       | `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` |
 
 ### Contracts / API
 
@@ -56,14 +56,14 @@ Routes: `/[locale]/verify-email`, `/forgot-password`, `/reset-password`. Auth na
 
 ## Risks and open questions
 
-- Without #58 (`GOOGLE_CLIENT_IDS` + `NEXT_PUBLIC_GOOGLE_CLIENT_ID`) the Google button is hidden;
+- Without #58 (`GOOGLE_CLIENT_IDS` + `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID`) the Google button is hidden;
   exit criterion "sign in with Google" cannot be verified in that environment.
 
 ## Implementation notes
 
 - `apiRequest` now treats empty 2xx bodies (including 202 from forgot-password / verify resend)
   as `undefined` instead of calling `response.json()` on an empty stream.
-- Google button requires both `GET /auth/providers.google` and `NEXT_PUBLIC_GOOGLE_CLIENT_ID`;
+- Google button requires both `GET /auth/providers.google` and `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID`;
   without #58 credentials it stays hidden.
 - Unverified banner sits under `SiteHeader` in the locale layout so every page surfaces it.
 - Token pages set `referrer: 'no-referrer'` in metadata and strip `token` via

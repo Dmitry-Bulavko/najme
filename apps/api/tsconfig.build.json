@@ -5,5 +5,12 @@
     "outDir": "dist"
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "test", "src/**/*.spec.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test",
+    "src/**/*.spec.ts",
+    // Dev-only seed (passwords + fixtures) must not ship in the production image (#88).
+    "src/dev-seed"
+  ]
 }

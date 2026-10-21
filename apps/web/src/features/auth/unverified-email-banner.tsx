@@ -1,11 +1,12 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { ApiError, apiRequest } from '@/lib/api/client';
+import { errorMessage } from '@/lib/i18n/error-message';
 import { useSession } from './session-context';
 
 const DISMISS_STORAGE_KEY = 'najme.unverified-email-banner.dismissed';
@@ -14,20 +15,29 @@ const DISMISS_STORAGE_KEY = 'najme.unverified-email-banner.dismissed';
  * Soft email-verification banner (R8 / ADR-0011). Shown when the signed-in user has
  * `emailVerified === false`. Dismissible for the tab session via sessionStorage. Resend
  * feedback uses toasts (no inline status).
+ *
+ * sessionStorage is read in an effect so the first client render matches the server (#146).
  */
 export function UnverifiedEmailBanner() {
   const t = useTranslations('auth');
   const tErrors = useTranslations('errors');
   const session = useSession();
   const [busy, setBusy] = useState(false);
-  const [dismissed, setDismissed] = useState(() => {
-    if (typeof sessionStorage === 'undefined') {
-      return false;
-    }
-    return sessionStorage.getItem(DISMISS_STORAGE_KEY) === '1';
-  });
+  // null = not yet read from sessionStorage (hide to avoid hydration mismatch).
+  const [dismissed, setDismissed] = useState<boolean | null>(null);
 
-  if (dismissed || session.state !== 'authenticated' || session.me.emailVerified) {
+  useEffect(() => {
+    // External store (sessionStorage) — must run after mount so SSR markup matches.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration-safe read (#146)
+    setDismissed(sessionStorage.getItem(DISMISS_STORAGE_KEY) === '1');
+  }, []);
+
+  if (
+    dismissed === null ||
+    dismissed ||
+    session.state !== 'authenticated' ||
+    session.me.emailVerified
+  ) {
     return null;
   }
 
@@ -43,7 +53,7 @@ export function UnverifiedEmailBanner() {
       toast.success(t('unverifiedBanner.resent'));
     } catch (error) {
       if (error instanceof ApiError) {
-        toast.error(tErrors(error.code as Parameters<typeof tErrors>[0]));
+        toast.error(errorMessage(tErrors, error.code));
       } else {
         toast.error(tErrors('HTTP_ERROR'));
       }

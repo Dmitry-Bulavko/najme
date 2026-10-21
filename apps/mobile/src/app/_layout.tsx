@@ -14,6 +14,7 @@ import { I18nextProvider, useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AuthProvider } from '@/features/auth/auth-provider';
+import { BusinessModeRestorer } from '@/features/business/business-mode-restorer';
 import { i18next, initI18n } from '@/i18n';
 
 void SplashScreen.preventAutoHideAsync();
@@ -64,7 +65,9 @@ export default function RootLayout() {
     <I18nextProvider i18n={i18next}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <RootStack />
+          <BusinessModeRestorer>
+            <RootStack />
+          </BusinessModeRestorer>
         </AuthProvider>
       </QueryClientProvider>
     </I18nextProvider>
@@ -77,6 +80,7 @@ function RootStack() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="(business)" />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       {__DEV__ ? (
         <Stack.Screen

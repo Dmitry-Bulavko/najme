@@ -1,7 +1,8 @@
 # Build context is the repo root (see .github/workflows/deploy.yml): this Dockerfile needs the
 # whole pnpm workspace to resolve @najme/* workspace dependencies.
 #
-#   docker build -f apps/web/Dockerfile --build-arg GIT_SHA=<sha> .
+#   docker build -f apps/web/Dockerfile --build-arg GIT_SHA=<sha> \
+#     --build-arg NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID=<id> .
 
 ARG NODE_VERSION=24
 
@@ -11,6 +12,10 @@ WORKDIR /app
 
 # --- Install & build ---------------------------------------------------------------------------
 FROM base AS builder
+# Baked into the Next.js client bundle at `next build`. Empty default keeps local/smoke builds
+# working without Google credentials; production deploy passes vars.GOOGLE_WEB_CLIENT_ID (#145).
+ARG NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID=
+ENV NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID
 COPY . .
 RUN pnpm install --frozen-lockfile
 # Builds @najme/web and every workspace package it depends on (packages/config, contracts, i18n,

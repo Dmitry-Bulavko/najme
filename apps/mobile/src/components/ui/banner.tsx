@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { tokens, type ColorToken } from '@najme/ui-tokens';
-import type { ReactElement } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { memo, type ReactElement } from 'react';
+import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from './text';
 
@@ -23,8 +23,15 @@ const toneConfig: Record<
   error: { color: 'danger', icon: 'alert-circle' },
 };
 
-/** Inline status message: coloured accent bar and icon, neutral text for legibility. */
-export function Banner({ tone = 'info', message, style }: BannerProps): ReactElement {
+/**
+ * Inline status message: coloured accent bar and icon, neutral text for legibility.
+ * Memoized so parent form re-renders do not reconcile the live region unnecessarily.
+ */
+export const Banner = memo(function Banner({
+  tone = 'info',
+  message,
+  style,
+}: BannerProps): ReactElement {
   const { color, icon } = toneConfig[tone];
   const urgent = tone === 'error' || tone === 'warning';
 
@@ -32,7 +39,9 @@ export function Banner({ tone = 'info', message, style }: BannerProps): ReactEle
     <View
       accessibilityRole={urgent ? 'alert' : 'summary'}
       accessibilityLabel={message}
-      accessibilityLiveRegion={urgent ? 'assertive' : 'polite'}
+      // Native: polite for success/info. Web: skip non-urgent liveRegion (scroll-into-view
+      // focus loss is fixed in Screen; still avoid redundant polite announcements on web).
+      accessibilityLiveRegion={urgent ? 'assertive' : Platform.OS !== 'web' ? 'polite' : undefined}
       style={[styles.banner, { borderLeftColor: tokens.colors[color] }, style]}
     >
       <Ionicons name={icon} size={22} color={tokens.colors[color]} />
@@ -41,7 +50,7 @@ export function Banner({ tone = 'info', message, style }: BannerProps): ReactEle
       </Text>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   banner: {

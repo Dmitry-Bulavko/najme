@@ -17,12 +17,13 @@ an env file.
 
 ## Environment variables
 
-| Name               | Purpose                                                                                                                                      |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `WEB_PORT`         | Dev server port (default 3001)                                                                                                               |
-| `API_INTERNAL_URL` | Optional in dev. API base URL for server-side calls, e.g. `http://localhost:3000/api/v1`; when unset the badge uses `PUBLIC_URL` + `/api/v1` |
-| `PUBLIC_URL`       | Public origin; fallback for the API health check                                                                                             |
-| `GIT_SHA`          | Build/version label                                                                                                                          |
+| Name                               | Purpose                                                                                                                                      |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WEB_PORT`                         | Dev server port (default 3001)                                                                                                               |
+| `API_INTERNAL_URL`                 | Optional in dev. API base URL for server-side calls, e.g. `http://localhost:3000/api/v1`; when unset the badge uses `PUBLIC_URL` + `/api/v1` |
+| `PUBLIC_URL`                       | Public origin; fallback for the API health check                                                                                             |
+| `GIT_SHA`                          | Build/version label                                                                                                                          |
+| `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Public GIS web client ID (baked at build); unset hides the Google button                                                                     |
 
 In dev, `/api/*` is proxied to `http://localhost:3000` (mirrors Caddy routing).
 

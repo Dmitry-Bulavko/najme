@@ -3,7 +3,15 @@
     "showPassword": "Show password",
     "hidePassword": "Hide password",
     "loading": "Loading",
-    "required": "Required"
+    "required": "Required",
+    "close": "Close",
+    "cancel": "Cancel",
+    "done": "Done",
+    "selectPlaceholder": "Choose an option",
+    "confirmTitle": "Are you sure?",
+    "confirmMessage": "This action cannot be undone.",
+    "confirmAction": "Confirm",
+    "deleteAction": "Delete"
   },
   "account": {
     "signIn": {
@@ -53,7 +61,28 @@
     "listPrivacy": "Privacy",
     "listHelp": "Help and support",
     "form": "Form field",
-    "formName": "Full name"
+    "formName": "Full name",
+    "controls": "Controls",
+    "select": "Select",
+    "selectLabel": "Category",
+    "selectOptionOne": "Haircut",
+    "selectOptionTwo": "Colour",
+    "switch": "Notifications",
+    "switchDescription": "Get reminders before appointments",
+    "segmented": "View",
+    "segmentDay": "Day",
+    "segmentWeek": "Week",
+    "chips": "Chips",
+    "chipHair": "Hair",
+    "chipNails": "Nails",
+    "badges": "Badges",
+    "badgeActive": "Active",
+    "badgePending": "Pending",
+    "pickers": "Pickers",
+    "timeLabel": "Start time",
+    "dateLabel": "Date",
+    "moneyLabel": "Price",
+    "confirmDemo": "Show confirm dialog"
   },
   "bookings": {
     "signIn": {

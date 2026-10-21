@@ -84,6 +84,7 @@ export function Button({
   style,
   onPress,
   accessibilityLabel,
+  accessibilityState,
   ...rest
 }: ButtonProps): ReactElement {
   const { t } = useTranslation('mobile');
@@ -94,7 +95,7 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? (loading ? `${label}, ${t('ui.loading')}` : label)}
-      accessibilityState={{ disabled: inactive, busy: loading }}
+      accessibilityState={{ ...accessibilityState, disabled: inactive, busy: loading }}
       disabled={inactive}
       onPress={onPress}
       style={({ pressed }) => [

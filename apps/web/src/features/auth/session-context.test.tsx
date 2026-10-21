@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { catalogs } from '@najme/i18n';
 
 import { useSession, AuthProvider } from './session-context';
-import { setAccessToken } from '@/lib/api/client';
+import { getAccessToken, setAccessToken } from '@/lib/api/client';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -35,6 +35,7 @@ const fakeUser = {
   avatarUrl: null,
   locale: 'en' as const,
   hasPassword: true,
+  isPlatformAdmin: false,
 };
 
 const fakeSession = {
@@ -122,6 +123,22 @@ describe('AuthProvider', () => {
     await waitFor(() => {
       expect(screen.getByTestId('anonymous')).toBeInTheDocument();
     });
+    expect(getAccessToken()).toBeNull();
+  });
+
+  it('clears the access token when /me fails after a successful refresh', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeJsonResponse(fakeSession))
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'INTERNAL_ERROR', message: 'boom' } }, 500),
+      );
+
+    renderProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('anonymous')).toBeInTheDocument();
+    });
+    expect(getAccessToken()).toBeNull();
   });
 });
 

@@ -12,6 +12,7 @@ import { EditProfileForm } from '@/features/account/edit-profile-form';
 import { AccountLanguageSettings } from '@/features/account/language-settings';
 import { setLocale } from '@/i18n';
 import {
+  apiRequest,
   clearSessionTokens,
   getAccessToken,
   setAccessToken,
@@ -32,12 +33,14 @@ const meWithPassword: Me = {
   avatarUrl: null,
   locale: 'en',
   hasPassword: true,
+  isPlatformAdmin: false,
 };
 
 const meGoogleOnly: Me = {
   ...meWithPassword,
   emailVerified: false,
   hasPassword: false,
+  isPlatformAdmin: false,
   displayName: null,
 };
 
@@ -83,6 +86,42 @@ jest.mock('@/features/health/use-api-status', () => ({
   useApiStatus: () => 'online' as const,
 }));
 
+const mockMyBusinessesState: {
+  data: {
+    businessId: string;
+    name: string;
+    slug: string;
+    status: 'APPROVED';
+    role: 'OWNER';
+    staffMemberId: null;
+    logoUrl: null;
+  }[];
+  isLoading: boolean;
+  isError: boolean;
+  isSuccess: boolean;
+  refetch: jest.Mock;
+} = {
+  data: [],
+  isLoading: false,
+  isError: false,
+  isSuccess: true,
+  refetch: jest.fn(),
+};
+
+const mockEnterBusinessMode = jest.fn(
+  async (_router: unknown, _businesses: unknown, _options?: unknown) => undefined,
+);
+
+jest.mock('@/features/business/use-my-businesses', () => ({
+  useMyBusinesses: () => mockMyBusinessesState,
+  useInvalidateMyBusinesses: () => jest.fn(),
+}));
+
+jest.mock('@/features/business/enter-mode', () => ({
+  enterBusinessMode: (...args: [unknown, unknown, unknown?]) => mockEnterBusinessMode(...args),
+  enterClientMode: jest.fn(async () => undefined),
+}));
+
 function makeJsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -99,6 +138,12 @@ beforeEach(async () => {
   mockRouterPush.mockClear();
   mockUpdateMe.mockClear();
   mockSignOut.mockClear();
+  mockEnterBusinessMode.mockClear();
+  mockMyBusinessesState.data = [];
+  mockMyBusinessesState.isLoading = false;
+  mockMyBusinessesState.isError = false;
+  mockMyBusinessesState.isSuccess = true;
+  mockMyBusinessesState.refetch = jest.fn();
   jest.mocked(setLocale).mockClear();
   await clearSessionTokens();
   setAccessToken(null);
@@ -116,10 +161,12 @@ describe('AccountHome', () => {
     expect(getByText(meWithPassword.email)).toBeTruthy();
     expect(getByText(catalogs.en.account.verified)).toBeTruthy();
 
+    expect(getByTestId('account-row-business-mode')).toBeTruthy();
     expect(getByTestId('account-row-edit-profile')).toBeTruthy();
     expect(getByTestId('account-row-language')).toBeTruthy();
     expect(getByTestId('account-row-change-password')).toBeTruthy();
     expect(getByTestId('account-row-sign-out')).toBeTruthy();
+    expect(getByText(catalogs.en.business.menu.businessMode)).toBeTruthy();
     expect(getByText(catalogs.en.account.settings.editProfile)).toBeTruthy();
     expect(getByText(catalogs.en.common.apiStatus.label)).toBeTruthy();
   });
@@ -150,6 +197,38 @@ describe('AccountHome', () => {
       confirm?.onPress?.();
     });
     expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows list error subtitle and refetches on press when /me/businesses fails', async () => {
+    mockMyBusinessesState.isError = true;
+    mockMyBusinessesState.isSuccess = false;
+    mockMyBusinessesState.data = [];
+
+    const { getByTestId, getByText } = await renderWithI18n(<AccountHome />);
+
+    expect(getByText(catalogs.en.business.list.error)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(getByTestId('account-row-business-mode'));
+    });
+
+    expect(mockMyBusinessesState.refetch).toHaveBeenCalled();
+    expect(mockEnterBusinessMode).not.toHaveBeenCalled();
+  });
+
+  it('routes to create only when the membership list is successfully empty', async () => {
+    mockMyBusinessesState.isSuccess = true;
+    mockMyBusinessesState.isError = false;
+    mockMyBusinessesState.data = [];
+
+    const { getByTestId, getByText } = await renderWithI18n(<AccountHome />);
+    expect(getByText(catalogs.en.business.menu.createBusiness)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(getByTestId('account-row-business-mode'));
+    });
+
+    expect(mockEnterBusinessMode).toHaveBeenCalledWith(expect.anything(), []);
   });
 });
 
@@ -200,6 +279,22 @@ describe('AccountLanguageSettings', () => {
       expect.objectContaining({ method: 'PATCH' }),
     );
   });
+
+  it('shows saved banner even when setLocale fails after a successful PATCH', async () => {
+    const updated = { ...meWithPassword, locale: 'ru' as const };
+    jest.mocked(fetch).mockResolvedValueOnce(makeJsonResponse(updated));
+    jest.mocked(setLocale).mockRejectedValueOnce(new Error('i18n init failed'));
+
+    const { getByTestId, findByText } = await renderWithI18n(<AccountLanguageSettings />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('account-locale-ru'));
+    });
+
+    // Account locale saved server-side → report success regardless of setLocale outcome.
+    expect(await findByText(catalogs.en.account.languageSection.saved)).toBeTruthy();
+    expect(mockUpdateMe).toHaveBeenCalledWith(updated);
+  });
 });
 
 describe('ChangePasswordForm', () => {
@@ -245,6 +340,197 @@ describe('ChangePasswordForm', () => {
 });
 
 describe('changePasswordWithLock', () => {
+  it('on 401 refreshes inside the mutex without deadlock and retries with new token', async () => {
+    setAccessToken('access-expired');
+    await setRefreshToken('refresh-initial');
+
+    const sessionAfterRefresh = {
+      accessToken: 'access-refreshed',
+      accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+      refreshToken: 'refresh-refreshed',
+      user: meWithPassword,
+    };
+    const sessionAfterPwChange = {
+      accessToken: 'access-final',
+      accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+      refreshToken: 'refresh-final',
+      user: meWithPassword,
+    };
+
+    jest.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      const auth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      if (url.includes('/me/password')) {
+        if (auth === 'Bearer access-expired') {
+          return makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401);
+        }
+        if (auth === 'Bearer access-refreshed') {
+          return makeJsonResponse(sessionAfterPwChange);
+        }
+      }
+      if (url.includes('/auth/refresh')) {
+        return makeJsonResponse(sessionAfterRefresh);
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    const result = await changePasswordWithLock({
+      currentPassword: 'old-password',
+      newPassword: 'longenough1',
+    });
+
+    expect(result.accessToken).toBe('access-final');
+    expect(getAccessToken()).toBe('access-final');
+    expect(await getRefreshToken()).toBe('refresh-final');
+  });
+
+  it('race: concurrent apiRequest 401 refresh uses the new refresh token from password change', async () => {
+    setAccessToken('access-old');
+    await setRefreshToken('refresh-old');
+
+    const sessionAfterPwChange = {
+      accessToken: 'access-pw',
+      accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+      refreshToken: 'refresh-pw',
+      user: meWithPassword,
+    };
+    const sessionAfterApiRefresh = {
+      accessToken: 'access-api',
+      accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+      refreshToken: 'refresh-api',
+      user: meWithPassword,
+    };
+
+    let releasePwChange!: (r: Response) => void;
+    const pwChangeGate = new Promise<Response>((resolve) => {
+      releasePwChange = resolve;
+    });
+    const refreshBodies: unknown[] = [];
+
+    jest.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      const auth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      if (url.includes('/me/password')) {
+        return pwChangeGate;
+      }
+      if (url.includes('/auth/refresh')) {
+        refreshBodies.push(init?.body ? JSON.parse(String(init.body)) : null);
+        return makeJsonResponse(sessionAfterApiRefresh);
+      }
+      if (url.includes('/secure')) {
+        if (auth === `Bearer ${sessionAfterApiRefresh.accessToken}`) {
+          return makeJsonResponse({ ok: true });
+        }
+        return makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401);
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    // 1. Start password change (holds mutex, fetch is gated).
+    const pwChange = changePasswordWithLock({
+      currentPassword: 'old-password',
+      newPassword: 'longenough1',
+    });
+
+    // 2. Fire a concurrent request that gets 401 → queues refresh behind the mutex.
+    const secureRequest = apiRequest('/secure');
+
+    // Let the concurrent request reach the mutex wait without advancing the password fetch.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(refreshBodies).toEqual([]);
+
+    // 3. Release gate → password change completes, rotating the refresh token.
+    releasePwChange(makeJsonResponse(sessionAfterPwChange));
+
+    await expect(pwChange).resolves.toMatchObject({ accessToken: 'access-pw' });
+    await expect(secureRequest).resolves.toEqual({ ok: true });
+
+    // The refresh was sent only after the password change resolved, using the NEW refresh token.
+    expect(refreshBodies).toEqual([{ refreshToken: 'refresh-pw' }]);
+  });
+
+  it('on a second 401 after refresh surfaces UNAUTHENTICATED with one refresh and two password calls', async () => {
+    setAccessToken('access-expired');
+    await setRefreshToken('refresh-initial');
+
+    let passwordCalls = 0;
+    let refreshCalls = 0;
+
+    jest.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/me/password')) {
+        passwordCalls += 1;
+        return makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401);
+      }
+      if (url.includes('/auth/refresh')) {
+        refreshCalls += 1;
+        return makeJsonResponse({
+          accessToken: 'access-refreshed',
+          accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+          refreshToken: 'refresh-refreshed',
+          user: meWithPassword,
+        });
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    await expect(
+      changePasswordWithLock({ currentPassword: 'old-password', newPassword: 'longenough1' }),
+    ).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+
+    expect(passwordCalls).toBe(2);
+    expect(refreshCalls).toBe(1);
+  });
+
+  it('clears tokens when refresh returns a definitive rejection', async () => {
+    setAccessToken('access-expired');
+    await setRefreshToken('refresh-initial');
+
+    jest.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/me/password')) {
+        return makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401);
+      }
+      if (url.includes('/auth/refresh')) {
+        return makeJsonResponse(
+          { error: { code: 'REFRESH_TOKEN_REUSED', message: 'reused' } },
+          401,
+        );
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    await expect(
+      changePasswordWithLock({ currentPassword: 'old-password', newPassword: 'longenough1' }),
+    ).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+
+    expect(getAccessToken()).toBeNull();
+    expect(await getRefreshToken()).toBeNull();
+  });
+
+  it('keeps tokens when refresh throws a TransientAuthError', async () => {
+    setAccessToken('access-expired');
+    await setRefreshToken('refresh-initial');
+
+    jest.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/me/password')) {
+        return makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401);
+      }
+      if (url.includes('/auth/refresh')) {
+        return makeJsonResponse({ error: { code: 'HTTP_ERROR', message: 'down' } }, 503);
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    await expect(
+      changePasswordWithLock({ currentPassword: 'old-password', newPassword: 'longenough1' }),
+    ).rejects.toMatchObject({ name: 'TransientAuthError' });
+
+    expect(await getRefreshToken()).toBe('refresh-initial');
+  });
+
   it('persists the rotated refresh token under the auth mutex', async () => {
     setAccessToken('access-old');
     await setRefreshToken('refresh-old');

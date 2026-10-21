@@ -8,6 +8,7 @@ import {
   persistAuthSession,
   refreshSession,
   setAccessToken,
+  TransientAuthError,
   withAuthMutex,
 } from './client';
 import { clearRefreshToken, getRefreshToken, setRefreshToken } from './token-storage';
@@ -27,6 +28,7 @@ const me = {
   avatarUrl: null,
   locale: 'en' as const,
   hasPassword: true,
+  isPlatformAdmin: false,
 };
 
 function sessionBody(accessToken: string, refreshToken?: string) {
@@ -49,6 +51,20 @@ afterEach(() => {
 });
 
 describe('apiRequest', () => {
+  it('throws ApiError HTTP_ERROR when a 2xx response body is not JSON', async () => {
+    jest.mocked(fetch).mockResolvedValueOnce(
+      new Response('<html>Bad gateway</html>', {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      }),
+    );
+
+    await expect(apiRequest('/foo')).rejects.toMatchObject({
+      code: 'HTTP_ERROR',
+      status: 200,
+    });
+  });
+
   it('sends X-Client: mobile and the Bearer access token', async () => {
     setAccessToken('tok-123');
     jest.mocked(fetch).mockResolvedValueOnce(makeJsonResponse({ ok: true }));
@@ -120,7 +136,33 @@ describe('401 retry with single-flight refresh', () => {
     expect(refreshCalls).toBe(1);
   });
 
-  it('clears the session when refresh fails', async () => {
+  it('single-flight retries both concurrent requests with the new token', async () => {
+    setAccessToken('old');
+    await setRefreshToken('rt-1');
+
+    const retried: string[] = [];
+    jest.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/auth/refresh')) {
+        await new Promise((r) => setTimeout(r, 20));
+        return makeJsonResponse(sessionBody('new-token', 'rt-new'));
+      }
+      const auth = (init?.headers as Record<string, string> | undefined)?.Authorization;
+      if (auth === 'Bearer new-token') {
+        // Track which paths were retried with the new token.
+        retried.push(url.replace(/.*\/api\/v1/, ''));
+        return makeJsonResponse({ ok: true });
+      }
+      return makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401);
+    });
+
+    const [resA, resB] = await Promise.all([apiRequest('/a'), apiRequest('/b')]);
+    expect(resA).toEqual({ ok: true });
+    expect(resB).toEqual({ ok: true });
+    expect(retried.sort()).toEqual(['/a', '/b']);
+  });
+
+  it('clears the session when refresh fails definitively (401)', async () => {
     setAccessToken('old');
     await setRefreshToken('rt-1');
 
@@ -136,6 +178,23 @@ describe('401 retry with single-flight refresh', () => {
     await expect(apiRequest('/secure')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
     expect(getAccessToken()).toBeNull();
     expect(await getRefreshToken()).toBeNull();
+  });
+
+  it('keeps the refresh token when refresh returns 503 during a 401 retry', async () => {
+    setAccessToken('old');
+    await setRefreshToken('rt-keep');
+
+    jest
+      .mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
+      )
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'INTERNAL_ERROR', message: 'down' } }, 503),
+      );
+
+    await expect(apiRequest('/secure')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    expect(await getRefreshToken()).toBe('rt-keep');
   });
 });
 
@@ -175,6 +234,40 @@ describe('withAuthMutex and session helpers', () => {
     await expect(refreshSession()).resolves.toBe('restored');
     expect(getAccessToken()).toBe('restored');
     expect(await getRefreshToken()).toBe('rt-new');
+  });
+
+  it('keeps the refresh token and throws TransientAuthError on network failure', async () => {
+    await setRefreshToken('rt-offline');
+    jest.mocked(fetch).mockRejectedValueOnce(new TypeError('Network request failed'));
+
+    await expect(refreshSession()).rejects.toBeInstanceOf(TransientAuthError);
+    expect(await getRefreshToken()).toBe('rt-offline');
+  });
+
+  it('keeps the refresh token and throws TransientAuthError on HTTP 503', async () => {
+    await setRefreshToken('rt-503');
+    jest
+      .mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'INTERNAL_ERROR', message: 'down' } }, 503),
+      );
+
+    await expect(refreshSession()).rejects.toBeInstanceOf(TransientAuthError);
+    expect(await getRefreshToken()).toBe('rt-503');
+  });
+
+  it('clears tokens on 401 REFRESH_TOKEN_REUSED', async () => {
+    await setRefreshToken('rt-reused');
+    setAccessToken('old');
+    jest
+      .mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'REFRESH_TOKEN_REUSED', message: 'reuse' } }, 401),
+      );
+
+    await expect(refreshSession()).resolves.toBeNull();
+    expect(getAccessToken()).toBeNull();
+    expect(await getRefreshToken()).toBeNull();
   });
 
   it('clearRefreshToken leaves storage empty after sign-out path', async () => {

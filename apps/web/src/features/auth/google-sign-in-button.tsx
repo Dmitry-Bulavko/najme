@@ -5,8 +5,12 @@
  *
  * Shown only when both:
  *   - GET /auth/providers returns `{ google: true }` (API has GOOGLE_CLIENT_IDS), and
- *   - NEXT_PUBLIC_GOOGLE_CLIENT_ID is set (web GIS client).
+ *   - NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID is set (web GIS client),
+ * and the session is not already authenticated.
  * Otherwise renders nothing so sign-in/up pages stay clean without #58 credentials.
+ *
+ * `google.accounts.id.initialize` runs once per page load for a given clientId/locale;
+ * latest router/signIn/searchParams/tErrors are read from refs (#146).
  */
 import { isLocale } from '@najme/i18n';
 import { authProvidersSchema, type AuthSession } from '@najme/contracts';
@@ -15,7 +19,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { ApiError, apiRequest } from '@/lib/api/client';
+import { errorMessage } from '@/lib/i18n/error-message';
 import { LOCALE_COOKIE_MAX_AGE, LOCALE_COOKIE_NAME } from '@/i18n/routing';
+import { replaceLocaleInPath, safeNextPath } from './safe-next-path';
 import { useSession } from './session-context';
 
 const GIS_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
@@ -86,11 +92,27 @@ export function GoogleSignInButton() {
   const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signIn } = useSession();
+  const session = useSession();
+  const { signIn } = session;
   const buttonHostRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() ?? '';
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() ?? '';
+
+  // Keep latest values for the GIS callback without re-running initialize.
+  const signInRef = useRef(signIn);
+  const routerRef = useRef(router);
+  const searchParamsRef = useRef(searchParams);
+  const tErrorsRef = useRef(tErrors);
+  const localeRef = useRef(locale);
+
+  useEffect(() => {
+    signInRef.current = signIn;
+    routerRef.current = router;
+    searchParamsRef.current = searchParams;
+    tErrorsRef.current = tErrors;
+    localeRef.current = locale;
+  }, [signIn, router, searchParams, tErrors, locale]);
 
   useEffect(() => {
     if (!clientId) {
@@ -118,30 +140,32 @@ export function GoogleSignInButton() {
           callback: (response) => {
             void (async () => {
               setApiError(null);
+              const currentLocale = localeRef.current;
               try {
-                const session = await apiRequest<AuthSession>('/auth/google', {
+                const authSession = await apiRequest<AuthSession>('/auth/google', {
                   method: 'POST',
-                  body: { idToken: response.credential, locale },
+                  body: { idToken: response.credential, locale: currentLocale },
                 });
-                signIn(session.accessToken, session.user);
+                signInRef.current(authSession.accessToken, authSession.user);
 
-                if (isLocale(session.user.locale) && session.user.locale !== locale) {
-                  setLocaleCookie(session.user.locale);
-                  const next = searchParams.get('next');
-                  const target = next ?? '/';
-                  const segments = target.split('/');
-                  segments[1] = session.user.locale;
-                  router.replace(segments.join('/') || `/${session.user.locale}`);
+                const pathLocale = isLocale(currentLocale) ? currentLocale : 'en';
+                const next = safeNextPath(searchParamsRef.current.get('next'), pathLocale);
+
+                if (
+                  isLocale(authSession.user.locale) &&
+                  authSession.user.locale !== currentLocale
+                ) {
+                  setLocaleCookie(authSession.user.locale);
+                  routerRef.current.replace(replaceLocaleInPath(next, authSession.user.locale));
                   return;
                 }
 
-                const next = searchParams.get('next');
-                router.replace(next ?? `/${locale}`);
+                routerRef.current.replace(next);
               } catch (error) {
                 if (error instanceof ApiError) {
-                  setApiError(tErrors(error.code as Parameters<typeof tErrors>[0]));
+                  setApiError(errorMessage(tErrorsRef.current, error.code));
                 } else {
-                  setApiError(tErrors('HTTP_ERROR'));
+                  setApiError(tErrorsRef.current('HTTP_ERROR'));
                 }
               }
             })();
@@ -166,9 +190,9 @@ export function GoogleSignInButton() {
     return () => {
       cancelled = true;
     };
-  }, [clientId, locale, router, searchParams, signIn, tErrors]);
+  }, [clientId, locale]);
 
-  if (!clientId) {
+  if (!clientId || session.state === 'authenticated') {
     return null;
   }
 
