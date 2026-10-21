@@ -28,6 +28,33 @@
   "languageSwitcher": {
     "label": "Dil"
   },
+  "cities": {
+    "ANDRIJEVICA": "Andrijevica",
+    "BAR": "Bar",
+    "BERANE": "Berane",
+    "BIJELO_POLJE": "Bijelo Polje",
+    "BUDVA": "Budva",
+    "CETINJE": "Cetinje",
+    "DANILOVGRAD": "Danilovgrad",
+    "GUSINJE": "Gusinje",
+    "HERCEG_NOVI": "Herceg Novi",
+    "KOLASIN": "Kolašin",
+    "KOTOR": "Kotor",
+    "MOJKOVAC": "Mojkovac",
+    "NIKSIC": "Nikšić",
+    "PETNJICA": "Petnjica",
+    "PLAV": "Plav",
+    "PLJEVLJA": "Pljevlja",
+    "PLUZINE": "Plužine",
+    "PODGORICA": "Podgorica",
+    "ROZAJE": "Rožaje",
+    "SAVNIK": "Šavnik",
+    "TIVAT": "Tivat",
+    "TUZI": "Tuzi",
+    "ULCINJ": "Ulcinj",
+    "ZABLJAK": "Žabljak",
+    "ZETA": "Zeta"
+  },
   "tabs": {
     "discover": "Keşfet",
     "bookings": "Randevular",

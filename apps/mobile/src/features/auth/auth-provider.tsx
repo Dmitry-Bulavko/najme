@@ -23,6 +23,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import { clearAppMode, clearLastBusinessId } from '@/features/business/last-business';
 import { setLocale } from '@/i18n';
 import {
   ApiError,
@@ -30,8 +31,10 @@ import {
   clearSessionTokens,
   persistAuthSession,
   refreshSession,
-  setAccessToken,
+  TransientAuthError,
+  withAuthMutex,
 } from '@/lib/api/client';
+import { getRefreshToken } from '@/lib/api/token-storage';
 
 interface LoadingSession {
   state: 'loading';
@@ -104,19 +107,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    try {
-      const { getRefreshToken } = await import('@/lib/api/token-storage');
-      const refreshToken = await getRefreshToken();
-      await apiRequest('/auth/logout', {
-        method: 'POST',
-        body: refreshToken ? { refreshToken } : {},
-        skipAuthRetry: true,
-      });
-    } catch {
-      // Logout is best-effort; clear local state regardless.
-    }
-    await clearSessionTokens();
-    setAccessToken(null);
+    // Serialize with refresh so we revoke the newest rotated token and cannot be undone by a
+    // late persistAuthSession (#144).
+    await withAuthMutex(async () => {
+      try {
+        const refreshToken = await getRefreshToken();
+        await apiRequest('/auth/logout', {
+          method: 'POST',
+          body: refreshToken ? { refreshToken } : {},
+          skipAuthRetry: true,
+        });
+      } catch {
+        // Logout is best-effort; clear local state regardless.
+      }
+      await clearSessionTokens();
+    });
+    // Drop mode memory so the next account does not inherit business mode.
+    await clearAppMode();
+    await clearLastBusinessId();
     setSession({ state: 'anonymous' });
   }, []);
 
@@ -151,6 +159,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSession({ state: 'authenticated', me: parsed.data });
         }
       } catch (error) {
+        if (error instanceof TransientAuthError) {
+          // Signed-out-for-now: keep SecureStore so the next launch / retry can restore (#144).
+          if (!cancelled) {
+            setSession({ state: 'anonymous' });
+          }
+          return;
+        }
         if (error instanceof ApiError && error.code === 'REFRESH_TOKEN_REUSED') {
           await clearSessionTokens();
         }

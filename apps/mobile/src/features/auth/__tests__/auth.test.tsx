@@ -8,6 +8,9 @@ import { AuthProvider, useSession } from '@/features/auth/auth-provider';
 import { canOfferGoogleSignIn, googleEnvConfigured } from '@/features/auth/google-availability';
 import { GoogleSignInButton } from '@/features/auth/google-sign-in-button';
 import { SignInForm } from '@/features/auth/sign-in-form';
+import { SignUpForm } from '@/features/auth/sign-up-form';
+import { ForgotPasswordForm } from '@/features/auth/forgot-password-form';
+import { UnverifiedEmailBanner } from '@/features/auth/unverified-email-banner';
 import { clearSessionTokens, setAccessToken } from '@/lib/api/client';
 import { getRefreshToken, setRefreshToken } from '@/lib/api/token-storage';
 import { initTestI18n, renderWithI18n } from '@/test-utils/i18n';
@@ -42,6 +45,8 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
     hasPlayServices: jest.fn(async () => true),
     signIn: jest.fn(async () => ({ data: { idToken: 'google-id-token' }, type: 'success' })),
   },
+  isCancelledResponse: (response: { type?: string }) => response.type === 'cancelled',
+  isSuccessResponse: (response: { type?: string }) => response.type === 'success',
 }));
 
 jest.mock('@/i18n', () => {
@@ -60,6 +65,7 @@ const me = {
   avatarUrl: null,
   locale: 'en' as const,
   hasPassword: true,
+  isPlatformAdmin: false,
 };
 
 function sessionBody(accessToken: string, refreshToken: string) {
@@ -85,10 +91,28 @@ function Harness({ children }: { children: ReactElement }) {
 function SessionProbe() {
   const session = useSession();
   if (session.state === 'loading') {
-    return <Text testID="session-loading">loading</Text>;
+    return (
+      <>
+        <Text testID="session-loading">loading</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="sign-out-probe"
+          onPress={() => void session.signOut()}
+        />
+      </>
+    );
   }
   if (session.state === 'anonymous') {
-    return <Text testID="session-anonymous">anonymous</Text>;
+    return (
+      <>
+        <Text testID="session-anonymous">anonymous</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="sign-out-probe"
+          onPress={() => void session.signOut()}
+        />
+      </>
+    );
   }
   return (
     <>
@@ -187,9 +211,10 @@ describe('AuthProvider session restore and sign-out', () => {
     expect(screen.getByTestId('signed-in-email')).toHaveTextContent('user@example.com');
   });
 
-  it('sign-out clears SecureStore', async () => {
+  it('sign-out posts /auth/logout with the stored refresh token and clears SecureStore', async () => {
     await setRefreshToken('rt-alive');
-    jest.mocked(fetch).mockImplementation(async (input) => {
+    const logoutBodies: unknown[] = [];
+    jest.mocked(fetch).mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.includes('/auth/refresh')) {
         return makeJsonResponse(sessionBody('access', 'rt-alive'));
@@ -198,6 +223,7 @@ describe('AuthProvider session restore and sign-out', () => {
         return makeJsonResponse(me);
       }
       if (url.includes('/auth/logout')) {
+        logoutBodies.push(init?.body ? JSON.parse(String(init.body)) : null);
         return new Response(null, { status: 204 });
       }
       return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
@@ -220,6 +246,71 @@ describe('AuthProvider session restore and sign-out', () => {
     await waitFor(async () => {
       expect(await getRefreshToken()).toBeNull();
     });
+    expect(logoutBodies).toEqual([{ refreshToken: 'rt-alive' }]);
+  });
+
+  it('cold-start on transient refresh failure stays anonymous without wiping SecureStore', async () => {
+    await setRefreshToken('rt-offline');
+    jest.mocked(fetch).mockRejectedValue(new TypeError('Network request failed'));
+
+    const screen = await renderWithI18n(
+      <Harness>
+        <SessionProbe />
+      </Harness>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-anonymous')).toBeTruthy();
+    });
+    expect(await getRefreshToken()).toBe('rt-offline');
+  });
+
+  it('sign-out during an in-flight refresh revokes the rotated token', async () => {
+    await setRefreshToken('rt-old');
+
+    let releaseRefresh: ((response: Response) => void) | undefined;
+    const refreshGate = new Promise<Response>((resolve) => {
+      releaseRefresh = resolve;
+    });
+    const logoutBodies: unknown[] = [];
+
+    jest.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/auth/refresh')) {
+        return refreshGate;
+      }
+      if (url.includes('/me')) {
+        return makeJsonResponse(me);
+      }
+      if (url.includes('/auth/logout')) {
+        logoutBodies.push(init?.body ? JSON.parse(String(init.body)) : null);
+        return new Response(null, { status: 204 });
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    const screen = await renderWithI18n(
+      <Harness>
+        <SessionProbe />
+      </Harness>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-loading')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('sign-out-probe'));
+    });
+
+    await act(async () => {
+      releaseRefresh?.(makeJsonResponse(sessionBody('access-rotated', 'rt-rotated')));
+    });
+
+    await waitFor(async () => {
+      expect(await getRefreshToken()).toBeNull();
+    });
+    expect(logoutBodies).toEqual([{ refreshToken: 'rt-rotated' }]);
   });
 });
 
@@ -232,6 +323,43 @@ describe('GoogleSignInButton visibility', () => {
     );
 
     expect(queryByTestId('google-sign-in')).toBeNull();
+  });
+
+  it('renders nothing when canOfferGoogleSignIn is false even if env looks configured', async () => {
+    jest.mocked(googleEnvConfigured).mockReturnValue(true);
+    jest.mocked(canOfferGoogleSignIn).mockReturnValue(false);
+
+    const { queryByTestId } = await renderWithI18n(
+      <Harness>
+        <GoogleSignInButton />
+      </Harness>,
+    );
+
+    expect(queryByTestId('google-sign-in')).toBeNull();
+  });
+
+  it('renders the button when env is configured and native module is available', async () => {
+    jest.mocked(googleEnvConfigured).mockReturnValue(true);
+    jest.mocked(canOfferGoogleSignIn).mockReturnValue(true);
+    mockRouterCanGoBack.mockReturnValue(false);
+
+    jest.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/providers')) {
+        return makeJsonResponse({ google: true, password: true });
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    const screen = await renderWithI18n(
+      <Harness>
+        <GoogleSignInButton />
+      </Harness>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('google-sign-in')).toBeTruthy();
+    });
   });
 });
 
@@ -306,5 +434,152 @@ describe('GoogleSignInButton navigation', () => {
       expect(mockRouterBack).toHaveBeenCalled();
     });
     expect(mockRouterReplace).not.toHaveBeenCalled();
+  });
+
+  it('treats a cancelled Google prompt as a silent no-op', async () => {
+    jest.mocked(googleEnvConfigured).mockReturnValue(true);
+    jest.mocked(canOfferGoogleSignIn).mockReturnValue(true);
+    const googleModule = jest.requireMock('@react-native-google-signin/google-signin') as {
+      GoogleSignin: {
+        signIn: {
+          mockImplementationOnce: (fn: () => Promise<unknown>) => void;
+          mock: { calls: unknown[] };
+        };
+      };
+    };
+    googleModule.GoogleSignin.signIn.mockImplementationOnce(async () => ({
+      type: 'cancelled',
+      data: null,
+    }));
+
+    jest.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/providers')) {
+        return makeJsonResponse({ google: true, password: true });
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+
+    const screen = await renderWithI18n(
+      <Harness>
+        <GoogleSignInButton />
+      </Harness>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('google-sign-in')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText(catalogs.en.auth.google.continueWith));
+    });
+
+    await waitFor(() => {
+      expect(googleModule.GoogleSignin.signIn.mock.calls.length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+    expect(mockRouterBack).not.toHaveBeenCalled();
+  });
+});
+
+describe('SignUpForm', () => {
+  it('shows inline validation errors on empty submit', async () => {
+    const { getByLabelText, findAllByRole } = await renderWithI18n(
+      <Harness>
+        <SignUpForm />
+      </Harness>,
+    );
+
+    await act(async () => {
+      fireEvent.press(getByLabelText(catalogs.en.auth.signUp.submit));
+    });
+
+    const alerts = await findAllByRole('alert');
+    expect(alerts.length).toBeGreaterThan(0);
+    const alertText = alerts.map((node) => String(node.props.children ?? '')).join(' ');
+    expect(alertText.length).toBeGreaterThan(0);
+  });
+
+  it('maps API error codes to the errors catalog', async () => {
+    jest
+      .mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'EMAIL_TAKEN', message: 'exists' } }, 409),
+      );
+
+    const { getByLabelText, findByText } = await renderWithI18n(
+      <Harness>
+        <SignUpForm />
+      </Harness>,
+    );
+
+    await act(async () => {
+      fireEvent.changeText(getByLabelText(catalogs.en.auth.signUp.emailLabel), 'user@example.com');
+      fireEvent.changeText(getByLabelText(catalogs.en.auth.signUp.passwordLabel), 'password1');
+      fireEvent.press(getByLabelText(catalogs.en.auth.signUp.submit));
+    });
+
+    expect(await findByText(catalogs.en.errors.EMAIL_TAKEN)).toBeTruthy();
+  });
+});
+
+describe('ForgotPasswordForm', () => {
+  it('shows the sent-confirmation screen after a successful submit', async () => {
+    jest.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const { getByLabelText, findByText } = await renderWithI18n(<ForgotPasswordForm />);
+
+    await act(async () => {
+      fireEvent.changeText(
+        getByLabelText(catalogs.en.auth.forgotPassword.emailLabel),
+        'user@example.com',
+      );
+      fireEvent.press(getByLabelText(catalogs.en.auth.forgotPassword.submit));
+    });
+
+    expect(await findByText(catalogs.en.auth.forgotPassword.sentTitle)).toBeTruthy();
+  });
+});
+
+describe('UnverifiedEmailBanner', () => {
+  const meUnverified = {
+    ...me,
+    emailVerified: false,
+  };
+
+  it('calls resend and shows the confirmation on success', async () => {
+    jest.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/refresh')) {
+        return makeJsonResponse(sessionBody('access', 'rt-2'));
+      }
+      if (url.includes('/me')) {
+        return makeJsonResponse(meUnverified);
+      }
+      if (url.includes('/auth/verify-email/resend')) {
+        return new Response(null, { status: 204 });
+      }
+      return makeJsonResponse({ error: { code: 'NOT_FOUND', message: url } }, 404);
+    });
+    await setRefreshToken('rt-banner');
+
+    const screen = await renderWithI18n(
+      <Harness>
+        <UnverifiedEmailBanner />
+      </Harness>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('unverified-email-banner')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText(catalogs.en.auth.unverifiedBanner.resend));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(catalogs.en.auth.unverifiedBanner.resent)).toBeTruthy();
+    });
   });
 });

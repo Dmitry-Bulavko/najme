@@ -2,9 +2,9 @@ import { tokens } from '@najme/ui-tokens';
 import { useRouter } from 'expo-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 
-import { ListGroup, ListItem, Screen, Text } from '@/components/ui';
+import { ListGroup, ListItem, Screen, Section } from '@/components/ui';
 import { AccountHome } from '@/features/account/account-home';
 import { SignInCta } from '@/features/auth/sign-in-cta';
 import { useSession } from '@/features/auth/auth-provider';
@@ -68,23 +68,3 @@ export default function AccountScreen(): ReactElement {
     </Screen>
   );
 }
-
-function Section({ title, children }: { title: string; children: React.ReactNode }): ReactElement {
-  return (
-    <View style={styles.section}>
-      <Text variant="caption" color="text03" accessibilityRole="header" style={styles.sectionTitle}>
-        {title}
-      </Text>
-      {children}
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  section: { gap: tokens.spacing.sm },
-  sectionTitle: {
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginLeft: tokens.spacing.xs,
-  },
-});

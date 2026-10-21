@@ -9,10 +9,11 @@ import { GoogleSignInButton } from './google-sign-in-button';
 import { setAccessToken } from '@/lib/api/client';
 
 const replace = vi.fn();
+const getParam = vi.fn<() => string | null>(() => null);
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace }),
-  useSearchParams: () => ({ get: () => null }),
+  useSearchParams: () => ({ get: getParam }),
 }));
 
 vi.mock('sonner', () => ({
@@ -41,6 +42,7 @@ const fakeUser = {
   avatarUrl: null,
   locale: 'en' as const,
   hasPassword: false,
+  isPlatformAdmin: false,
 };
 
 type GisCallback = (response: { credential: string }) => void;
@@ -82,6 +84,7 @@ function renderButton() {
 beforeEach(() => {
   setAccessToken(null);
   replace.mockClear();
+  getParam.mockReturnValue(null);
   vi.stubGlobal('fetch', vi.fn());
   vi.mocked(fetch).mockResolvedValue(
     makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
@@ -97,8 +100,8 @@ afterEach(() => {
 });
 
 describe('GoogleSignInButton', () => {
-  it('renders nothing when NEXT_PUBLIC_GOOGLE_CLIENT_ID is unset', async () => {
-    vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', '');
+  it('renders nothing when NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID is unset', async () => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID', '');
     renderButton();
 
     await waitFor(() => {
@@ -107,7 +110,7 @@ describe('GoogleSignInButton', () => {
   });
 
   it('stays hidden when providers.google is false', async () => {
-    vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'web-client.apps.googleusercontent.com');
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID', 'web-client.apps.googleusercontent.com');
     vi.mocked(fetch)
       .mockResolvedValueOnce(
         makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
@@ -126,7 +129,7 @@ describe('GoogleSignInButton', () => {
   });
 
   it('posts the GIS credential and redirects on success', async () => {
-    vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'web-client.apps.googleusercontent.com');
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID', 'web-client.apps.googleusercontent.com');
     // loadGisScript short-circuits when window.google.accounts.id already exists.
     const gis = installGisMock();
 
@@ -174,8 +177,50 @@ describe('GoogleSignInButton', () => {
     );
   });
 
+  it('falls back to /en when ?next= is an external URL', async () => {
+    getParam.mockReturnValue('https://evil.example/pwned');
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID', 'web-client.apps.googleusercontent.com');
+    const gis = installGisMock();
+
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('/auth/refresh')) {
+        return Promise.resolve(
+          makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
+        );
+      }
+      if (url.includes('/auth/providers')) {
+        return Promise.resolve(makeJsonResponse({ google: true }));
+      }
+      if (url.includes('/auth/google')) {
+        return Promise.resolve(
+          makeJsonResponse({
+            accessToken: 'tok',
+            accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+            user: fakeUser,
+          }),
+        );
+      }
+      return Promise.resolve(
+        makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
+      );
+    });
+
+    renderButton();
+
+    await waitFor(() => {
+      expect(gis.initialize).toHaveBeenCalled();
+    });
+
+    gis.getCallback()!({ credential: 'gis-id-token' });
+
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledWith('/en');
+    });
+  });
+
   it('shows GOOGLE_TOKEN_INVALID when the API rejects the credential', async () => {
-    vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'web-client.apps.googleusercontent.com');
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID', 'web-client.apps.googleusercontent.com');
     const gis = installGisMock();
 
     vi.mocked(fetch).mockImplementation((input) => {

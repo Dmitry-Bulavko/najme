@@ -1,7 +1,9 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
+
+import { bindMyBusinessesQueryClient } from '@/features/business/my-businesses-cache';
 
 import { AuthProvider } from './session-context';
 
@@ -22,6 +24,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
       }),
     [],
   );
+
+  useEffect(() => {
+    bindMyBusinessesQueryClient(queryClient);
+    return () => bindMyBusinessesQueryClient(null);
+  }, [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

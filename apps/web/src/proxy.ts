@@ -6,6 +6,13 @@ import { isSupportedLocale, LOCALE_COOKIE_MAX_AGE, LOCALE_COOKIE_NAME } from './
 /** Header next-intl reads to determine the locale of the current request. */
 const NEXT_INTL_LOCALE_HEADER = 'x-next-intl-locale';
 
+/**
+ * Email-link pages that carry a secret in the query string (ADR-0011). Response header required;
+ * metadata `referrer: 'no-referrer'` alone only emits a `<meta>` tag.
+ */
+const TOKEN_LINK_PATH =
+  /^\/(?:en|me|ru|tr)\/(?:verify-email|reset-password|invitations\/accept)(?:\/|$)/;
+
 export const config = {
   // Skip Next.js internals, static files and the API dev-proxy path. `api`, `_next` and `_vercel`
   // are excluded only as whole first segments, so `/apiary` and `/api-docs` still get a locale.
@@ -37,7 +44,11 @@ export function proxy(request: NextRequest): NextResponse {
     // server components fall back to the default locale regardless of the URL segment.
     const headers = new Headers(request.headers);
     headers.set(NEXT_INTL_LOCALE_HEADER, firstSegment);
-    return NextResponse.next({ request: { headers } });
+    const response = NextResponse.next({ request: { headers } });
+    if (TOKEN_LINK_PATH.test(pathname)) {
+      response.headers.set('Referrer-Policy', 'no-referrer');
+    }
+    return response;
   }
 
   const cookieLocale = request.cookies.get(LOCALE_COOKIE_NAME)?.value;

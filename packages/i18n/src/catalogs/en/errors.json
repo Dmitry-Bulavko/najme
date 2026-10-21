@@ -17,5 +17,12 @@
   "PASSWORD_NOT_SET": "This account has no password. Sign in with Google or set a password via password reset.",
   "GOOGLE_SIGN_IN_DISABLED": "Google sign-in is not available right now.",
   "GOOGLE_TOKEN_INVALID": "Google sign-in failed. Please try again.",
-  "RATE_LIMITED": "Too many attempts. Please wait a moment and try again."
+  "RATE_LIMITED": "Too many attempts. Please wait a moment and try again.",
+  "SLUG_TAKEN": "This URL slug is already taken. Please choose another.",
+  "SLUG_LOCKED": "The URL slug can no longer be changed after the business is approved.",
+  "UPLOAD_INVALID": "This upload is invalid or incomplete. Please choose another image and try again.",
+  "ALREADY_MEMBER": "You are already a member of this business.",
+  "INVITATION_EXISTS": "A pending invitation for this email already exists.",
+  "INVITATION_EMAIL_MISMATCH": "Sign in with the email address this invitation was sent to.",
+  "LAST_OWNER": "A business must keep at least one owner."
 }

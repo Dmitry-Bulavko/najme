@@ -1,0 +1,46 @@
+{
+  "pageTitle": "Business moderation",
+  "heading": "Businesses",
+  "subtitle": "Approve or reject businesses waiting for review.",
+  "menuLink": "Admin",
+  "tabs": {
+    "pending": "Pending",
+    "rejected": "Rejected",
+    "approved": "Approved"
+  },
+  "list": {
+    "empty": "No businesses in this status.",
+    "loadMore": "Load more",
+    "loading": "Loading businesses…",
+    "error": "Could not load businesses.",
+    "retry": "Retry",
+    "owner": "Owner",
+    "verified": "verified",
+    "unverified": "unverified",
+    "staff": "{count, plural, one {# staff} other {# staff}}",
+    "services": "{count, plural, one {# service} other {# services}}",
+    "hours": "{count, plural, one {# with hours} other {# with hours}}"
+  },
+  "detail": {
+    "title": "Details",
+    "empty": "Select a business to review.",
+    "city": "City",
+    "category": "Category",
+    "reason": "Rejection reason",
+    "createdAt": "Created",
+    "reviewedAt": "Reviewed"
+  },
+  "actions": {
+    "approve": "Approve",
+    "approving": "Approving…",
+    "reject": "Reject",
+    "rejectTitle": "Reject business",
+    "rejectHint": "Explain what the owner should fix (10–500 characters).",
+    "rejectReasonLabel": "Reason",
+    "rejectConfirm": "Reject business",
+    "rejecting": "Rejecting…",
+    "cancel": "Cancel",
+    "approvedToast": "Business approved.",
+    "rejectedToast": "Business rejected."
+  }
+}

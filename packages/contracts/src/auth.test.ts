@@ -21,6 +21,7 @@ const me = {
   avatarUrl: null,
   locale: 'en',
   hasPassword: true,
+  isPlatformAdmin: false,
 };
 
 describe('registerRequestSchema', () => {

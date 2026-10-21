@@ -1,0 +1,46 @@
+{
+  "pageTitle": "Moderacija biznisa",
+  "heading": "Biznisi",
+  "subtitle": "Odobrite ili odbijte biznise koji čekaju pregled.",
+  "menuLink": "Admin",
+  "tabs": {
+    "pending": "Na čekanju",
+    "rejected": "Odbijeni",
+    "approved": "Odobreni"
+  },
+  "list": {
+    "empty": "Nema biznisa u ovom statusu.",
+    "loadMore": "Učitaj još",
+    "loading": "Učitavanje biznisa…",
+    "error": "Nije moguće učitati biznise.",
+    "retry": "Pokušaj ponovo",
+    "owner": "Vlasnik",
+    "verified": "verifikovan",
+    "unverified": "neverifikovan",
+    "staff": "{count, plural, one {# zaposleni} few {# zaposlena} other {# zaposlenih}}",
+    "services": "{count, plural, one {# usluga} few {# usluge} other {# usluga}}",
+    "hours": "{count, plural, one {# sa radnim vremenom} few {# sa radnim vremenom} other {# sa radnim vremenom}}"
+  },
+  "detail": {
+    "title": "Detalji",
+    "empty": "Izaberite biznis za pregled.",
+    "city": "Grad",
+    "category": "Kategorija",
+    "reason": "Razlog odbijanja",
+    "createdAt": "Kreiran",
+    "reviewedAt": "Pregledan"
+  },
+  "actions": {
+    "approve": "Odobri",
+    "approving": "Odobravanje…",
+    "reject": "Odbij",
+    "rejectTitle": "Odbij biznis",
+    "rejectHint": "Objasnite šta vlasnik treba da ispravi (10–500 karaktera).",
+    "rejectReasonLabel": "Razlog",
+    "rejectConfirm": "Odbij biznis",
+    "rejecting": "Odbijanje…",
+    "cancel": "Otkaži",
+    "approvedToast": "Biznis je odobren.",
+    "rejectedToast": "Biznis je odbijen."
+  }
+}

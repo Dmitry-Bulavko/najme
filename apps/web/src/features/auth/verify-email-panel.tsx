@@ -7,7 +7,8 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { ApiError, apiRequest, getAccessToken } from '@/lib/api/client';
+import { ApiError, apiRequest } from '@/lib/api/client';
+import { errorMessage } from '@/lib/i18n/error-message';
 import { useSession } from './session-context';
 import { useEmailLinkToken } from './use-email-link-token';
 
@@ -22,11 +23,13 @@ export function VerifyEmailPanel() {
   const tErrors = useTranslations('errors');
   const locale = useLocale();
   const token = useEmailLinkToken();
-  const { updateMe, state: sessionState } = useSession();
+  const session = useSession();
+  const { updateMe, state: sessionState } = session;
   const [status, setStatus] = useState<VerifyStatus>(token ? 'verifying' : 'idle');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessageText, setErrorMessageText] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const started = useRef(false);
+  const signedIn = sessionState === 'authenticated';
 
   useEffect(() => {
     if (!token || started.current) {
@@ -41,7 +44,7 @@ export function VerifyEmailPanel() {
     void (async () => {
       try {
         await apiRequest('/auth/verify-email', { method: 'POST', body: { token } });
-        if (getAccessToken()) {
+        if (sessionState === 'authenticated') {
           try {
             const raw = await apiRequest<unknown>('/me');
             const parsed = meSchema.safeParse(raw);
@@ -56,16 +59,16 @@ export function VerifyEmailPanel() {
       } catch (error) {
         setStatus('error');
         if (error instanceof ApiError) {
-          setErrorMessage(tErrors(error.code as Parameters<typeof tErrors>[0]));
+          setErrorMessageText(errorMessage(tErrors, error.code));
         } else {
-          setErrorMessage(tErrors('HTTP_ERROR'));
+          setErrorMessageText(tErrors('HTTP_ERROR'));
         }
       }
     })();
   }, [sessionState, tErrors, token, updateMe]);
 
   async function onResend() {
-    if (!getAccessToken()) {
+    if (sessionState !== 'authenticated') {
       return;
     }
     setResending(true);
@@ -74,7 +77,7 @@ export function VerifyEmailPanel() {
       toast.success(t('unverifiedBanner.resent'));
     } catch (error) {
       if (error instanceof ApiError) {
-        toast.error(tErrors(error.code as Parameters<typeof tErrors>[0]));
+        toast.error(errorMessage(tErrors, error.code));
       } else {
         toast.error(tErrors('HTTP_ERROR'));
       }
@@ -109,11 +112,10 @@ export function VerifyEmailPanel() {
   }
 
   if (status === 'error') {
-    const signedIn = Boolean(getAccessToken());
     return (
       <div className="grid gap-4 text-center" data-testid="verify-email-error">
         <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {errorMessage}
+          {errorMessageText}
         </p>
         {signedIn ? (
           <Button

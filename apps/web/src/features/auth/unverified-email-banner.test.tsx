@@ -41,6 +41,7 @@ const unverifiedUser: Me = {
   avatarUrl: null,
   locale: 'en',
   hasPassword: true,
+  isPlatformAdmin: false,
 };
 
 const verifiedUser: Me = { ...unverifiedUser, emailVerified: true };

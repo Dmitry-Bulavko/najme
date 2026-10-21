@@ -41,9 +41,16 @@ Every error response uses the envelope from contracts:
 
 - `Authorization: Bearer <accessToken>`. A global guard protects every route; public endpoints are
   explicitly marked with `@Public()`. Every 401 carries `UNAUTHENTICATED` (session details: ADR-0010).
-- Authorization is checked in services, not only guards: business-scoped endpoints verify the user's
-  membership and role in that business. Every business-scoped endpoint gets an e2e test proving a
-  non-member receives 403/404.
+- **Tenancy (ADR-0013).** Business-scoped routes live under `/businesses/:businessId/…` and use
+  `BusinessAccessGuard` + `@BusinessRoles(...)`. Membership is resolved **before** body validation:
+  - unknown / soft-deleted business, or non-member → **404** `NOT_FOUND`;
+  - member without an allowed role → **403** `FORBIDDEN`;
+  - cross-tenant id in the path → 404; in the body → **422** `VALIDATION_FAILED`.
+- Namespaces: `/public/*` (unauthenticated), `/businesses/:businessId/*` (members), `/me/*`
+  (caller's own data), `/admin/*` (platform admins). Role matrix: OWNER (everything), ADMIN (ops
+  except delete business / manage owners), STAFF (own calendar + read services/staff).
+- Every business-scoped endpoint gets an e2e test (and the route-walker) proving a non-member
+  receives 404.
 
 ## Other
 

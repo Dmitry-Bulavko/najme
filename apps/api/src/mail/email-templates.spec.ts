@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SUPPORTED_LOCALES, catalogs } from '@najme/i18n';
-import { formatMessage, renderEmail } from './email-templates.js';
+import { formatMessage, renderEmail, renderInvitationEmail } from './email-templates.js';
 
 const URL = 'http://localhost:3001/en/verify-email?token=a-b_c&x=1';
 
@@ -50,5 +50,33 @@ describe('formatMessage with special characters', () => {
       '$1 2 h',
     );
     expect(formatMessage('a $& {hours}', 'en', { hours: 2 })).toBe('a $& 2');
+  });
+
+  it('does not re-expand placeholders that appear inside substituted values', () => {
+    expect(
+      formatMessage('{inviterName} invited you as {role}', 'en', {
+        inviterName: 'Ada {role}',
+        role: 'an admin',
+      }),
+    ).toBe('Ada {role} invited you as an admin');
+  });
+});
+
+describe('renderInvitationEmail', () => {
+  const inviteUrl = 'http://localhost:3001/ru/invitations/accept?token=abc_def';
+
+  it.each(SUPPORTED_LOCALES)('renders %s without leftover placeholders', (locale) => {
+    const email = renderInvitationEmail(locale, {
+      businessName: 'Salon <script>',
+      inviterName: 'Ada',
+      role: 'ADMIN',
+      url: inviteUrl,
+    });
+    expect(email.subject.length).toBeGreaterThan(0);
+    expect(email.text).not.toMatch(/\{[a-zA-Z]/);
+    expect(email.html).not.toMatch(/\{[a-zA-Z]/);
+    expect(email.html).toContain('Salon &lt;script&gt;');
+    expect(email.text).toContain('Salon <script>');
+    expect(email.text).toContain(inviteUrl);
   });
 });

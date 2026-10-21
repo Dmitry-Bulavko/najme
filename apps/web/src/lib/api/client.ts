@@ -3,7 +3,8 @@
  *
  * - Base path: `/api/v1` (same-origin; dev rewrite in next.config.ts, Caddy in prod).
  * - Attaches `Authorization: Bearer <accessToken>` from the in-memory store.
- * - On 401: performs a single-flight POST /auth/refresh then retries the original request once.
+ * - On 401 for a bearer-authenticated, non-`/auth/` request: single-flight POST /auth/refresh
+ *   then retries the original request once.
  * - Cross-tab refresh is serialized via `navigator.locks` when available.
  * - Throws ApiError on any non-2xx response.
  */
@@ -60,6 +61,11 @@ export async function withAuthRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
   return fn();
 }
 
+/** Definitive refresh rejections that mean the current access token is unusable. */
+function shouldClearAccessTokenOnRefreshFailure(status: number): boolean {
+  return status === 400 || status === 401 || status === 403;
+}
+
 /** Executes POST /auth/refresh, returning the new access token or null on failure. */
 async function doRefresh(): Promise<string | null> {
   try {
@@ -69,7 +75,9 @@ async function doRefresh(): Promise<string | null> {
       body: JSON.stringify({}),
     });
     if (!res.ok) {
-      accessToken = null;
+      if (shouldClearAccessTokenOnRefreshFailure(res.status)) {
+        accessToken = null;
+      }
       let errorBody: unknown;
       try {
         errorBody = await res.json();
@@ -95,7 +103,7 @@ async function doRefresh(): Promise<string | null> {
     if (error instanceof ApiError) {
       throw error;
     }
-    accessToken = null;
+    // Network / unexpected failure: leave the current access token alone.
     return null;
   }
 }
@@ -115,12 +123,25 @@ export async function refreshSession(): Promise<string | null> {
   return refreshingPromise;
 }
 
+/**
+ * Refresh without acquiring the Web Lock and without joining `refreshingPromise`.
+ *
+ * Callers that already hold `withAuthRefreshLock` (e.g. password change) must use this: the
+ * shared single-flight promise is lock-bound, so awaiting it while holding the lock deadlocks
+ * when a concurrent `refreshSession()` is queued on the same lock (#147).
+ */
+export async function refreshSessionUnlocked(): Promise<string | null> {
+  return doRefresh();
+}
+
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
 }
 
 /**
- * Makes a JSON request to `/api/v1/<path>`. On 401 it attempts a token refresh then retries once.
+ * Makes a JSON request to `/api/v1/<path>`. On 401 for a bearer-authenticated non-auth path it
+ * attempts a token refresh then retries once. Public `/auth/*` calls never refresh (a wrong
+ * password must not trigger cookie refresh / reuse handling mid sign-in).
  */
 export async function apiRequest<T>(
   path: string,
@@ -143,9 +164,11 @@ export async function apiRequest<T>(
     });
   };
 
-  let response = await doFetch(accessToken);
+  const requestToken = accessToken;
+  let response = await doFetch(requestToken);
 
-  if (response.status === 401) {
+  const mayRefresh = Boolean(requestToken) && !path.startsWith('/auth/');
+  if (response.status === 401 && mayRefresh) {
     const newToken = await refreshSession();
     // If refresh succeeded, retry once; otherwise fall through to throw ApiError.
     if (newToken) {

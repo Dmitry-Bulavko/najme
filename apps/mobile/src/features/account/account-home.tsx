@@ -4,10 +4,12 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, View } from 'react-native';
 
-import { ListGroup, ListItem, Text } from '@/components/ui';
+import { ListGroup, ListItem, Section } from '@/components/ui';
 import { useSession } from '@/features/auth/auth-provider';
 import { ApiStatusBadge } from '@/features/health/api-status-badge';
 import { UnverifiedEmailBanner } from '@/features/auth/unverified-email-banner';
+import { enterBusinessMode } from '@/features/business/enter-mode';
+import { useMyBusinesses } from '@/features/business/use-my-businesses';
 
 import { ProfileHeaderCard } from './profile-header-card';
 
@@ -16,9 +18,10 @@ import { ProfileHeaderCard } from './profile-header-card';
  * sign-out with confirmation.
  */
 export function AccountHome(): ReactElement | null {
-  const { t } = useTranslation(['account', 'common', 'mobile']);
+  const { t } = useTranslation(['account', 'common', 'mobile', 'business']);
   const router = useRouter();
   const session = useSession();
+  const myBusinesses = useMyBusinesses();
 
   if (session.state !== 'authenticated') {
     return null;
@@ -39,6 +42,34 @@ export function AccountHome(): ReactElement | null {
     ]);
   }
 
+  function businessModeSubtitle(): string {
+    if (myBusinesses.isLoading) return t('business:list.loading');
+    if (myBusinesses.isError) return t('business:list.error');
+    if (myBusinesses.isSuccess && myBusinesses.data.length === 0) {
+      return t('business:menu.createBusiness');
+    }
+    if (myBusinesses.isSuccess && myBusinesses.data.length > 0) {
+      return t('business:menu.switchBusiness');
+    }
+    return t('business:list.loading');
+  }
+
+  function openBusinessMode() {
+    if (myBusinesses.isLoading) return;
+    if (myBusinesses.isError) {
+      void myBusinesses.refetch();
+      return;
+    }
+    if (!myBusinesses.isSuccess) return;
+    if (myBusinesses.data.length === 0) {
+      void enterBusinessMode(router, []);
+      return;
+    }
+    void enterBusinessMode(router, myBusinesses.data, {
+      forcePick: myBusinesses.data.length > 1,
+    });
+  }
+
   return (
     <View style={styles.root} testID="account-signed-in">
       <UnverifiedEmailBanner />
@@ -46,6 +77,13 @@ export function AccountHome(): ReactElement | null {
 
       <Section title={t('account:pageTitle')}>
         <ListGroup>
+          <ListItem
+            icon="briefcase-outline"
+            title={t('business:menu.businessMode')}
+            subtitle={businessModeSubtitle()}
+            onPress={openBusinessMode}
+            testID="account-row-business-mode"
+          />
           <ListItem
             icon="person-outline"
             title={t('account:settings.editProfile')}
@@ -90,23 +128,6 @@ export function AccountHome(): ReactElement | null {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }): ReactElement {
-  return (
-    <View style={styles.section}>
-      <Text variant="caption" color="text03" accessibilityRole="header" style={styles.sectionTitle}>
-        {title}
-      </Text>
-      {children}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   root: { gap: tokens.spacing.lg },
-  section: { gap: tokens.spacing.sm },
-  sectionTitle: {
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginLeft: tokens.spacing.xs,
-  },
 });

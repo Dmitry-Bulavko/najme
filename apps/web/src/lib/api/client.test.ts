@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
   apiRequest,
+  getAccessToken,
   refreshSession,
+  refreshSessionUnlocked,
   setAccessToken,
   setRefreshTokenReusedHandler,
   withAuthRefreshLock,
@@ -105,6 +107,7 @@ describe('401 retry with single-flight refresh', () => {
             avatarUrl: null,
             locale: 'en',
             hasPassword: true,
+            isPlatformAdmin: false,
           },
         }),
       )
@@ -135,6 +138,7 @@ describe('401 retry with single-flight refresh', () => {
         avatarUrl: null,
         locale: 'en',
         hasPassword: true,
+        isPlatformAdmin: false,
       },
     });
 
@@ -178,6 +182,32 @@ describe('401 retry with single-flight refresh', () => {
     await expect(apiRequest('/protected')).rejects.toBeInstanceOf(ApiError);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+
+  it('does not call /auth/refresh on a 401 from /auth/login even with a stale access token', async () => {
+    setAccessToken('stale-access');
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeJsonResponse({ error: { code: 'INVALID_CREDENTIALS', message: 'bad' } }, 401),
+    );
+
+    await expect(
+      apiRequest('/auth/login', { method: 'POST', body: { email: 'a@b.com', password: 'x' } }),
+    ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(String(vi.mocked(fetch).mock.calls[0]![0])).toContain('/auth/login');
+  });
+
+  it('does not refresh on 401 when the request had no bearer token', async () => {
+    setAccessToken(null);
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
+    );
+
+    await expect(apiRequest('/me')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -203,7 +233,7 @@ describe('withAuthRefreshLock', () => {
 });
 
 describe('refreshSession', () => {
-  it('returns null and clears token when refresh returns non-2xx', async () => {
+  it('returns null and clears token when refresh returns 401', async () => {
     setAccessToken('stale');
     vi.mocked(fetch).mockResolvedValueOnce(
       makeJsonResponse({ error: { code: 'UNAUTHENTICATED', message: 'x' } }, 401),
@@ -211,6 +241,27 @@ describe('refreshSession', () => {
 
     const token = await refreshSession();
     expect(token).toBeNull();
+    expect(getAccessToken()).toBeNull();
+  });
+
+  it('returns null and keeps the access token when refresh returns 503', async () => {
+    setAccessToken('still-valid');
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeJsonResponse({ error: { code: 'INTERNAL_ERROR', message: 'down' } }, 503),
+    );
+
+    const token = await refreshSession();
+    expect(token).toBeNull();
+    expect(getAccessToken()).toBe('still-valid');
+  });
+
+  it('returns null and keeps the access token on a network error', async () => {
+    setAccessToken('still-valid');
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    const token = await refreshSession();
+    expect(token).toBeNull();
+    expect(getAccessToken()).toBe('still-valid');
   });
 
   it('invokes the reuse handler and throws ApiError on REFRESH_TOKEN_REUSED', async () => {
@@ -245,11 +296,100 @@ describe('refreshSession', () => {
           avatarUrl: null,
           locale: 'en',
           hasPassword: true,
+          isPlatformAdmin: false,
         },
       }),
     );
 
     await expect(refreshSession()).resolves.toBe('fresh');
     expect(request).toHaveBeenCalledWith('najme-auth-refresh', expect.any(Function));
+  });
+});
+
+describe('refreshSessionUnlocked', () => {
+  it('refreshes without acquiring the auth refresh lock', async () => {
+    const request = vi.fn(async (_name: string, fn: () => Promise<unknown>) => fn());
+    vi.stubGlobal('navigator', { locks: { request } });
+    setAccessToken('stale');
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeJsonResponse({
+        accessToken: 'unlocked-fresh',
+        accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+        user: {
+          id: 'u1',
+          email: 'a@b.com',
+          emailVerified: false,
+          displayName: null,
+          avatarUrl: null,
+          locale: 'en',
+          hasPassword: true,
+          isPlatformAdmin: false,
+        },
+      }),
+    );
+
+    await expect(refreshSessionUnlocked()).resolves.toBe('unlocked-fresh');
+    expect(request).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBe('unlocked-fresh');
+  });
+
+  it('does not await a lock-bound refreshingPromise while the lock is held', async () => {
+    let locked = false;
+    const waiters: Array<() => void> = [];
+    const request = vi.fn(async (_name: string, fn: () => Promise<unknown>) => {
+      if (locked) {
+        await new Promise<void>((resolve) => {
+          waiters.push(resolve);
+        });
+      }
+      locked = true;
+      try {
+        return await fn();
+      } finally {
+        locked = false;
+        waiters.shift()?.();
+      }
+    });
+    vi.stubGlobal('navigator', { locks: { request } });
+    setAccessToken('stale');
+
+    vi.mocked(fetch).mockImplementation((input) => {
+      if (String(input).includes('/auth/refresh')) {
+        return Promise.resolve(
+          makeJsonResponse({
+            accessToken: 'unlocked-while-queued',
+            accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+            user: {
+              id: 'u1',
+              email: 'a@b.com',
+              emailVerified: false,
+              displayName: null,
+              avatarUrl: null,
+              locale: 'en',
+              hasPassword: true,
+              isPlatformAdmin: false,
+            },
+          }),
+        );
+      }
+      return Promise.resolve(
+        makeJsonResponse({ error: { code: 'HTTP_ERROR', message: 'x' } }, 500),
+      );
+    });
+
+    // Hold the lock the way password change does, then queue a lock-bound refreshSession.
+    const unlockedWhileHolding = withAuthRefreshLock(async () => {
+      const queued = refreshSession();
+      await Promise.resolve();
+      await Promise.resolve();
+      // Must not hang on the queued lock-bound promise.
+      const token = await refreshSessionUnlocked();
+      return { token, queued };
+    });
+
+    const { token, queued } = await unlockedWhileHolding;
+    expect(token).toBe('unlocked-while-queued');
+    await expect(queued).resolves.toBe('unlocked-while-queued');
   });
 });

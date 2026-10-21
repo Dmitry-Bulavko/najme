@@ -3,7 +3,15 @@
     "showPassword": "Показать пароль",
     "hidePassword": "Скрыть пароль",
     "loading": "Загрузка",
-    "required": "Обязательно"
+    "required": "Обязательно",
+    "close": "Закрыть",
+    "cancel": "Отмена",
+    "done": "Готово",
+    "selectPlaceholder": "Выберите вариант",
+    "confirmTitle": "Вы уверены?",
+    "confirmMessage": "Это действие нельзя отменить.",
+    "confirmAction": "Подтвердить",
+    "deleteAction": "Удалить"
   },
   "account": {
     "signIn": {
@@ -53,7 +61,28 @@
     "listPrivacy": "Конфиденциальность",
     "listHelp": "Помощь и поддержка",
     "form": "Поле формы",
-    "formName": "Полное имя"
+    "formName": "Полное имя",
+    "controls": "Элементы управления",
+    "select": "Выбор",
+    "selectLabel": "Категория",
+    "selectOptionOne": "Стрижка",
+    "selectOptionTwo": "Окрашивание",
+    "switch": "Уведомления",
+    "switchDescription": "Напоминания перед записями",
+    "segmented": "Вид",
+    "segmentDay": "День",
+    "segmentWeek": "Неделя",
+    "chips": "Чипы",
+    "chipHair": "Волосы",
+    "chipNails": "Ногти",
+    "badges": "Значки",
+    "badgeActive": "Активно",
+    "badgePending": "Ожидание",
+    "pickers": "Выбор даты и времени",
+    "timeLabel": "Время начала",
+    "dateLabel": "Дата",
+    "moneyLabel": "Цена",
+    "confirmDemo": "Показать диалог подтверждения"
   },
   "bookings": {
     "signIn": {

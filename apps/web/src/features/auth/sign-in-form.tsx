@@ -16,7 +16,9 @@ import { Label } from '@/components/ui/label';
 import { loginRequestSchema, type AuthSession, type LoginRequest } from '@najme/contracts';
 import { LOCALE_COOKIE_MAX_AGE, LOCALE_COOKIE_NAME } from '@/i18n/routing';
 import { ApiError, apiRequest } from '@/lib/api/client';
+import { errorMessage } from '@/lib/i18n/error-message';
 import { GoogleSignInButton } from './google-sign-in-button';
+import { replaceLocaleInPath, safeNextPath } from './safe-next-path';
 import { useSession } from './session-context';
 
 function setLocaleCookie(localeValue: string): void {
@@ -36,14 +38,14 @@ export function SignInForm() {
   const [apiError, setApiError] = useState<string | null>(null);
   const passwordId = useId();
   const passwordErrorId = `${passwordId}-error`;
+  const safeLocale = isLocale(locale) ? locale : 'en';
 
   // Already signed in — skip the form and honour ?next= (or home).
   useEffect(() => {
     if (session.state === 'authenticated') {
-      const next = searchParams.get('next');
-      router.replace(next ?? `/${locale}`);
+      router.replace(safeNextPath(searchParams.get('next'), safeLocale));
     }
-  }, [locale, router, searchParams, session.state]);
+  }, [router, safeLocale, searchParams, session.state]);
 
   const {
     register,
@@ -63,22 +65,19 @@ export function SignInForm() {
 
       signIn(session.accessToken, session.user);
 
+      const next = safeNextPath(searchParams.get('next'), safeLocale);
+
       // After sign-in, if account locale differs from URL locale, navigate to the correct one.
       if (isLocale(session.user.locale) && session.user.locale !== locale) {
         setLocaleCookie(session.user.locale);
-        const next = searchParams.get('next');
-        const target = next ?? '/';
-        const segments = target.split('/');
-        segments[1] = session.user.locale;
-        router.replace(segments.join('/') || `/${session.user.locale}`);
+        router.replace(replaceLocaleInPath(next, session.user.locale));
         return;
       }
 
-      const next = searchParams.get('next');
-      router.replace(next ?? `/${locale}`);
+      router.replace(next);
     } catch (error) {
       if (error instanceof ApiError) {
-        setApiError(tErrors(error.code as Parameters<typeof tErrors>[0]));
+        setApiError(errorMessage(tErrors, error.code));
       } else {
         setApiError(tErrors('HTTP_ERROR'));
       }
@@ -99,7 +98,7 @@ export function SignInForm() {
           type="email"
           autoComplete="email"
           inputMode="email"
-          placeholder="you@example.com"
+          placeholder={t('emailPlaceholder')}
         />
       </FormField>
 

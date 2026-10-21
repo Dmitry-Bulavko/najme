@@ -3,7 +3,15 @@
     "showPassword": "Şifreyi göster",
     "hidePassword": "Şifreyi gizle",
     "loading": "Yükleniyor",
-    "required": "Zorunlu"
+    "required": "Zorunlu",
+    "close": "Kapat",
+    "cancel": "İptal",
+    "done": "Tamam",
+    "selectPlaceholder": "Bir seçenek belirleyin",
+    "confirmTitle": "Emin misiniz?",
+    "confirmMessage": "Bu işlem geri alınamaz.",
+    "confirmAction": "Onayla",
+    "deleteAction": "Sil"
   },
   "account": {
     "signIn": {
@@ -53,7 +61,28 @@
     "listPrivacy": "Gizlilik",
     "listHelp": "Yardım ve destek",
     "form": "Form alanı",
-    "formName": "Ad soyad"
+    "formName": "Ad soyad",
+    "controls": "Kontroller",
+    "select": "Seçim",
+    "selectLabel": "Kategori",
+    "selectOptionOne": "Saç kesimi",
+    "selectOptionTwo": "Renk",
+    "switch": "Bildirimler",
+    "switchDescription": "Randevu öncesi hatırlatmalar",
+    "segmented": "Görünüm",
+    "segmentDay": "Gün",
+    "segmentWeek": "Hafta",
+    "chips": "Çipler",
+    "chipHair": "Saç",
+    "chipNails": "Tırnak",
+    "badges": "Rozetler",
+    "badgeActive": "Aktif",
+    "badgePending": "Beklemede",
+    "pickers": "Seçiciler",
+    "timeLabel": "Başlangıç saati",
+    "dateLabel": "Tarih",
+    "moneyLabel": "Fiyat",
+    "confirmDemo": "Onay diyaloğunu göster"
   },
   "bookings": {
     "signIn": {

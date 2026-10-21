@@ -26,6 +26,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/features/auth/session-context';
 import { LOCALE_COOKIE_MAX_AGE, LOCALE_COOKIE_NAME } from '@/i18n/routing';
 import { ApiError, apiRequest } from '@/lib/api/client';
+import { errorMessage } from '@/lib/i18n/error-message';
 
 import { changePasswordWithLock } from './change-password';
 import { getInitials } from './get-initials';
@@ -127,7 +128,7 @@ function ProfileHeaderCard({ me }: { me: Me }) {
       toast.success(t('resent'));
     } catch (error) {
       if (error instanceof ApiError) {
-        toast.error(tErrors(error.code as Parameters<typeof tErrors>[0]));
+        toast.error(errorMessage(tErrors, error.code));
       } else {
         toast.error(tErrors('HTTP_ERROR'));
       }
@@ -207,7 +208,7 @@ function ProfileNameForm({ me }: { me: Me }) {
       toast.success(t('profileSection.saved'));
     } catch (error) {
       if (error instanceof ApiError) {
-        toast.error(tErrors(error.code as Parameters<typeof tErrors>[0]));
+        toast.error(errorMessage(tErrors, error.code));
       } else {
         toast.error(tErrors('HTTP_ERROR'));
       }
@@ -244,12 +245,15 @@ function LanguageForm({ me }: { me: Me }) {
   const router = useRouter();
   const { updateMe } = useSession();
 
+  const formLocale = isLocale(me.locale) ? me.locale : (locale as Locale);
+
   const {
     register,
     handleSubmit,
     formState: { isSubmitting },
   } = useForm<LanguageFormValues>({
-    defaultValues: { locale: isLocale(me.locale) ? me.locale : (locale as Locale) },
+    // Keep the select in sync when session `me.locale` updates after mount (#147).
+    values: { locale: formLocale },
   });
 
   async function onSubmit(data: LanguageFormValues) {
@@ -277,7 +281,7 @@ function LanguageForm({ me }: { me: Me }) {
       }
     } catch (error) {
       if (error instanceof ApiError) {
-        toast.error(tErrors(error.code as Parameters<typeof tErrors>[0]));
+        toast.error(errorMessage(tErrors, error.code));
       } else {
         toast.error(tErrors('HTTP_ERROR'));
       }
@@ -360,7 +364,7 @@ function ChangePasswordForm({ onSuccess }: { onSuccess: (me: Me) => void }) {
         return;
       }
       if (error instanceof ApiError) {
-        toast.error(tErrors(error.code as Parameters<typeof tErrors>[0]));
+        toast.error(errorMessage(tErrors, error.code));
       } else {
         toast.error(tErrors('HTTP_ERROR'));
       }

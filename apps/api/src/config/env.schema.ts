@@ -39,6 +39,16 @@ export const envSchema = z
     GOOGLE_CLIENT_IDS: z.string().optional(),
     /** Origin of the web app; base of the links in emails (`${APP_WEB_URL}/<locale>/...`). */
     APP_WEB_URL: z.url(),
+    /** S3-compatible object storage (MinIO in dev/CI, Lightsail in production) — ADR-0014. */
+    STORAGE_ENDPOINT: z.url(),
+    STORAGE_REGION: z.string().min(1),
+    STORAGE_BUCKET: z.string().min(1),
+    STORAGE_ACCESS_KEY_ID: z.string().min(1),
+    STORAGE_SECRET_ACCESS_KEY: z.string().min(1),
+    /** Public origin (+ optional bucket path) used to build logoUrl / coverUrl / photoUrl. */
+    STORAGE_PUBLIC_BASE_URL: z.url(),
+    /** MinIO needs path-style addressing; Lightsail typically does not. */
+    STORAGE_FORCE_PATH_STYLE: z.stringbool().default(true),
   })
   .refine((env) => (env.SMTP_USER === undefined) === (env.SMTP_PASSWORD === undefined), {
     message: 'SMTP_USER and SMTP_PASSWORD must be set together',
@@ -53,6 +63,8 @@ export const envSchema = z
     AUTH_COOKIE_SECURE: env.AUTH_COOKIE_SECURE ?? env.NODE_ENV !== 'development',
     // No trailing slash, so links can be built with a plain `${APP_WEB_URL}/...`.
     APP_WEB_URL: env.APP_WEB_URL.replace(/\/+$/, ''),
+    STORAGE_PUBLIC_BASE_URL: env.STORAGE_PUBLIC_BASE_URL.replace(/\/+$/, ''),
+    STORAGE_ENDPOINT: env.STORAGE_ENDPOINT.replace(/\/+$/, ''),
   }));
 
 export type Env = z.infer<typeof envSchema>;

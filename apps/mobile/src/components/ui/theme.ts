@@ -40,5 +40,16 @@ export const AVATAR_INITIALS_LINE_RATIO = 0.5;
  */
 export const TAB_LABEL_FONT_SIZE = 11;
 export const TAB_LABEL_LINE_HEIGHT = 14;
-/** Icon + label row before adding the bottom safe-area inset. */
-export const TAB_BAR_BASE_HEIGHT = 56;
+/** Default tab icon size used by expo-router's tab bar. */
+export const TAB_ICON_SIZE = 28;
+/**
+ * Icon + label row before adding the bottom safe-area inset.
+ * Must cover: border (1) + paddingTop/Bottom (spacing.xs each) + icon + label line (#148).
+ */
+export const TAB_BAR_BASE_HEIGHT = 64;
+
+/**
+ * Letter-spacing (dp) for section headers (e.g. account settings sections). Extracted from the
+ * inline magic number so both the shared `Section` component and any StyleSheet can stay in sync.
+ */
+export const SECTION_LETTER_SPACING = 0.6;

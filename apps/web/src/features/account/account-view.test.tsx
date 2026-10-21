@@ -46,11 +46,13 @@ const passwordUser: Me = {
   avatarUrl: null,
   locale: 'en',
   hasPassword: true,
+  isPlatformAdmin: false,
 };
 
 const googleUser: Me = {
   ...passwordUser,
   hasPassword: false,
+  isPlatformAdmin: false,
   emailVerified: false,
   displayName: 'Gog',
 };
@@ -156,11 +158,48 @@ describe('AccountView', () => {
     expect(screen.getByRole('option', { name: LOCALE_META.ru.label })).toBeTruthy();
   });
 
+  it('updates the language select when me.locale changes after mount', async () => {
+    mockSessionRestore(passwordUser);
+    // Profile PATCH returns a different locale so LanguageForm must follow `values` (#147).
+    vi.mocked(fetch).mockResolvedValueOnce(
+      makeJsonResponse({ ...passwordUser, displayName: 'Alice Updated', locale: 'me' }),
+    );
+
+    renderAccount();
+    const user = userEvent.setup();
+
+    await screen.findByRole('heading', { name: catalogs.en.account.pageTitle });
+
+    const select = screen.getByLabelText(catalogs.en.account.languageSection.label);
+    expect(select).toHaveValue('en');
+
+    const nameInput = screen.getByLabelText(catalogs.en.account.profileSection.displayNameLabel);
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Alice Updated');
+    await user.click(screen.getByRole('button', { name: catalogs.en.account.profileSection.save }));
+
+    await waitFor(() => {
+      expect(select).toHaveValue('me');
+    });
+  });
+
   it('maps INVALID_CREDENTIALS onto the current-password field', async () => {
     mockSessionRestore(passwordUser);
-    vi.mocked(fetch).mockResolvedValueOnce(
-      makeJsonResponse({ error: { code: 'INVALID_CREDENTIALS', message: 'bad' } }, 401),
-    );
+    // Wrong password is also 401; changePasswordWithLock refreshes once then retries (#147).
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'INVALID_CREDENTIALS', message: 'bad' } }, 401),
+      )
+      .mockResolvedValueOnce(
+        makeJsonResponse({
+          accessToken: 'refreshed',
+          accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+          user: passwordUser,
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeJsonResponse({ error: { code: 'INVALID_CREDENTIALS', message: 'bad' } }, 401),
+      );
 
     renderAccount();
     const user = userEvent.setup();
@@ -206,5 +245,98 @@ describe('AccountView', () => {
         screen.getByText(catalogs.en.account.unverified).parentElement as HTMLElement,
       ).getByRole('button', { name: catalogs.en.account.resend }),
     ).toBeInTheDocument();
+  });
+
+  it('shows the verified badge when emailVerified is true', async () => {
+    mockSessionRestore(passwordUser);
+
+    renderAccount();
+
+    await screen.findByRole('heading', { name: catalogs.en.account.pageTitle });
+
+    expect(screen.getByText(catalogs.en.account.verified)).toBeInTheDocument();
+    expect(screen.queryByText(catalogs.en.account.unverified)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: catalogs.en.account.resend }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('resends verification from the unverified badge', async () => {
+    mockSessionRestore(googleUser);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 202 }));
+
+    renderAccount();
+    const user = userEvent.setup();
+
+    await screen.findByRole('heading', { name: catalogs.en.account.pageTitle });
+
+    await user.click(screen.getByRole('button', { name: catalogs.en.account.resend }));
+
+    await waitFor(() => {
+      expect(toastSuccess).toHaveBeenCalledWith(catalogs.en.account.resent);
+    });
+    expect(
+      vi.mocked(fetch).mock.calls.some((c) => String(c[0]) === '/api/v1/auth/verify-email/resend'),
+    ).toBe(true);
+  });
+
+  it('signs out via /auth/logout and redirects home as anonymous', async () => {
+    mockSessionRestore(passwordUser);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    renderAccount();
+    const user = userEvent.setup();
+
+    await screen.findByRole('heading', { name: catalogs.en.account.pageTitle });
+
+    await user.click(screen.getByRole('button', { name: catalogs.en.account.signOut }));
+
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledWith('/en');
+    });
+    expect(vi.mocked(fetch).mock.calls.some((c) => String(c[0]) === '/api/v1/auth/logout')).toBe(
+      true,
+    );
+    // AccountView redirects anonymous users to sign-in after signOut clears the session.
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledWith('/en/sign-in?next=%2Fen%2Faccount');
+    });
+  });
+
+  it('shows a localized mismatch message and does not call the password API', async () => {
+    mockSessionRestore(passwordUser);
+
+    renderAccount();
+    const user = userEvent.setup();
+
+    await screen.findByRole('heading', { name: catalogs.en.account.pageTitle });
+
+    const callsBefore = vi.mocked(fetch).mock.calls.length;
+
+    await user.type(
+      screen.getByLabelText(catalogs.en.account.passwordSection.currentLabel),
+      'oldpassword',
+    );
+    await user.type(
+      screen.getByLabelText(catalogs.en.account.passwordSection.newLabel),
+      'newpassword1',
+    );
+    await user.type(
+      screen.getByLabelText(catalogs.en.account.passwordSection.confirmLabel),
+      'differentpass',
+    );
+    await user.click(
+      screen.getByRole('button', { name: catalogs.en.account.passwordSection.save }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        catalogs.en.account.passwordSection.mismatch,
+      );
+    });
+    expect(vi.mocked(fetch).mock.calls.length).toBe(callsBefore);
+    expect(vi.mocked(fetch).mock.calls.some((c) => String(c[0]) === '/api/v1/me/password')).toBe(
+      false,
+    );
   });
 });

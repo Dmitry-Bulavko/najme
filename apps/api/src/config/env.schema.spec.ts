@@ -8,13 +8,22 @@ const base = {
   SMTP_PORT: '1025',
   MAIL_FROM: 'Najme <no-reply@najme.test>',
   APP_WEB_URL: 'http://localhost:3001/',
+  STORAGE_ENDPOINT: 'http://localhost:9000',
+  STORAGE_REGION: 'us-east-1',
+  STORAGE_BUCKET: 'najme',
+  STORAGE_ACCESS_KEY_ID: 'minioadmin',
+  STORAGE_SECRET_ACCESS_KEY: 'minioadmin',
+  STORAGE_PUBLIC_BASE_URL: 'http://localhost:9000/najme/',
+  STORAGE_FORCE_PATH_STYLE: 'true',
 };
 
 describe('envSchema mail settings', () => {
-  it('parses the SMTP port and strips the trailing slash of APP_WEB_URL', () => {
+  it('parses the SMTP port and strips trailing slashes from URL bases', () => {
     const env = envSchema.parse(base);
     expect(env.SMTP_PORT).toBe(1025);
     expect(env.APP_WEB_URL).toBe('http://localhost:3001');
+    expect(env.STORAGE_PUBLIC_BASE_URL).toBe('http://localhost:9000/najme');
+    expect(env.STORAGE_FORCE_PATH_STYLE).toBe(true);
     expect(env.SMTP_USER).toBeUndefined();
   });
 
